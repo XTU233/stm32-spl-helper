@@ -1,0 +1,64 @@
+{
+  "_comment": "TIM 的输出比较 / 输入捕获 / 刹车死区三个结构体成员中文。这三块是 PWM 与编码器应用的核心参数。",
+  "symbols": {
+    "TIM_OCInitTypeDef": {
+      "briefZh": "定时器输出比较（PWM）参数结构体，被 TIM_OC1Init ~ TIM_OC4Init 使用。决定输出什么波形、占空比与极性。",
+      "usageZh": "做 PWM 输出的标准流程：① 先 TIM_TimeBaseInit 设好 Prescaler/Period（决定 PWM 频率）；② 填本结构体；③ TIM_OCxInit 写入通道；④ 若要互补输出，还要 TIM_CtrlPWMOutputs(TIMx, ENABLE) 打开主输出；⑤ TIM_Cmd 启动。PWM 频率 = 定时器时钟 / ((Prescaler+1) × (Period+1))。",
+      "notesZh": [
+        "最常踩的坑：配完 TIM_OCxInit 却忘了 TIM_CtrlPWMOutputs(TIMx, ENABLE)，高级定时器（TIM1）的引脚不会输出任何波形。",
+        "TIM_Pulse 决定占空比：占空比 = TIM_Pulse / (TIM_Period + 1)。改了 Period 要同步重算 Pulse，否则占空比会变。",
+        "TIM_OCMode_PWM1 与 PWM2 的差别是有效电平相反：PWM1 是 CNT < CCR 时输出有效电平，PWM2 反过来。",
+        "只有 TIM1（高级定时器）才有互补输出（OutputNState / OCNPolarity）。TIM2~TIM4 上设这些字段无效。",
+        "C8T6 的 TIM1 通道可在 PA8~PA11、PB13~PB15 等引脚，部分需要重映射，接线前用引脚速查表确认。"
+      ],
+      "membersZh": {
+        "TIM_OCMode": "输出比较模式。做 PWM 用 TIM_OCMode_PWM1（CNT < CCR 时输出有效电平）或 PWM2；还有 TIM_OCMode_Timing（只产生中断不输出）、Toggle（计满翻转）、Active/Inactive（强制电平）。",
+        "TIM_OutputState": "主输出通道使能。TIM_OutputState_Enable 打开该通道输出，Disable 关闭。关闭后引脚回到普通 GPIO 状态。",
+        "TIM_OutputNState": "互补输出通道使能（仅 TIM1 有效）。控制 CHxN 那根脚是否输出互补波形，配合死区时间用于驱动半桥/全桥。TIM2~TIM4 无互补输出，设了也无效。",
+        "TIM_Pulse": "比较值（写入 CCRx），决定占空比：占空比 = Pulse / (Period + 1)。取值 0~65535，0 表示始终无效电平、等于 Period+1 表示始终有效电平。",
+        "TIM_OCPolarity": "主输出极性。TIM_OCPolarity_High 表示有效电平为高，Low 表示反相（有效电平为低）。驱动低电平有效的 LED 或栅极驱动器时用 Low。",
+        "TIM_OCNPolarity": "互补输出极性（仅 TIM1）。作用同 OCPolarity，但作用于 CHxN 引脚。通常与主输出相反，保证上下桥不会同时导通。",
+        "TIM_OCIdleState": "空闲状态（刹车或停止时）主输出的电平。TIM_OCIdleState_Set 让引脚在刹车时保持高电平，Reset 保持低。默认要设成**安全电平**，否则刹车瞬间可能烧桥。",
+        "TIM_OCNIdleState": "空闲状态（刹车或停止时）互补输出的电平（仅 TIM1）。与 OCIdleState 相反地设置，保证刹车时上下桥都关断。"
+      }
+    },
+
+    "TIM_ICInitTypeDef": {
+      "briefZh": "定时器输入捕获参数结构体，被 TIM_ICInit 使用。用于测脉宽、测频率、读编码器。",
+      "usageZh": "输入捕获的标准流程：① TIM_TimeBaseInit 设好时基（决定捕获的时间分辨率）；② 填本结构体并 TIM_ICInit；③ 若要捕获溢出次数，开 TIM_IT_Update；④ TIM_ITConfig(TIMx, TIM_IT_CCx, ENABLE) 开捕获中断；⑤ 中断里用 TIM_GetCapture1/2/3/4 读计数值，两次差值 × 计数周期 = 时间间隔。",
+      "notesZh": [
+        "捕获中断里必须先清标志（TIM_ClearITPendingBit），否则会反复进中断。",
+        "测长间隔信号时定时器会溢出多次，要同时统计溢出次数再换算，否则算出来的脉宽是错的。",
+        "输入捕获滤波（TIM_ICFilter）能滤掉毛刺，但会增加响应延迟，且要求信号变化间隔大于滤波采样周期。",
+        "C8T6 的 TIM3/TIM4 有硬件编码器接口，配合 TIM_EncoderInterfaceConfig 可直接读正交编码器，不用自己写捕获逻辑。"
+      ],
+      "membersZh": {
+        "TIM_Channel": "要配置的捕获通道，取 TIM_Channel_1 ~ TIM_Channel_4，对应引脚上的 CH1~CH4。一个定时器 4 个通道各自独立，可同时捕获 4 路信号。",
+        "TIM_ICPolarity": "捕获边沿。TIM_ICPolarity_Rising 上升沿捕获、Falling 下降沿、Rising_Falling 双边沿（双边沿常用于编码器或测占空比）。",
+        "TIM_ICSelection": "输入选择。TIM_ICSelection_DirectTI 表示通道引脚直连该捕获单元（最常用）；IndirectTI 表示交叉到相邻通道，用于「一个引脚同时测频率和占空比」这类 PWM 输入模式。",
+        "TIM_ICPrescaler": "捕获分频。每 N 个有效边沿才捕获一次，取 TIM_ICPSC_DIV1（每次）/2/4/8。信号很密时用它降采样，避免中断过于频繁。",
+        "TIM_ICFilter": "输入滤波系数，0~15。数值越大滤波越强、抗毛刺越好，但延迟也越大。信号干净时用 0 即可；有抖动时取 4~8。"
+      }
+    },
+
+    "TIM_BDTRInitTypeDef": {
+      "briefZh": "高级定时器的刹车与死区参数结构体（仅 TIM1 有效），被 TIM_BDTRConfig 使用。用于电机控制里的半桥/全桥保护。",
+      "usageZh": "驱动 H 桥或三相逆变器时的必备配置，顺序：① 按上下管的开关时间算死区（TIM_DeadTime）；② 配好刹车输入（TIM_Break）与极性，刹车引脚一般是 TIM1_BKIN；③ TIM_BDTRConfig；④ 最后一定要 TIM_CtrlPWMOutputs(TIMx, ENABLE) 才会真正输出。",
+      "notesZh": [
+        "死区时间按 DTG[7:0] 编码，不是线性纳秒值。72MHz 下常见档位约 14ns 起步，具体按参考手册的 DTG 表换算。",
+        "刹车（Break）是硬件保护：BKIN 引脚一旦有效，PWM 输出立即被强制到空闲电平，不经过软件。调试电机时务必配好，否则过流瞬间烧管。",
+        "TIM_AutomaticOutput 要在确认不会误触发刹车后再开，否则上电瞬间可能因 BKIN 悬空而一直不输出。",
+        "没用 TIM1 的互补输出时不必调用 BDTRConfig；但一旦用了互补输出，死区必须设，0 死区会导致上下管直通。"
+      ],
+      "membersZh": {
+        "TIM_OSSRState": "运行模式下的关闭状态选择。TIM_OSSRState_Enable 时，通道关闭后引脚由定时器接管保持无效电平；Disable 时引脚释放。驱动功率管时应 Enable，避免关断瞬间引脚浮空。",
+        "TIM_OSSIState": "空闲模式下的关闭状态选择。TIM_OSSIState_Enable 表示计数器停止时输出保持无效电平。与 OSSR 配合确保任何停止场景下管子都是关断的。",
+        "TIM_LOCKLevel": "锁定级别，防止寄存器被意外改写。TIM_LOCKLevel_OFF 不锁；_1 锁 BDTR；_2 锁 BDTR+CCR；_3 锁 BDTR+CCR+CCMR。锁定后只能靠复位解除，调试阶段建议先用 OFF。",
+        "TIM_DeadTime": "死区时间，取值 0~0xFF。指上下管都关断的那段等待时间，防止直通短路。按你的栅极驱动器与 MOS 开关时间设定，通常几百纳秒。",
+        "TIM_Break": "刹车输入使能。TIM_Break_Enable 打开 BKIN 引脚保护，一旦该引脚有效立即强制输出到空闲电平。电机应用必须开。",
+        "TIM_BreakPolarity": "刹车输入极性。TIM_BreakPolarity_High 表示 BKIN 高电平触发，Low 表示低电平触发。取决于你的过流检测电路输出是高有效还是低有效。",
+        "TIM_AutomaticOutput": "自动输出使能。TIM_AutomaticOutput_Enable 表示刹车条件消失后自动恢复输出；Disable 则需要软件清除标志后才恢复。安全要求高的场合用 Disable，让程序显式确认。"
+      }
+    }
+  }
+}

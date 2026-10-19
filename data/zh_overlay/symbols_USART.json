@@ -1,0 +1,20 @@
+{
+  "_comment": "USART 同步时钟结构体成员中文。USART_ClockInit 只影响同步模式的 SCLK 输出，异步串口不用调。",
+  "symbols": {
+    "USART_ClockInitTypeDef": {
+      "briefZh": "USART 同步模式时钟结构体，USART_ClockInit 用它配置同步模式下 SCLK 输出的使能、极性、相位与末位输出。",
+      "usageZh": "只在同步（USART_CR2 的 CLKEN 置位）时才需要：先 USART_Init 配好波特率等，再调 USART_ClockInit，最后 USART_Cmd(ENABLE)。最常用的是 USART1，SCLK 在 PA8，仅主机模式（USART_CK 只能主出），且只能在 1 位数据宽度、无奇偶校验的配置下使用。异步串口（最常见的用法）不需要调用，也不会用到本结构体。",
+      "notesZh": [
+        "同步模式要求 USART_CR1 中 WordLength=8 位且 Parity=None，否则硬件不允许进入同步模式。",
+        "SCLK 引脚（USART1 是 PA8、USART2 是 PA4、USART3 是 PB12）必须配成 GPIO_Mode_AF_PP，配成普通输出会没有时钟。",
+        "SCLK 频率等于波特率，不是 APB 时钟；需要更高时钟的 SPI 器件就用 SPI 而不要用 USART 同步模式。"
+      ],
+      "membersZh": {
+        "USART_Clock": "同步时钟输出开关：USART_Clock_Enable 使能 USART_CK 引脚输出同步时钟（CR2 的 CLKEN 置位），USART_Clock_Disable 关闭，退化为纯异步通信。这个字段是结构体里唯一决定“是否输出时钟”的开关，其余三项都只在 Enable 时有意义。",
+        "USART_CPOL": "时钟极性：USART_CPOL_Low 表示空闲时 SCLK 为低电平，USART_CPOL_High 表示空闲时为高电平。要匹配从机的 SPI 极性设置，接反会导致从机在整个字节的错位位置上采样。",
+        "USART_CPHA": "时钟相位：USART_CPHA_1Edge 在 SCLK 的第一个跳变沿采样数据，USART_CPHA_2Edge 在第二个跳变沿采样。与 CPOL 组合成 SPI 模式 0~3，必须与从机一致。注意 STM32F103 的 USART 同步模式有已知限制，某些 CPOL/CPHA 组合下采样点与 SPI 主机不对齐，接 SPI 从机时优先用硬件 SPI。",
+        "USART_LastBit": "最后一个数据位的时钟脉冲是否从 SCLK 输出：USART_LastBit_Enable 输出（LBCL 置位），USART_LastBit_Disable 不输出。多数从机（如 SPI 移位寄存器）需要最后一位的时钟来锁存，通常 Enable；只输出 8 个时钟给 7 位器件时用 Disable。"
+      }
+    }
+  }
+}

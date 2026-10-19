@@ -1,0 +1,106 @@
+{
+  "_comment": "FSMC 结构体成员中文。本型号（LQFP48）未引出 FSMC 引脚，仅供查阅。",
+  "symbols": {
+    "FSMC_NORSRAMInitTypeDef": {
+      "briefZh": "FSMC 的 NOR/SRAM/PSRAM 存储块配置结构体，FSMC_NORSRAMInit 用它设置 Bank、存储类型、数据宽度、突发/等待信号以及读写时序指针；本型号未引出 FSMC 引脚，仅供查阅。",
+      "usageZh": "顺序：RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC) → 配 GPIO 为复用推挽 → 必要时 GPIO_PinRemapConfig(GPIO_Remap_FSMC_NADV) → 填两块结构体（本结构体 + FSMC_NORSRAMTimingInitTypeDef）→ FSMC_NORSRAMInit → FSMC_NORSRAMCmd(bank, ENABLE)。之后可直接按地址访问：Bank1 四个子块分别映射到 0x60000000 / 0x64000000 / 0x68000000 / 0x6C000000，每个子块 64MB。因本型号未引出引脚，仅供查阅。",
+      "notesZh": [
+        "STM32F103C8T6（LQFP48）没有引出 FSMC 引脚（FSMC 的 D0~D15、A0~A25、/NE1~/NE4 全在 PD/PE/PF/PG 上，本封装没有这些端口），本结构体仅供查阅。",
+        "FSMC_NORSRAMCmd 的第二个参数就是 ENABLE/DISABLE，写法是 FSMC_NORSRAMCmd(FSMC_Bank1_NORSRAMx, ENABLE)，只初始化不使能，访问外部地址会直接进 HardFault。",
+        "要读写用不同时序必须 FSMC_ExtendedMode_Enable 并同时提供 FSMC_WriteTimingStruct，否则写时序被忽略、写操作沿用读时序。",
+        "FSMC_NORSRAMStructInit 默认 Bank=FSMC_Bank1_NORSRAM1、数据宽度 16b，忘了改会配错块、地址对不上。",
+        "FSMC_NORSRAMTimingInitTypeDef 如果定义成局部变量，FSMC_NORSRAMInit 调用结束后它虽然被读完，但后续若再调用 FSMC_NORSRAMInit 前必须保证指针仍有效，所以实际项目里通常用静态或全局的一份时序结构体。",
+        "AHB 时钟（HCLK）改了以后所有 FSMC 时序参数要按新周期重算，否则频率一变读写就不稳。"
+      ],
+      "membersZh": {
+        "FSMC_Bank": "要配置的存储块，NOR/SRAM 侧取 FSMC_Bank1_NORSRAM1 ~ FSMC_Bank1_NORSRAM4（四个子块的基地址依次是 0x60000000 / 0x64000000 / 0x68000000 / 0x6C000000，每块 64MB）。可位或同时配多块，但此时它们共用同一个 FSMC_ReadWriteTimingStruct。只能填 Bank1 系列，填成 FSMC_Bank2_NAND 或 FSMC_Bank4_PCCARD 会配错寄存器。",
+        "FSMC_DataAddressMux": "数据/地址线是否复用：FSMC_DataAddressMux_Disable 表示地址线和数据线分开（绝大多数 SRAM/NOR 用这个），FSMC_DataAddressMux_Enable 表示复用总线，需要 NAADV 信号锁存地址（部分 Intel 式 NOR 或 LCD 屏用）。填错会导致读到的地址全错。",
+        "FSMC_MemoryType": "接的存储器类型：FSMC_MemoryType_SRAM（异步 SRAM，最常用，配 AccessMode_A）、FSMC_MemoryType_PSRAM（同步突发 SRAM，需要 CLK 和突发模式）、FSMC_MemoryType_NOR（同步/异步 NOR Flash，使能突发读时用到 CLKDivision 和 DataLatency）。它决定 FSMC 是否会生成时钟、等待信号等附加行为。",
+        "FSMC_MemoryDataWidth": "外部存储器的数据总线宽度：FSMC_MemoryDataWidth_8b 或 FSMC_MemoryDataWidth_16b，必须与器件手册一致。16 位时要占 D0~D15，且 MCU 的 HADDR1 接器件 A0（地址会左移一位）；接 8 位器件却填 16b，读每个字节地址会跳 2，数据全错。",
+        "FSMC_BurstAccessMode": "同步突发访问：FSMC_BurstAccessMode_Enable 用于同步 PSRAM/NOR 的突发读（需要 FSMC_CLK 时钟线与器件 CLK 相连，并用 FSMC_CLKDivision、FSMC_DataLatency 配时序），FSMC_BurstAccessMode_Disable 是异步访问（SRAM 的标准选择）。异步 SRAM 打开它会导致时序错乱。",
+        "FSMC_AsynchronousWait": "异步等待使能：FSMC_AsynchronousWait_Enable 允许在异步访问期间也使用 NWAIT 等待信号，让慢速异步器件拉长周期；FSMC_AsynchronousWait_Disable 表示异步模式下不理会 NWAIT。只在器件确实有 NWAIT 且需要延长才打开。",
+        "FSMC_WaitSignalPolarity": "NWAIT 等待信号的有效电平：FSMC_WaitSignalPolarity_Low 表示低电平有效（多数 SRAM/NOR），FSMC_WaitSignalPolarity_High 表示高电平有效。必须与器件手册的 WAIT 极性一致，接反会让 FSMC 一直等或从不等，表现为读写超时或数据错位。",
+        "FSMC_WrapMode": "突发回卷模式：FSMC_WrapMode_Enable 让同步突发读取在达到突发长度后回卷到起始地址（用于 Cache 行填充），FSMC_WrapMode_Disable 则不回卷。只对同步突发（BurstAccessMode_Enable）有意义，异步 SRAM 填 Disable。",
+        "FSMC_WaitSignalActive": "NWAIT 信号在什么阶段被采样：FSMC_WaitSignalActive_BeforeWaitState 在等待状态之前插入等待，FSMC_WaitSignalActive_DuringWaitState 在等待状态期间插入。这个取值要匹配器件手册中 WAIT 相对读写周期的位置，选错等于时序整体偏一个周期。",
+        "FSMC_WriteOperation": "是否允许写：FSMC_WriteOperation_Enable 打开写使能，FSMC_WriteOperation_Disable 禁止写（只读 ROM/部分 NOR 这样配，避免误写）。对 RAM 必须 Enable；对只读器件 Disable，把它当 RAM 一样直接赋值会写坏内容。",
+        "FSMC_WaitSignal": "是否使用 NWAIT 硬件等待：FSMC_WaitSignal_Enable 时 FSMC 会等 NWAIT 信号满足条件才结束周期（适合慢速或不定长器件），FSMC_WaitSignal_Disable 则完全按时序参数走。不用 NWAIT 却打开，会一直等而导致总线卡死。",
+        "FSMC_ExtendedMode": "扩展模式：FSMC_ExtendedMode_Enable 为读写分别使用 FSMC_ReadWriteTimingStruct 和 FSMC_WriteTimingStruct 两套时序；FSMC_ExtendedMode_Disable 时读写共用 FSMC_ReadWriteTimingStruct，FSMC_WriteTimingStruct 被忽略。绝大多数 SRAM 读写时序不同，实际都要 Enable。",
+        "FSMC_WriteBurst": "写操作是否用突发模式，FSMC_WriteBurst_Enable / FSMC_WriteBurst_Disable。NOR Flash 的写是命令序列，通常 Disable；同步 PSRAM 可以 Enable。异步 SRAM 上没有意义，保持 Disable。",
+        "FSMC_ReadWriteTimingStruct": "指向读（扩展模式下还兼作读）时序结构体的指针，类型是 FSMC_NORSRAMTimingInitTypeDef *。必须指向一个在 FSMC_NORSRAMInit 调用期间仍然有效的变量（通常是局部或全局的独立结构体），不能填 NULL；多个 Bank 共用同一指针时它们时序完全相同。",
+        "FSMC_WriteTimingStruct": "指向写时序结构体的指针，只有 FSMC_ExtendedMode_Enable 时才被使用；关掉扩展模式时这个指针被忽略，可以指向与读时序相同的变量或保持 NULL。写时序往往比读时序更需要裕量（尤其 NOR 的编程写入），别直接复用读时序凑合。"
+      }
+    },
+    "FSMC_NORSRAMTimingInitTypeDef": {
+      "briefZh": "FSMC 的 NOR/SRAM Bank 时序结构体，FSMC_NORSRAMInit 通过指针引用它，逐步设置地址建立/保持、数据建立、总线周转与访问模式；本型号未引出 FSMC 引脚，仅供查阅。",
+      "usageZh": "所有时间字段取值范围都是 0~15（4 位，单位 HCLK 周期），且写的是「周期数 − 1」。以 IS62WV51216（55ns）在 HCLK=72MHz（13.9ns）下为例：地址建立 0、数据建立 5（6 个周期≈83ns）即可。填完把结构体地址挂到 FSMC_NORSRAMInitTypeDef 的 FSMC_ReadWriteTimingStruct / FSMC_WriteTimingStruct 上。因本型号未引出引脚，仅供查阅。",
+      "notesZh": [
+        "STM32F103C8T6（LQFP48）没有引出 FSMC 引脚（FSMC 的 D0~D15、A0~A25、/NE1~/NE4 全在 PD/PE/PF/PG 上，本封装没有这些端口），本结构体仅供查阅。",
+        "时序配得太小是最常见的故障：现象是「偶发读错、写进去读回来不对」，不是每次都错，很难查。",
+        "这几个字段只有 4 位，写入大于 15 的值会被静默截断，算出来的时序会完全不是你想要的样子。",
+        "FSMC_CLKDivision、FSMC_DataLatency 只对同步突发（BurstAccessMode_Enable）有意义，异步 SRAM 填 0，但也要赋 0 而不是不赋值。"
+      ],
+      "membersZh": {
+        "FSMC_AddressSetupTime": "地址建立时间（ADDSET），0~15，写的是「周期数 − 1」，即 FSMC 发出地址后到发出 /WE 或 /OE 之间的延时。器件手册的 tAVAQ / tAS 除以 HCLK 周期再减 1。模式 A 下一次异步访问的总时长约等于 (ADDSET + 1) + (DATAST + 1) 个 HCLK，按这个总数对照器件最慢访问时间留余量。",
+        "FSMC_AddressHoldTime": "地址保持时间（ADDHLD），0~15，只在访问模式 B/C/D 中有效；模式 A（异步 SRAM 常用）下这个值被硬件忽略，保持 0 即可。用于需要地址在读写信号之后仍保持一段时间的器件（如部分 SRAM、复用总线 NOR）。",
+        "FSMC_DataSetupTime": "数据建立时间（DATAST），0~15，读写信号有效期间持续的时间，决定器件最慢的访问时间能不能满足。写入过小表现为读出数据偶发错位，典型取值 2~15。器件手册的 tAVQV/tOE 换算时要减去地址建立占用的周期。",
+        "FSMC_BusTurnAroundDuration": "总线周转时间（BUSTURN），0~15，只在读写方向切换时插入的空闲周期，用于防止总线冲突或给双向器件留出驱动关闭时间。多数 SRAM 填 0；有明确 tDF 要求的器件按手册加 1~2。",
+        "FSMC_CLKDivision": "FSMC_CLK 输出时钟的分频系数，0~15（取值即分频比，0 会按 1 处理），只在同步突发模式（FSMC_BurstAccessMode_Enable）下有效，异步 SRAM 填 0。FSMC_CLK = HCLK / (CLKDivision + 1)，要接同步器件时按器件时钟上限选值。",
+        "FSMC_DataLatency": "同步突发读的数据延迟（CAS latency），0~15 个 FSMC 时钟周期，只在同步突发读时有意义，异步 SRAM 填 0。它定义从发出读命令到数据有效之间插入的 CLK 周期数，要按器件手册的 tAA / tLZ 与所选 FSMC_CLK 频率共同确定。",
+        "FSMC_AccessMode": "访问模式，取 FSMC_AccessMode_A / B / C / D，决定上面几个时间参数在时序中的插入位置：模式 A 是 SRAM 最常用的异步读写模式，模式 B 用于复用总线 NOR，模式 C/D 用于同步突发/复用总线场景。选错模式编译器不报错，但地址建立、保持会被放到错误的位置，现象是数据整体偏移。"
+      }
+    },
+    "FSMC_NANDInitTypeDef": {
+      "briefZh": "FSMC 的 NAND Flash 存储块配置结构体，FSMC_NANDInit 用它设置 Bank、R/B 握手、数据宽度、ECC 以及公共区/属性区时序指针；本型号未引出 FSMC 引脚，仅供查阅。",
+      "usageZh": "NAND 用 Bank2（0x70000000）或 Bank3（0x80000000），FSMC 只负责 /CE、/WE、/RE 和 CLE/ALE 时序，读 ID、读页、编程、擦除这些命令序列必须自己写。地址分布：公共区偏移 0x00、属性区偏移 0x08、数据区偏移 0x10。NAND 需要先把 FSMC_NORSRAMInit 之外的另一套时钟/GPIO 配好（用 RCC_AHBPeriph_FSMC）。因本型号未引出引脚，仅供查阅。",
+      "notesZh": [
+        "STM32F103C8T6（LQFP48）没有引出 FSMC 引脚（FSMC 的 D0~D15、A0~A25、/NE1~/NE4 全在 PD/PE/PF/PG 上，本封装没有这些端口），本结构体仅供查阅。",
+        "FSMC_TCLRSetupTime / FSMC_TARSetupTime 是 CLE/ALE 相对 /CE 的建立时间，与公共区时序结构里的数值是两个维度，两边都要按手册填。",
+        "FSMC_ECCPageSize 必须与实际页大小一致，否则 ECC 永远校验不过，表现为「查出 ECC 错误却找不到坏块」。",
+        "开启 ECC 后要在硬件清掉 ECC 结果（一次完整页读写结束）后立刻 FSMC_GetECC 取走，取晚了会被下一次访问覆盖。"
+      ],
+      "membersZh": {
+        "FSMC_Bank": "NAND 存储块，取 FSMC_Bank2_NAND（基地址 0x70000000）或 FSMC_Bank3_NAND（0x80000000），每个块 256MB。填成 FSMC_Bank1_NORSRAMx 时开了 USE_FULL_ASSERT 会在 assert_failed 停住，没开则静默写入错误的寄存器。",
+        "FSMC_Waitfeature": "R/B 就绪/忙信号握手：FSMC_Waitfeature_Enable 表示 FSMC 会自动等待 NAND 的 R/B 引脚变为就绪再结束周期，FSMC_Waitfeature_Disable 表示不等，需要软件轮询状态寄存器。用 Enable 时 R/B 必须接到 FSMC 的 NWAIT/INT 引脚，接错会让程序一直卡在写操作里。",
+        "FSMC_MemoryDataWidth": "NAND 数据总线宽度：FSMC_MemoryDataWidth_8b 只用 D0~D7（多数 NAND 是 8 位），FSMC_MemoryDataWidth_16b 用 D0~D15。填 16b 接 8 位器件或反之，读写的高低字节会错位、读 ID 直接不对。",
+        "FSMC_ECC": "是否启用 FSMC 的硬件 ECC 计算：FSMC_ECC_Enable 在每次页读写时自动累加 ECC，事后用 FSMC_GetECC 取出；FSMC_ECC_Disable 则不做校验。NAND 必须开启 ECC 才能发现位翻转；SPL 不提供坏块管理和 FTL，这些要自己实现。",
+        "FSMC_ECCPageSize": "ECC 计算的页大小，取 FSMC_ECCPageSize_256Bytes / 512Bytes / 1024Bytes / 2048Bytes / 4096Bytes / 8192Bytes，必须与 NAND 的实际页大小一致（K9F1G08 是 2048，老片子 512）。设错时 ECC 结果永远是错的，表象是“ECC 校验一直失败”。",
+        "FSMC_TCLRSetupTime": "CLE（命令锁存）相对于 /CE 的建立时间，单位 HCLK 周期，取值 0~7。NAND 的命令字靠 CLE 高电平区分，这个值太小会让第一条命令被当成数据。器件手册里的 tCLS 除以 HCLK 周期得到。",
+        "FSMC_TARSetupTime": "ALE（地址锁存）相对于 /CE 的建立时间，单位 HCLK 周期，取值 0~7。与 TCLR 同理，对应手册中的 tALS；设置偏小会出现“地址写进去了但被当成数据”的错位现象。",
+        "FSMC_CommonSpaceTimingStruct": "指向公共区（命令/地址/数据通吃的那段地址空间，偏移 0x00）的时序结构体指针，类型是 FSMC_NAND_PCCARDTimingInitTypeDef *。必须指向初始化期间有效的变量，不能填 NULL。",
+        "FSMC_AttributeSpaceTimingStruct": "指向属性区（偏移 0x08，用于 ID/状态等特殊访问）的时序结构体指针，类型同上。可以指向与公共区相同的变量以简化配置；有特殊时序要求的器件才需要单独一份。"
+      }
+    },
+    "FSMC_NAND_PCCARDTimingInitTypeDef": {
+      "briefZh": "FSMC 的 NAND 与 PC Card 共用的时序结构体，FSMC_NANDInit / FSMC_PCCARDInit 通过指针引用它，设置建立、等待、保持与高阻时间；本型号未引出 FSMC 引脚，仅供查阅。",
+      "usageZh": "NAND 与 PC Card 用同一套四成员时序：FSMC_SetupTime 对应建立时间（NAND 中兼作 CLE/ALE 之外的数据建立）、FSMC_WaitSetupTime 对应 /WE、/RE 脉宽、FSMC_HoldSetupTime 对应保持时间、FSMC_HiZSetupTime 对应总线高阻时间。注意这几个字段在 NANDInit 与 PCCARDInit 下解释出来的具体信号不同，务必对着函数说明与器件手册逐项核对。因本型号未引出引脚，仅供查阅。",
+      "notesZh": [
+        "STM32F103C8T6（LQFP48）没有引出 FSMC 引脚（FSMC 的 D0~D15、A0~A25、/NE1~/NE4 全在 PD/PE/PF/PG 上，本封装没有这些端口），本结构体仅供查阅。",
+        "四个字段的单位都是 HCLK 周期且写「周期数 − 1」，写 0 表示 1 个周期。",
+        "同一份时序结构体被 NAND 和 PC Card 两个 Init 共用，但含义映射不同；从 NAND 迁到 PCCard 代码时不要原样照搬数值。"
+      ],
+      "membersZh": {
+        "FSMC_SetupTime": "建立时间，NAND 下对应数据建立（tDS），PC Card 下对应地址/数据的建立（tSU），单位 HCLK 周期（0~255）。按手册的 tDS/tSU 除以 HCLK 周期并减 1 填写，过小会造成命令或数据在信号稳定前被采样。",
+        "FSMC_WaitSetupTime": "等待（脉冲）时间，NAND 下对应 /WE、/RE 的有效宽度（tWP / tRP），PC Card 下对应读写选通宽度，单位 HCLK 周期（0~255）。这是最容易配小的参数，NAND 写超时会表现为写进去读出全 0xFF。",
+        "FSMC_HoldSetupTime": "保持时间，NAND 下对应数据在 /WE 上升沿后的保持（tDH），PC Card 下对应 tH，单位 HCLK 周期（0~255）。偏小会导致写入的最后一个字节丢失或随机错。",
+        "FSMC_HiZSetupTime": "总线高阻时间，NAND 下主要对应读写之间的总线空档（tRR / tCLR 相关），PC Card 下对应器件释放总线的等待时间，单位 HCLK 周期（0~255）。用于防止 MCU 与器件同时驱动总线，双向总线器件必有要求，填 0 在部分器件上会引起总线冲突。"
+      }
+    },
+    "FSMC_PCCARDInitTypeDef": {
+      "briefZh": "FSMC 的 PC Card（PCMCIA / CompactFlash）存储块配置结构体，FSMC_PCCARDInit 用它设置 R/B 握手、CLE/ALE 建立时间与公共区/属性区/IO 区三套时序；本型号未引出 FSMC 引脚，仅供查阅。",
+      "usageZh": "PC Card 固定占用 Bank4（基地址 0x90000000，64MB）且固定 16 位数据宽度，所以结构体里没有 FSMC_Bank、也没有 FSMC_MemoryDataWidth：公共区偏移 0x00、属性区 0x08、IO 区 0x10。三套时序可以指向同一个变量，但手册里 tSU/tH 不同的设备（特别是访问 CIS 信息时）要分开填。因本型号未引出引脚，仅供查阅。",
+      "notesZh": [
+        "STM32F103C8T6（LQFP48）没有引出 FSMC 引脚（FSMC 的 D0~D15、A0~A25、/NE1~/NE4 全在 PD/PE/PF/PG 上，本封装没有这些端口），本结构体仅供查阅。",
+        "PC Card 只有在驱动 PCMCIA 卡或 CF 卡时才用；C8T6 上没有任何实际意义。",
+        "IO 区与属性区的访问时序往往不同，全部指向同一份时序是读不出 CIS 信息的常见原因。"
+      ],
+      "membersZh": {
+        "FSMC_Waitfeature": "R/B 就绪/忙握手开关（FSMC_Waitfeature_Enable / Disable），与 NAND 的用法相同：Enable 时 FSMC 自动等待卡的就绪信号，Disable 时软件自己轮询。PC Card 的 READY/WAIT 引脚必须接到 FSMC 的对应信号上，否则 Enable 会让总线一直卡住。",
+        "FSMC_TCLRSetupTime": "CLE 相对 /CE 的建立时间，单位 HCLK 周期，取值 0~7。PC Card 上用 CLE 作为命令/地址锁存信号，这个值太小会导致第一条命令被当成数据。",
+        "FSMC_TARSetupTime": "ALE 相对 /CE 的建立时间，单位 HCLK 周期，取值 0~7。对应手册的 tALS，与 TCLR 一起构成锁存信号的建立窗口。",
+        "FSMC_CommonSpaceTimingStruct": "指向公共区（偏移 0x00，配置寄存器与通用访问）时序结构体的指针，类型为 FSMC_NAND_PCCARDTimingInitTypeDef *，必须指向有效变量。",
+        "FSMC_AttributeSpaceTimingStruct": "指向属性区（偏移 0x08，用于读取 CIS 等属性信息）时序结构体的指针。属性区通常比公共区慢，必要时单独定义一份。",
+        "FSMC_IOSpaceTimingStruct": "指向 IO 区（偏移 0x10，用于卡上的 IO 设备访问）时序结构体的指针。只有真正使用 IO 空间（如 CF 卡 IO 模式）才需要单独调时序。"
+      }
+    }
+  }
+}

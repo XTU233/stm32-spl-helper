@@ -1,0 +1,1372 @@
+{
+  "schemaVersion": 1,
+  "peripheral": "FSMC",
+  "functions": [
+    {
+      "id": "FSMC_NORSRAMDeInit",
+      "name": "FSMC_NORSRAMDeInit",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec1",
+      "prototype": "void FSMC_NORSRAMDeInit(uint32_t FSMC_Bank);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_Bank",
+          "type": "uint32_t",
+          "descEn": "specifies the FSMC Bank to be used This parameter can be one of the following values:",
+          "descZh": "要复位的 NOR/SRAM 存储块，取值 FSMC_Bank1_NORSRAM1、FSMC_Bank1_NORSRAM2、FSMC_Bank1_NORSRAM3、FSMC_Bank1_NORSRAM4。注意这里**不是** FSMC_Bank1（FSMC_Bank1 是 NAND 用的 Bank2 的别名，容易看错）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Deinitializes the FSMC NOR/SRAM Banks registers to their default reset values.",
+      "briefZh": "把指定 NOR/SRAM 存储块的 FSMC 配置寄存器恢复为复位默认值（相当于对该 Bank 做一次外设复位）。",
+      "usageZh": "在重新配置某个 Bank 之前先清干净，避免上一次留下的位影响新配置。用 FSMC_NORSRAMInit 改配置其实会整体重写 BCR/BTR，所以正常情况下不必先 DeInit；只有从「NOR/SRAM 模式」切换成「NAND/PCCARD 模式」（或反过来）时才需要先 DeInit 再 Init，因为两套 API 写的是同一批寄存器里的不同位域，不清会留下脏位。\n\n**型号提醒**：STM32F103C8T6（LQFP48）没有引出任何 FSMC 引脚，FSMC 只在 100 脚以上的型号（如 STM32F103ZET6、VET6）上可用。在 C8T6 上调用本函数只能改寄存器、看不到任何外部总线效果，实际工程里不要用 FSMC。",
+      "prerequisites": [
+        "已使能 FSMC 时钟（RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE)）",
+        "已把相关 GPIO 配成复用推挽输出并调用 GPIO_PinRemapConfig(GPIO_Remap_FSMC_NADV, ...) 等重映射（若用到 NADV）"
+      ],
+      "registers": [
+        "FSMC_BCR1",
+        "FSMC_BCR2",
+        "FSMC_BCR3",
+        "FSMC_BCR4",
+        "FSMC_BTR1",
+        "FSMC_BTR2",
+        "FSMC_BTR3",
+        "FSMC_BTR4",
+        "FSMC_BWTR1",
+        "FSMC_BWTR2",
+        "FSMC_BWTR3",
+        "FSMC_BWTR4"
+      ],
+      "relatedFunctions": [
+        "FSMC_NORSRAMInit",
+        "FSMC_NORSRAMCmd",
+        "FSMC_NANDDeInit",
+        "RCC_AHBPeriphClockCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6（LQFP48，64KB Flash/20KB RAM）没有引出 FSMC 引脚：PD/PE/PF/PG 这些 FSMC 信号脚在 48 脚封装上根本不存在，本函数在 C8T6 上只能改到永远不会输出到引脚的内部寄存器，纯属无效操作",
+        "DeInit 会把 BCR 的 MBKEN 位清 0，即关闭该存储块；之后必须重新 FSMC_NORSRAMInit + FSMC_NORSRAMCmd 才能用",
+        "FSMC_Bank1_NORSRAM1 与 FSMC_Bank1_NORSRAM2 共用 BCR1/BTR1（区别只在 BCR 的 MUXEN 位：MUXEN=0 时 NORSRAM1 占整个 256MB 空间，MUXEN=1 时两个各占 128MB），所以对它们调用 DeInit 实际改的是同一组寄存器",
+        "FSMC_Bank4 的 PCCARD 是另一套 API，别拿 FSMC_Bank4_PCCARD 传给本函数做 NOR 复位",
+        "复位后 FSMC 的 HADDR/HCLK 等输出引脚状态由 GPIO 决定，不是由 FSMC 决定；DeInit 不会把引脚变回 GPIO 模式"
+      ],
+      "exampleCode": "/* 从 NOR/SRAM 用法切换到 NAND 用法前，先清掉 Bank1 的残留配置 */\nRCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE);\nFSMC_NORSRAMDeInit(FSMC_Bank1_NORSRAM1);\n\n/* 此后可以安全地用 FSMC_NANDInit 配置 Bank2 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "FSMC_Bank1",
+        "FSMC_Bank1_NORSRAM1",
+        "FSMC_Bank1_NORSRAM2",
+        "FSMC_Bank1_NORSRAM3",
+        "FSMC_Bank1_NORSRAM4",
+        "FSMC_Bank4",
+        "FSMC_Bank4_PCCARD",
+        "FSMC_NANDInit",
+        "FSMC_NORSRAMCmd",
+        "FSMC_NORSRAMInit",
+        "GPIO_PinRemapConfig",
+        "GPIO_Remap_FSMC_NADV",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_FSMC"
+      ],
+      "headerLine": 695,
+      "sourceLine": 102,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_NANDDeInit",
+      "name": "FSMC_NANDDeInit",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec1",
+      "prototype": "void FSMC_NANDDeInit(uint32_t FSMC_Bank);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_Bank",
+          "type": "uint32_t",
+          "descEn": "specifies the FSMC Bank to be used This parameter can be one of the following values:",
+          "descZh": "要复位的 NAND 存储块，取值 FSMC_Bank2_NAND 或 FSMC_Bank3_NAND。FSMC_Bank2 是 FSMC_Bank2_NAND 的别名、FSMC_Bank3 是 FSMC_Bank3_NAND 的别名，写哪个都一样，但写 FSMC_Bank1 或 FSMC_Bank4_PCCARD 会触发 assert 失败。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Deinitializes the FSMC NAND Banks registers to their default reset values.",
+      "briefZh": "把指定 NAND 存储块（Bank2/Bank3）的 FSMC 配置寄存器恢复为复位默认值。",
+      "usageZh": "切换 NAND 芯片型号、换页大小（512B/2KB/4KB）或从 NAND 用法切回 NOR 用法之前调用，把 PCR/PMEM/PATT 里的时序和 ECC 配置清干净。\n\n**型号提醒**：STM32F103C8T6（LQFP48）没有引出 FSMC 引脚，FSMC 仅在 100 脚以上的型号（ZET6/VET6 等）上可用，C8T6 上这段代码没有实际硬件意义。",
+      "prerequisites": [
+        "已使能 FSMC 时钟（RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE)）",
+        "已配置 FSMC 的 GPIO（NAND 需要 D0~D7、CLE/ALE、/CE、/RE、/WE、R/B 等引脚，均为复用推挽 + 上拉）"
+      ],
+      "registers": [
+        "FSMC_PCR2",
+        "FSMC_PCR3",
+        "FSMC_PMEM2",
+        "FSMC_PMEM3",
+        "FSMC_PATT2",
+        "FSMC_PATT3",
+        "FSMC_ECCR2",
+        "FSMC_ECCR3"
+      ],
+      "relatedFunctions": [
+        "FSMC_NANDInit",
+        "FSMC_NANDCmd",
+        "FSMC_NORSRAMDeInit",
+        "FSMC_PCCARDDeInit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，本函数在 C8T6 上无实际用途（引脚不够）",
+        "DeInit 后该 Bank 的 PCR 被清零，即 NAND 存储块被关闭，必须重新 FSMC_NANDInit + FSMC_NANDCmd 才能访问",
+        "FSMC_Bank2_NAND 对应的外部地址是 0x70000000，FSMC_Bank3_NAND 是 0x80000000，用指针直接访问时地址别写错",
+        "如果把两端都接了 NAND（Bank2 与 Bank3），DeInit 只影响你指定的那一个，另一个仍在工作",
+        "1 个 NAND Bank 只支持 8 位或 16 位数据宽度（FSMC_MemoryDataWidth_8b/16b），8 位时数据只走 D0~D7"
+      ],
+      "exampleCode": "/* 换用另一种 NAND（页大小、时序都不同）前先复位配置 */\nFSMC_NANDDeInit(FSMC_Bank2_NAND);\n\n/* 再按新芯片的参数重新初始化 */\nFSMC_NANDInit(&FSMC_NANDInitStructure);\nFSMC_NANDCmd(FSMC_Bank2_NAND, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "FSMC_Bank1",
+        "FSMC_Bank2",
+        "FSMC_Bank2_NAND",
+        "FSMC_Bank3",
+        "FSMC_Bank3_NAND",
+        "FSMC_Bank4_PCCARD",
+        "FSMC_MemoryDataWidth_8b",
+        "FSMC_NANDCmd",
+        "FSMC_NANDInit",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_FSMC"
+      ],
+      "headerLine": 697,
+      "sourceLine": 129,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_PCCARDDeInit",
+      "name": "FSMC_PCCARDDeInit",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec1",
+      "prototype": "void FSMC_PCCARDDeInit(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Deinitializes the FSMC PCCARD Bank registers to their default reset values.",
+      "briefZh": "把 PC Card（Bank4）的 FSMC 配置寄存器恢复为复位默认值。",
+      "usageZh": "PC Card 在实际项目里几乎见不到，这个函数的存在主要是为了和 NOR/NAND 那两套 API 保持对称。只有在确实驱动 PCMCIA/CF 卡这类设备、需要重配时才会用到。\n\n**型号提醒**：STM32F103C8T6（LQFP48）没有引出 FSMC 引脚，也没有 PC Card 需要的地址/控制信号，本函数在 C8T6 上无实际意义；FSMC 仅在 ZET6/VET6 等 100 脚以上型号可用。",
+      "prerequisites": [
+        "已使能 FSMC 时钟（RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE)）",
+        "已配置 FSMC 相关的 GPIO 复用功能"
+      ],
+      "registers": [
+        "FSMC_PCR4",
+        "FSMC_PMEM4",
+        "FSMC_PATT4",
+        "FSMC_PIO4"
+      ],
+      "relatedFunctions": [
+        "FSMC_PCCARDInit",
+        "FSMC_PCCARDCmd",
+        "FSMC_PCCARDStructInit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，本函数在 C8T6 上无实际用途",
+        "PC Card 永远只能用 FSMC_Bank4（地址 0x90000000），所以函数没有 FSMC_Bank 参数",
+        "DeInit 后 PCR4 被清零，Bank4 关闭，必须重新 Init 并 Cmd(ENABLE)",
+        "PC Card 的地址空间固定 64MB，且只能用 16 位数据宽度访问"
+      ],
+      "exampleCode": "/* PC Card 只有 Bank4 一个，所以本函数没有 Bank 参数 */\nFSMC_PCCARDDeInit();\nFSMC_PCCARDInit(&FSMC_PCCARDInitStructure);\nFSMC_PCCARDCmd(ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "FSMC_Bank4",
+        "FSMC_PCCARDCmd",
+        "FSMC_PCCARDInit",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_FSMC"
+      ],
+      "headerLine": 698,
+      "sourceLine": 158,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_NORSRAMInit",
+      "name": "FSMC_NORSRAMInit",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec2",
+      "prototype": "void FSMC_NORSRAMInit(FSMC_NORSRAMInitTypeDef* FSMC_NORSRAMInitStruct);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_NORSRAMInitStruct",
+          "type": "FSMC_NORSRAMInitTypeDef*",
+          "descEn": "pointer to a FSMC_NORSRAMInitTypeDef structure that contains the configuration information for the FSMC NOR/SRAM specified Banks.",
+          "descZh": "指向 FSMC_NORSRAMInitTypeDef 的指针。字段：FSMC_Bank（FSMC_Bank1_NORSRAM1~4 的任意组合）、FSMC_DataAddressMux（地址/数据是否复用，一般 FSMC_DataAddressMux_Disable）、FSMC_MemoryType（FSMC_MemoryType_SRAM / PSRAM / NOR）、FSMC_MemoryDataWidth（8b/16b）、FSMC_BurstAccessMode（同步突发，异步 SRAM 用 Disable）、FSMC_WaitSignalPolarity、FSMC_WrapMode、FSMC_WaitSignalActive（BeforeWaitState/DuringWaitState）、FSMC_WriteOperation（Enable/Disable）、FSMC_WaitSignal、FSMC_ExtendedMode（读写分开设时序时必须 Enable）、FSMC_WriteBurst、FSMC_AsynchronousWait、FSMC_ReadWriteTimingStruct、FSMC_WriteTimingStruct（仅在 ExtendedMode 使能时生效）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Initializes the FSMC NOR/SRAM Banks according to the specified parameters in the FSMC_NORSRAMInitStruct.",
+      "briefZh": "按结构体参数配置 FSMC 的 NOR Flash / SRAM / PSRAM 存储块（时序、数据宽度、访问模式等）。",
+      "usageZh": "这是驱动外部 SRAM（如 IS62WV51216）或 NOR Flash（如 SST39VF）的核心函数，替代了以前用 FSMC_NORSRAMStructInit 逐位拼寄存器的写法。一次调用可以同时配置多个 NOR/SRAM Bank（把 FSMC_Bank 位或起来），但此时它们会**共用同一个 FSMC_ReadWriteTimingStruct**。\n\n正确顺序：开 FSMC 时钟 → 配 GPIO 为复用推挽 → （可能需要）打开 FSMC 的 NADV/CLK 重映射 → 填结构体 → 调用本函数 → FSMC_NORSRAMCmd(bank, ENABLE)。\n\n**型号提醒**：STM32F103C8T6（LQFP48）**没有引出任何 FSMC 引脚**，FSMC 只在 100 脚以上型号（如 STM32F103ZET6、VET6）才有。C8T6 上这段代码只会写内部寄存器、不会产生任何外部总线信号，想在 C8T6 上外扩 SRAM 只能换型号或用软件模拟总线。",
+      "prerequisites": [
+        "已使能 FSMC 时钟：RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE)——它是 AHB 外设，用 APB 的那个函数开会不生效",
+        "已把用到的 FSMC 引脚（地址线 A0~A25、数据线 D0~D15、/NE、/NOE、/NWE、NADV 等）用 GPIO_Init 配成 GPIO_Mode_AF_PP",
+        "已调用 GPIO_PinRemapConfig(GPIO_Remap_FSMC_NADV, ENABLE)（用到 NADV 时）",
+        "结构体各字段已全部赋值，或先调用 FSMC_NORSRAMStructInit 填默认值"
+      ],
+      "registers": [
+        "FSMC_BCR1",
+        "FSMC_BCR2",
+        "FSMC_BCR3",
+        "FSMC_BCR4",
+        "FSMC_BTR1",
+        "FSMC_BTR2",
+        "FSMC_BTR3",
+        "FSMC_BTR4",
+        "FSMC_BWTR1",
+        "FSMC_BWTR2",
+        "FSMC_BWTR3",
+        "FSMC_BWTR4"
+      ],
+      "relatedFunctions": [
+        "FSMC_NORSRAMStructInit",
+        "FSMC_NORSRAMCmd",
+        "FSMC_NORSRAMDeInit",
+        "RCC_AHBPeriphClockCmd",
+        "GPIO_Init",
+        "GPIO_PinRemapConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6（LQFP48，64KB Flash/20KB RAM）**没有引出 FSMC 引脚**：FSMC 的 D0~D15、A0~A25、/NE1~/NE4 全在 PD/PE/PF/PG 上，而 LQFP48 封装根本没有这几个端口。FSMC 只在 100 脚及以上的型号（STM32F103ZET6/VET6/RET6 等）上可用，选型时务必确认封装",
+        "时序配错是最常见的故障源：FSMC_AddressSetupTime/FSMC_DataSetupTime 太小会出现「读出的数据偶发错位、写进去的值读回来不对」；这两个字段写的是**周期数减 1**，写 0 表示 1 个 HCLK，不是 0 个周期",
+        "FSMC_CLKDivision、FSMC_DataLatency 只对同步突发（BurstAccessMode 使能，如 NOR Flash 的同步读）有意义，异步 SRAM 上填 0 即可",
+        "FSMC_MemoryType_SRAM/PSRAM/NOR 三者的差别在于 FSMC 是否自动产生「写使能前的地址锁存」「读延时」等行为；拿到 SRAM 数据手册先看它是异步还是同步接口",
+        "要读写分开设不同时序，必须把 FSMC_ExtendedMode 设为 FSMC_ExtendedMode_Enable，并同时提供 FSMC_WriteTimingStruct；ExtendedMode 关闭时 FSMC_WriteTimingStruct 会被忽略（此时写时序复用读时序）",
+        "只读设备（如某些 NOR）要把 FSMC_WriteOperation 设为 FSMC_WriteOperation_Disable，否则误写会破坏内容",
+        "同时初始化多个 Bank 时它们共用 FSMC_ReadWriteTimingStruct，要各自不同的时序只能分多次调用",
+        "FSMC_Bank 写错（例如传了 FSMC_Bank4_PCCARD）在开了 USE_FULL_ASSERT 时会在 assert_failed 里停住，没开则静默写入错误的寄存器",
+        "FSMC 用的是 AHB 时钟（HCLK=72MHz），HCLK 改了之后所有 FSMC 时序参数都要重新按新周期换算，否则会出现频率一改就读写不稳",
+        "访问外部存储器的地址由 Bank 决定：NORSRAM1=0x60000000、NORSRAM2=0x64000000、NORSRAM3=0x68000000、NORSRAM4=0x6C000000，且 HADDR 与 FSMC 地址线的对应关系会随数据宽度变化（16 位时 FSMC_A0 接 MCU 的 HADDR1）"
+      ],
+      "exampleCode": "FSMC_NORSRAMInitTypeDef  FSMC_NORSRAMInitStructure;\nFSMC_NORSRAMTimingInitTypeDef  ReadWriteTiming;\n\n/* 1. 开 FSMC 时钟（AHB 外设） */\nRCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE);\n\n/* 2. 时序：HCLK=72MHz，1 个 HCLK 约 13.9ns */\nReadWriteTiming.FSMC_AddressSetupTime      = 0x01;  /* 地址建立 2 HCLK  */\nReadWriteTiming.FSMC_AddressHoldTime       = 0x00;\nReadWriteTiming.FSMC_DataSetupTime         = 0x05;  /* 数据建立 6 HCLK  */\nReadWriteTiming.FSMC_BusTurnAroundDuration = 0x00;\nReadWriteTiming.FSMC_CLKDivision           = 0x00;\nReadWriteTiming.FSMC_DataLatency           = 0x00;\nReadWriteTiming.FSMC_AccessMode            = FSMC_AccessMode_A;  /* SRAM 固定用模式 A */\n\n/* 3. 存储块配置：Bank1 的 NORSRAM3（对应地址 0x68000000） */\nFSMC_NORSRAMInitStructure.FSMC_Bank                = FSMC_Bank1_NORSRAM3;\nFSMC_NORSRAMInitStructure.FSMC_DataAddressMux      = FSMC_DataAddressMux_Disable;\nFSMC_NORSRAMInitStructure.FSMC_MemoryType          = FSMC_MemoryType_SRAM;\nFSMC_NORSRAMInitStructure.FSMC_MemoryDataWidth     = FSMC_MemoryDataWidth_16b;\nFSMC_NORSRAMInitStructure.FSMC_BurstAccessMode     = FSMC_BurstAccessMode_Disable;\nFSMC_NORSRAMInitStructure.FSMC_AsynchronousWait    = FSMC_AsynchronousWait_Disable;\nFSMC_NORSRAMInitStructure.FSMC_WaitSignalPolarity  = FSMC_WaitSignalPolarity_Low;\nFSMC_NORSRAMInitStructure.FSMC_WrapMode            = FSMC_WrapMode_Disable;\nFSMC_NORSRAMInitStructure.FSMC_WaitSignalActive    = FSMC_WaitSignalActive_BeforeWaitState;\nFSMC_NORSRAMInitStructure.FSMC_WriteOperation      = FSMC_WriteOperation_Enable;\nFSMC_NORSRAMInitStructure.FSMC_WaitSignal          = FSMC_WaitSignal_Disable;\nFSMC_NORSRAMInitStructure.FSMC_ExtendedMode        = FSMC_ExtendedMode_Disable;\nFSMC_NORSRAMInitStructure.FSMC_WriteBurst          = FSMC_WriteBurst_Disable;\nFSMC_NORSRAMInitStructure.FSMC_ReadWriteTimingStruct = &ReadWriteTiming;\nFSMC_NORSRAMInitStructure.FSMC_WriteTimingStruct     = &ReadWriteTiming;\nFSMC_NORSRAMInit(&FSMC_NORSRAMInitStructure);\n\n/* 4. 使能该 Bank */\nFSMC_NORSRAMCmd(FSMC_Bank1_NORSRAM3, ENABLE);\n\n/* 5. 之后就能像访问内存一样读写外部 SRAM */\n*(volatile uint16_t*)0x68000000 = 0x1234;",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "FSMC_AccessMode_A",
+        "FSMC_AsynchronousWait_Disable",
+        "FSMC_Bank1_NORSRAM1",
+        "FSMC_Bank1_NORSRAM3",
+        "FSMC_Bank4_PCCARD",
+        "FSMC_BurstAccessMode_Disable",
+        "FSMC_DataAddressMux_Disable",
+        "FSMC_ExtendedMode_Disable",
+        "FSMC_ExtendedMode_Enable",
+        "FSMC_MemoryDataWidth_16b",
+        "FSMC_MemoryType_SRAM",
+        "FSMC_NORSRAMCmd",
+        "FSMC_NORSRAMInitTypeDef",
+        "FSMC_NORSRAMStructInit",
+        "FSMC_NORSRAMTimingInitTypeDef",
+        "FSMC_WaitSignalActive_BeforeWaitState",
+        "FSMC_WaitSignalPolarity_Low",
+        "FSMC_WaitSignal_Disable",
+        "FSMC_WrapMode_Disable",
+        "FSMC_WriteBurst_Disable",
+        "FSMC_WriteOperation_Disable",
+        "FSMC_WriteOperation_Enable",
+        "GPIO_Init",
+        "GPIO_Mode_AF_PP",
+        "GPIO_PinRemapConfig",
+        "GPIO_Remap_FSMC_NADV",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_FSMC",
+        "USE_FULL_ASSERT"
+      ],
+      "headerLine": 699,
+      "sourceLine": 176,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_NANDInit",
+      "name": "FSMC_NANDInit",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec2",
+      "prototype": "void FSMC_NANDInit(FSMC_NANDInitTypeDef* FSMC_NANDInitStruct);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_NANDInitStruct",
+          "type": "FSMC_NANDInitTypeDef*",
+          "descEn": "pointer to a FSMC_NANDInitTypeDef structure that contains the configuration information for the FSMC NAND specified Banks.",
+          "descZh": "指向 FSMC_NANDInitTypeDef 的指针。字段：FSMC_Bank（FSMC_Bank2_NAND 或 FSMC_Bank3_NAND）、FSMC_Waitfeature（是否用 R/B 信号插入等待）、FSMC_MemoryDataWidth（8b/16b）、FSMC_ECC（FSMC_ECC_Enable/Disable）、FSMC_ECCPageSize（256/512/1024/2048/4096/8192 字节）、FSMC_TCLRSetupTime、FSMC_TARSetupTime、FSMC_CommonSpaceTimingStruct（公共区时序）、FSMC_AttributeSpaceTimingStruct（属性区时序）、FSMC_IOSpaceTimingStruct。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Initializes the FSMC NAND Banks according to the specified parameters in the FSMC_NANDInitStruct.",
+      "briefZh": "按结构体参数配置 FSMC 的 NAND Flash 存储块（页大小、ECC、时序）。",
+      "usageZh": "驱动 NAND Flash（如 K9F1G08、MT29F）时用。NAND 与 NOR 的配置结构体完全不同：这里要指定 FSMC_NAND_PCCARDTimingInitTypeDef（FSMC_SetupTime 对应 tCLR/tAR，FSMC_WaitSetupTime 对应 tWP，FSMC_HoldSetupTime 对应 tRP，FSMC_HiZSetupTime 对应 tCLR/tRR）。\n\nFSMC 硬件只负责产生正确的 /CE、/WE、/RE、CLE/ALE 时序和搬数据，**NAND 的命令序列（复位、读 ID、读页、编程、擦除）必须由你自己写**，SPL 不提供 NAND 驱动层。\n\n**型号提醒**：STM32F103C8T6（LQFP48）无 FSMC 引脚引出，本函数在 C8T6 上不可用；FSMC 只在 ZET6/VET6 等 100 脚以上型号可用。",
+      "prerequisites": [
+        "已使能 FSMC 时钟：RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE)",
+        "已把 NAND 引脚（D0~D7 或 D0~D15、CLE、ALE、/CE2、/RE、/WE、R/B）配成 GPIO_Mode_AF_PP",
+        "结构体各字段已赋值，或先用 FSMC_NANDStructInit 填默认值"
+      ],
+      "registers": [
+        "FSMC_PCR2",
+        "FSMC_PCR3",
+        "FSMC_PMEM2",
+        "FSMC_PMEM3",
+        "FSMC_PATT2",
+        "FSMC_PATT3"
+      ],
+      "relatedFunctions": [
+        "FSMC_NANDStructInit",
+        "FSMC_NANDCmd",
+        "FSMC_NANDECCCmd",
+        "FSMC_GetECC",
+        "FSMC_NANDDeInit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，NAND 方案在 C8T6 上做不了（这是选型问题，不是软件问题）",
+        "FSMC_TCLRSetupTime / FSMC_TARSetupTime 是 **CLE/ALE 相对 /CE 的建立时间**，与 FSMC_CommonSpaceTimingStruct 里的数值是两个维度，两边都要按数据手册填，只填一边会出现「命令字写进去被当成数据」",
+        "FSMC_ECCPageSize 必须与你要读写的页大小一致（K9F1G08 是 2048 字节页，K9F2G08 也是 2048，512 字节页的老片子用 512），设错会导致 ECC 校验永远不过、报「ECC 错误」却查不出坏块",
+        "ECC 开启后必须在 ECCR 被硬件清除（即一次完整页读写结束）之后立刻 FSMC_GetECC 取走结果，取晚了会被下一次访问覆盖",
+        "FSMC_Waitfeature_Enable 时 R/B 引脚必须接到正确的 FSMC 引脚上；不接或接错会让 FSMC 一直等，表现为程序卡死在写操作里",
+        "NAND 的地址空间：Bank2 = 0x70000000，Bank3 = 0x80000000；公共区偏移 0x00、属性区偏移 0x08、数据区偏移 0x10（这部分要靠自己按地址偏移访问）",
+        "FSMC 只做时序和 ECC，坏块管理、FTL 要自己实现；不要指望 SPL 提供读页/写页函数",
+        "NAND 的 8 位数据宽度下只用到 D0~D7，D8~D15 悬空或者接上拉"
+      ],
+      "exampleCode": "FSMC_NANDInitTypeDef  FSMC_NANDInitStructure;\nFSMC_NAND_PCCARDTimingInitTypeDef  ComSpaceTiming, AttSpaceTiming;\n\nRCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE);\n\n/* 公共区时序：HCLK=72MHz，1 周期约 13.9ns */\nComSpaceTiming.FSMC_SetupTime      = 0x01;  /* tCLR/tAR */\nComSpaceTiming.FSMC_WaitSetupTime  = 0x03;  /* tWP >= 25ns */\nComSpaceTiming.FSMC_HoldSetupTime  = 0x02;  /* tRP */\nComSpaceTiming.FSMC_HiZSetupTime   = 0x01;\nAttSpaceTiming = ComSpaceTiming;\n\nFSMC_NANDInitStructure.FSMC_Bank                  = FSMC_Bank2_NAND;\nFSMC_NANDInitStructure.FSMC_Waitfeature           = FSMC_Waitfeature_Enable;  /* 用 R/B 做握手 */\nFSMC_NANDInitStructure.FSMC_MemoryDataWidth       = FSMC_MemoryDataWidth_8b;\nFSMC_NANDInitStructure.FSMC_ECC                   = FSMC_ECC_Enable;\nFSMC_NANDInitStructure.FSMC_ECCPageSize           = FSMC_ECCPageSize_2048Bytes;\nFSMC_NANDInitStructure.FSMC_TCLRSetupTime         = 0x00;\nFSMC_NANDInitStructure.FSMC_TARSetupTime          = 0x00;\nFSMC_NANDInitStructure.FSMC_CommonSpaceTimingStruct    = &ComSpaceTiming;\nFSMC_NANDInitStructure.FSMC_AttributeSpaceTimingStruct = &AttSpaceTiming;\nFSMC_NANDInitStructure.FSMC_IOSpaceTimingStruct        = &AttSpaceTiming;\nFSMC_NANDInit(&FSMC_NANDInitStructure);\nFSMC_NANDCmd(FSMC_Bank2_NAND, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "FSMC_Bank2_NAND",
+        "FSMC_Bank3_NAND",
+        "FSMC_ECCPageSize_2048Bytes",
+        "FSMC_ECC_Enable",
+        "FSMC_GetECC",
+        "FSMC_MemoryDataWidth_8b",
+        "FSMC_NANDCmd",
+        "FSMC_NANDInitTypeDef",
+        "FSMC_NANDStructInit",
+        "FSMC_NAND_PCCARDTimingInitTypeDef",
+        "FSMC_Waitfeature_Enable",
+        "GPIO_Mode_AF_PP",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_FSMC"
+      ],
+      "headerLine": 700,
+      "sourceLine": 262,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_PCCARDInit",
+      "name": "FSMC_PCCARDInit",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec2",
+      "prototype": "void FSMC_PCCARDInit(FSMC_PCCARDInitTypeDef* FSMC_PCCARDInitStruct);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_PCCARDInitStruct",
+          "type": "FSMC_PCCARDInitTypeDef*",
+          "descEn": "pointer to a FSMC_PCCARDInitTypeDef structure that contains the configuration information for the FSMC PCCARD Bank.",
+          "descZh": "指向 FSMC_PCCARDInitTypeDef 的指针。字段：FSMC_CommonSpaceTimingStruct（公共存储区时序）、FSMC_AttributeSpaceTimingStruct（属性区时序）、FSMC_IOSpaceTimingStruct（IO 区时序），三者都是 FSMC_NAND_PCCARDTimingInitTypeDef 类型。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Initializes the FSMC PCCARD Bank according to the specified parameters in the FSMC_PCCARDInitStruct.",
+      "briefZh": "按结构体参数配置 FSMC 的 PC Card（Bank4）存储块。",
+      "usageZh": "只有在驱动 PCMCIA/CompactFlash 这类 PC Card 设备时才用。参数里没有 FSMC_Bank，因为 PC Card 固定占用 Bank4（0x90000000）。结构体用的是 FSMC_PCCARDInitTypeDef，里面只有三个时序结构体（公共区、属性区、IO 区），没有数据宽度字段——PC Card 固定 16 位。\n\n**型号提醒**：STM32F103C8T6（LQFP48）无 FSMC 引脚引出，本函数在 C8T6 上无实际意义；FSMC 只在 100 脚以上型号可用。",
+      "prerequisites": [
+        "已使能 FSMC 时钟：RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE)",
+        "已配置 PC Card 相关引脚为复用推挽输出",
+        "结构体各字段已赋值，或先用 FSMC_PCCARDStructInit 填默认值"
+      ],
+      "registers": [
+        "FSMC_PCR4",
+        "FSMC_PMEM4",
+        "FSMC_PATT4",
+        "FSMC_PIO4"
+      ],
+      "relatedFunctions": [
+        "FSMC_PCCARDStructInit",
+        "FSMC_PCCARDCmd",
+        "FSMC_PCCARDDeInit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，PC Card 方案在 C8T6 上无意义",
+        "PC Card 固定占用 FSMC_Bank4，地址 0x90000000，容量 64MB",
+        "PC Card 固定 16 位数据宽度，所以结构体里没有 FSMC_MemoryDataWidth 字段",
+        "PC Card 的 IO 区访问与属性区访问是两套时序，数据手册上 tSU/tH 不同的设备必须分别填，图省事全填同一组可能读不出 CIS 信息"
+      ],
+      "exampleCode": "FSMC_PCCARDInitTypeDef  FSMC_PCCARDInitStructure;\nFSMC_NAND_PCCARDTimingInitTypeDef  Timing;\n\nRCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE);\n\nTiming.FSMC_SetupTime     = 0x04;\nTiming.FSMC_WaitSetupTime = 0x06;\nTiming.FSMC_HoldSetupTime = 0x04;\nTiming.FSMC_HiZSetupTime  = 0x02;\n\nFSMC_PCCARDInitStructure.FSMC_CommonSpaceTimingStruct    = &Timing;\nFSMC_PCCARDInitStructure.FSMC_AttributeSpaceTimingStruct = &Timing;\nFSMC_PCCARDInitStructure.FSMC_IOSpaceTimingStruct        = &Timing;\nFSMC_PCCARDInit(&FSMC_PCCARDInitStructure);\nFSMC_PCCARDCmd(ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "FSMC_Bank4",
+        "FSMC_NAND_PCCARDTimingInitTypeDef",
+        "FSMC_PCCARDCmd",
+        "FSMC_PCCARDInitTypeDef",
+        "FSMC_PCCARDStructInit",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_FSMC"
+      ],
+      "headerLine": 701,
+      "sourceLine": 328,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_NORSRAMStructInit",
+      "name": "FSMC_NORSRAMStructInit",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec2",
+      "prototype": "void FSMC_NORSRAMStructInit(FSMC_NORSRAMInitTypeDef* FSMC_NORSRAMInitStruct);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_NORSRAMInitStruct",
+          "type": "FSMC_NORSRAMInitTypeDef*",
+          "descEn": "pointer to a FSMC_NORSRAMInitTypeDef structure which will be initialized.",
+          "descZh": "待填充的 FSMC_NORSRAMInitTypeDef 结构体指针。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Fills each FSMC_NORSRAMInitStruct member with its default value.",
+      "briefZh": "把 FSMC_NORSRAMInitTypeDef 结构体各字段填充为默认值。",
+      "usageZh": "在 FSMC_NORSRAMInit 之前调用，保证结构体里没有栈上的随机值。默认值为：FSMC_Bank = FSMC_Bank1_NORSRAM1、FSMC_DataAddressMux = Disable、FSMC_MemoryType = SRAM、FSMC_MemoryDataWidth = 16b、FSMC_WriteOperation = Enable、FSMC_ExtendedMode = Disable、时序指针指向内部的一个静态默认时序结构（各时序字段为 0）。\n\n注意它**不会**为你分配 FSMC_ReadWriteTimingStruct 指向的结构体——默认用的是库内部的静态变量，多个 Bank 同时初始化时会互相覆盖，所以实际项目里通常自己定义时序变量再显式赋值。\n\n**型号提醒**：C8T6（LQFP48）无 FSMC 引脚，本函数在 C8T6 上无实际用途。",
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": [
+        "FSMC_NORSRAMInit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "时序结构体成员不会被这个函数清空成「可用值」——默认时序各项都是 0，写 0 意味着最短时序，直接拿去驱动真实器件多半读不对，必须自己算好再赋",
+        "默认 FSMC_Bank 是 FSMC_Bank1_NORSRAM1，忘了改会配错存储块，现象是访问 0x68000000 死活读不到数据",
+        "默认 FSMC_MemoryDataWidth 是 16b，接 8 位器件时务必改成 FSMC_MemoryDataWidth_8b，否则每读一个字节地址会跳 2",
+        "默认 FSMC_WriteOperation = Enable，对接只读器件时记得改成 Disable",
+        "在 C8T6 上跑这段代码不会报错，但引脚不存在，不会有任何外部反应——别把「编译通过」当成「功能正常」"
+      ],
+      "exampleCode": "FSMC_NORSRAMInitTypeDef FSMC_NORSRAMInitStructure;\nFSMC_NORSRAMTimingInitTypeDef ReadWriteTiming;\n\n/* 先填默认值，避免结构体里是随机数 */\nFSMC_NORSRAMStructInit(&FSMC_NORSRAMInitStructure);\n\n/* 再改需要改的字段（默认是 Bank1_NORSRAM1 + SRAM + 16b） */\nFSMC_NORSRAMInitStructure.FSMC_Bank = FSMC_Bank1_NORSRAM3;\n\n/* 时序结构一定要自己定义并显式挂上去 */\nReadWriteTiming.FSMC_AddressSetupTime      = 0x01;\nReadWriteTiming.FSMC_DataSetupTime         = 0x05;\nReadWriteTiming.FSMC_AccessMode            = FSMC_AccessMode_A;\nFSMC_NORSRAMInitStructure.FSMC_ReadWriteTimingStruct = &ReadWriteTiming;\nFSMC_NORSRAMInitStructure.FSMC_WriteTimingStruct     = &ReadWriteTiming;\nFSMC_NORSRAMInit(&FSMC_NORSRAMInitStructure);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FSMC_AccessMode_A",
+        "FSMC_Bank1_NORSRAM1",
+        "FSMC_Bank1_NORSRAM3",
+        "FSMC_MemoryDataWidth_8b",
+        "FSMC_NORSRAMInit",
+        "FSMC_NORSRAMInitTypeDef",
+        "FSMC_NORSRAMTimingInitTypeDef"
+      ],
+      "headerLine": 702,
+      "sourceLine": 380,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_NANDStructInit",
+      "name": "FSMC_NANDStructInit",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec2",
+      "prototype": "void FSMC_NANDStructInit(FSMC_NANDInitTypeDef* FSMC_NANDInitStruct);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_NANDInitStruct",
+          "type": "FSMC_NANDInitTypeDef*",
+          "descEn": "pointer to a FSMC_NANDInitTypeDef structure which will be initialized.",
+          "descZh": "待填充的 FSMC_NANDInitTypeDef 结构体指针。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Fills each FSMC_NANDInitStruct member with its default value.",
+      "briefZh": "把 FSMC_NANDInitTypeDef 结构体各字段填充为默认值。",
+      "usageZh": "在 FSMC_NANDInit 之前调用，得到一个确定的起点。默认值为：FSMC_Bank = FSMC_Bank2_NAND、FSMC_Waitfeature = Disable、FSMC_MemoryDataWidth = 8b、FSMC_ECC = Disable、FSMC_ECCPageSize = 2048Bytes、各时序指针指向库内静态默认结构（值为 0）。\n\n和 NOR 那套一样，默认时序指针指向的是**库内部静态变量**，多个 Bank 一起初始化时会互相覆盖，正式代码里应自己定义时序结构体。\n\n**型号提醒**：C8T6（LQFP48）无 FSMC 引脚，本函数在 C8T6 上无实际用途。",
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": [
+        "FSMC_NANDInit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "默认 ECC 是关闭的，读 NAND 时不会做校验；要做 ECC 必须显式改成 FSMC_ECC_Enable 并设对 FSMC_ECCPageSize",
+        "默认 FSMC_ECCPageSize 是 2048Bytes，用 512 字节页的老 NAND 一定要改，否则 ECC 结果始终是错的",
+        "默认数据宽度 8b 会关掉 D8~D15；若硬件接了 16 位 NAND 要改成 FSMC_MemoryDataWidth_16b，否则高字节永远读不出来",
+        "默认 Waitfeature 关闭，表示不依赖 R/B 引脚握手，程序必须自己轮询状态寄存器判断 NAND 忙闲",
+        "在 C8T6 上调用本函数不会报错，但引脚不存在，没有任何外部效果"
+      ],
+      "exampleCode": "FSMC_NANDInitTypeDef FSMC_NANDInitStructure;\nFSMC_NAND_PCCARDTimingInitTypeDef ComSpaceTiming;\n\nFSMC_NANDStructInit(&FSMC_NANDInitStructure);   /* 默认 Bank2_NAND、8b、ECC 关闭 */\n\nFSMC_NANDInitStructure.FSMC_ECC         = FSMC_ECC_Enable;\nFSMC_NANDInitStructure.FSMC_ECCPageSize = FSMC_ECCPageSize_2048Bytes;\n\nComSpaceTiming.FSMC_SetupTime     = 0x01;\nComSpaceTiming.FSMC_WaitSetupTime = 0x03;\nComSpaceTiming.FSMC_HoldSetupTime = 0x02;\nComSpaceTiming.FSMC_HiZSetupTime  = 0x01;\nFSMC_NANDInitStructure.FSMC_CommonSpaceTimingStruct = &ComSpaceTiming;\nFSMC_NANDInit(&FSMC_NANDInitStructure);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FSMC_Bank2_NAND",
+        "FSMC_ECCPageSize_2048Bytes",
+        "FSMC_ECC_Enable",
+        "FSMC_MemoryDataWidth_16b",
+        "FSMC_NANDInit",
+        "FSMC_NANDInitTypeDef",
+        "FSMC_NAND_PCCARDTimingInitTypeDef"
+      ],
+      "headerLine": 703,
+      "sourceLine": 418,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_PCCARDStructInit",
+      "name": "FSMC_PCCARDStructInit",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec2",
+      "prototype": "void FSMC_PCCARDStructInit(FSMC_PCCARDInitTypeDef* FSMC_PCCARDInitStruct);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_PCCARDInitStruct",
+          "type": "FSMC_PCCARDInitTypeDef*",
+          "descEn": "pointer to a FSMC_PCCARDInitTypeDef structure which will be initialized.",
+          "descZh": "待填充的 FSMC_PCCARDInitTypeDef 结构体指针。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Fills each FSMC_PCCARDInitStruct member with its default value.",
+      "briefZh": "把 FSMC_PCCARDInitTypeDef 结构体各字段填充为默认值。",
+      "usageZh": "在 FSMC_PCCARDInit 之前调用，避免结构体里是栈上的随机值。默认三个时序结构体指针都指向库内的静态默认结构（各项为 0）。PC Card 很少用，这个函数主要是保持 API 完整性。\n\n**型号提醒**：C8T6（LQFP48）无 FSMC 引脚，本函数在 C8T6 上无实际用途。",
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": [
+        "FSMC_PCCARDInit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "默认时序全为 0（最短时序），真实 PC Card 器件几乎不可能在这个时序下工作，必须自己按数据手册算",
+        "三个时序结构体是用指针挂进去的，如果传入的是局部变量，函数返回后指针悬空会读到栈垃圾——务必保证时序变量生命周期覆盖整个使用期（用全局或 static）",
+        "在 C8T6 上调用本函数不会报错，但没有对应引脚，不会有任何外部效果"
+      ],
+      "exampleCode": "FSMC_PCCARDInitTypeDef FSMC_PCCARDInitStructure;\nFSMC_NAND_PCCARDTimingInitTypeDef Timing;\n\nFSMC_PCCARDStructInit(&FSMC_PCCARDInitStructure);\n\nTiming.FSMC_SetupTime     = 0x04;\nTiming.FSMC_WaitSetupTime = 0x06;\nTiming.FSMC_HoldSetupTime = 0x04;\nTiming.FSMC_HiZSetupTime  = 0x02;\n\nFSMC_PCCARDInitStructure.FSMC_CommonSpaceTimingStruct    = &Timing;\nFSMC_PCCARDInitStructure.FSMC_AttributeSpaceTimingStruct = &Timing;\nFSMC_PCCARDInitStructure.FSMC_IOSpaceTimingStruct        = &Timing;\nFSMC_PCCARDInit(&FSMC_PCCARDInitStructure);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FSMC_NAND_PCCARDTimingInitTypeDef",
+        "FSMC_PCCARDInit",
+        "FSMC_PCCARDInitTypeDef"
+      ],
+      "headerLine": 704,
+      "sourceLine": 444,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_NORSRAMCmd",
+      "name": "FSMC_NORSRAMCmd",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec3",
+      "prototype": "void FSMC_NORSRAMCmd(uint32_t FSMC_Bank, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_Bank",
+          "type": "uint32_t",
+          "descEn": "specifies the FSMC Bank to be used This parameter can be one of the following values:",
+          "descZh": "要开关的 NOR/SRAM 存储块，取值 FSMC_Bank1_NORSRAM1 ~ FSMC_Bank1_NORSRAM4，可用 | 组合多个。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the FSMC_Bank. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 打开该存储块，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified NOR/SRAM Memory Bank.",
+      "briefZh": "使能或关闭指定的 NOR/SRAM 存储块（等价于设置 BCR 的 MBKEN 位）。",
+      "usageZh": "FSMC_NORSRAMInit 之后必须调用本函数 ENABLE，存储块才真正开始工作；Init 只写配置，不打开存储块——忘了这一步表现为「配置全对但读写外部 SRAM 全是 0 或 HardFault」。低功耗场景下把外部器件断电时也可以用 DISABLE 关掉该 Bank。\n\n参数 FSMC_Bank 同样接受多个 Bank 的或，一次开关多个。\n\n**型号提醒**：STM32F103C8T6（LQFP48）没有引出 FSMC 引脚，本函数在 C8T6 上无实际硬件效果；FSMC 只在 100 脚以上型号可用。",
+      "prerequisites": [
+        "已使能 FSMC 时钟（RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE)）",
+        "已用 FSMC_NORSRAMInit 配置好该 Bank 的 BCR/BTR"
+      ],
+      "registers": [
+        "FSMC_BCR1",
+        "FSMC_BCR2",
+        "FSMC_BCR3",
+        "FSMC_BCR4"
+      ],
+      "relatedFunctions": [
+        "FSMC_NORSRAMInit",
+        "FSMC_NORSRAMDeInit",
+        "FSMC_NANDCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，本函数在 C8T6 上无实际用途",
+        "只 Init 不 Cmd(ENABLE) 是最常见的新手错误：所有配置看起来都对，但访问外部存储器读到的一直是 0 或者直接进 HardFault",
+        "DISABLE 只关闭 FSMC 对该 Bank 的响应，不会复位 BCR/BTR 里的配置；再次 ENABLE 会沿用上次的配置",
+        "关闭存储块后，访问对应地址区间（如 0x68000000）会触发总线错误，在 Cortex-M3 上表现为 HardFault，指针访问前要先确认 Bank 是开着的",
+        "对同一个 Bank 重复 ENABLE 是安全的（只是重复置位），但重复 Init 会整体覆盖之前的时序配置"
+      ],
+      "exampleCode": "FSMC_NORSRAMInit(&FSMC_NORSRAMInitStructure);\nFSMC_NORSRAMCmd(FSMC_Bank1_NORSRAM3, ENABLE);   /* 别漏，否则 Bank 不工作 */\n\n/* 低功耗：外部 SRAM 断电前先关掉这个 Bank */\nFSMC_NORSRAMCmd(FSMC_Bank1_NORSRAM3, DISABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FSMC_Bank1_NORSRAM1",
+        "FSMC_Bank1_NORSRAM3",
+        "FSMC_Bank1_NORSRAM4",
+        "FSMC_NORSRAMInit",
+        "FunctionalState",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_FSMC"
+      ],
+      "headerLine": 705,
+      "sourceLine": 475,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_NANDCmd",
+      "name": "FSMC_NANDCmd",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec3",
+      "prototype": "void FSMC_NANDCmd(uint32_t FSMC_Bank, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_Bank",
+          "type": "uint32_t",
+          "descEn": "specifies the FSMC Bank to be used This parameter can be one of the following values:",
+          "descZh": "要开关的 NAND 存储块，FSMC_Bank2_NAND 或 FSMC_Bank3_NAND。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the FSMC_Bank. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 打开该 NAND Bank，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified NAND Memory Bank.",
+      "briefZh": "使能或关闭指定的 NAND 存储块。",
+      "usageZh": "FSMC_NANDInit 之后必须调用本函数 ENABLE，NAND Bank 才会响应外部访问。与 NOR 版本一样，只 Init 不 Cmd 会导致 NAND 完全没反应（读 ID 一直返回 0x00 或 0xFF）。\n\n**型号提醒**：STM32F103C8T6（LQFP48）无 FSMC 引脚引出，本函数在 C8T6 上无实际硬件效果；FSMC 只在 ZET6/VET6 等 100 脚以上型号可用。",
+      "prerequisites": [
+        "已使能 FSMC 时钟（RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE)）",
+        "已用 FSMC_NANDInit 配置好该 Bank 的 PCR/PMEM/PATT"
+      ],
+      "registers": [
+        "FSMC_PCR2",
+        "FSMC_PCR3"
+      ],
+      "relatedFunctions": [
+        "FSMC_NANDInit",
+        "FSMC_NANDDeInit",
+        "FSMC_NANDECCCmd",
+        "FSMC_NORSRAMCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，本函数在 C8T6 上无实际用途",
+        "Bank2 对应地址 0x70000000，Bank3 对应 0x80000000，两个 Bank 可以各接一片 NAND 独立开关",
+        "关闭 NAND Bank 后访问对应地址会进 HardFault，而不是返回错误码",
+        "本函数只开关存储块，不影响 ECC 的开关状态（ECC 由 FSMC_NANDECCCmd 单独控制）",
+        "FSMC_NANDInit 已经写过 PCR，但 MBKEN 之类的使能位是这里才置上的，顺序不能颠倒"
+      ],
+      "exampleCode": "FSMC_NANDInit(&FSMC_NANDInitStructure);\nFSMC_NANDCmd(FSMC_Bank2_NAND, ENABLE);\n\n/* 使能后即可以 0x70000000 为基址访问 NAND */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FSMC_Bank2_NAND",
+        "FSMC_Bank3_NAND",
+        "FSMC_NANDECCCmd",
+        "FSMC_NANDInit",
+        "FunctionalState",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_FSMC"
+      ],
+      "headerLine": 706,
+      "sourceLine": 501,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_PCCARDCmd",
+      "name": "FSMC_PCCARDCmd",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec3",
+      "prototype": "void FSMC_PCCARDCmd(FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the PCCARD Memory Bank. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 打开 PC Card 存储块，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the PCCARD Memory Bank.",
+      "briefZh": "使能或关闭 PC Card（Bank4）存储块。",
+      "usageZh": "FSMC_PCCARDInit 之后调用 ENABLE，Bank4 才对外部 PC Card 生效。没有 Bank 参数，因为 PC Card 固定占用 Bank4。\n\n**型号提醒**：STM32F103C8T6（LQFP48）无 FSMC 引脚引出，本函数在 C8T6 上无实际硬件效果。",
+      "prerequisites": [
+        "已使能 FSMC 时钟（RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE)）",
+        "已用 FSMC_PCCARDInit 配置好 PCR4/PMEM4/PATT4/PIO4"
+      ],
+      "registers": [
+        "FSMC_PCR4"
+      ],
+      "relatedFunctions": [
+        "FSMC_PCCARDInit",
+        "FSMC_PCCARDDeInit",
+        "FSMC_NORSRAMCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，本函数在 C8T6 上无实际用途",
+        "PC Card 的地址空间恒为 0x90000000~0x9FFFFFFF，关闭后访问该区间会进 HardFault",
+        "没有 Bank 参数，写代码时不用（也不能）指定别的 Bank",
+        "PC Card 的检测/复位信号（CD、RESET）不在 FSMC 里，需要自己用普通 GPIO 控制"
+      ],
+      "exampleCode": "FSMC_PCCARDInit(&FSMC_PCCARDInitStructure);\nFSMC_PCCARDCmd(ENABLE);   /* Bank4 从 0x90000000 开始，64MB */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FSMC_PCCARDInit",
+        "FunctionalState",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_FSMC",
+        "RESET"
+      ],
+      "headerLine": 707,
+      "sourceLine": 538,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_NANDECCCmd",
+      "name": "FSMC_NANDECCCmd",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec3",
+      "prototype": "void FSMC_NANDECCCmd(uint32_t FSMC_Bank, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_Bank",
+          "type": "uint32_t",
+          "descEn": "specifies the FSMC Bank to be used This parameter can be one of the following values:",
+          "descZh": "目标 NAND 存储块，FSMC_Bank2_NAND 或 FSMC_Bank3_NAND。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the FSMC NAND ECC feature. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 打开硬件 ECC，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the FSMC NAND ECC feature.",
+      "briefZh": "使能或关闭指定的 NAND Bank 的硬件 ECC 计算功能。",
+      "usageZh": "用 NAND 存数据且需要可靠性时开启。硬件 ECC 会在每次读写一个 ECC 页时自动累加校验值，页传输结束后可以从 ECCR 寄存器（用 FSMC_GetECC 读）取到 32 位结果，与你自己按同样算法算出的期望值比对就能判断数据是否正确。\n\n注意 ECC 只对**数据区**计算，NAND 的 spare/OOB 区（坏块标志、ECC 存放区）不参与。\n\n**型号提醒**：STM32F103C8T6（LQFP48）无 FSMC 引脚引出，本函数在 C8T6 上无实际硬件效果；FSMC 只在 100 脚以上型号可用。",
+      "prerequisites": [
+        "已使能 FSMC 时钟（RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE)）",
+        "已用 FSMC_NANDInit 配置该 Bank，且 FSMC_ECCPageSize 与器件页大小一致",
+        "该 Bank 已 FSMC_NANDCmd(..., ENABLE)"
+      ],
+      "registers": [
+        "FSMC_PCR2",
+        "FSMC_PCR3",
+        "FSMC_ECCR2",
+        "FSMC_ECCR3"
+      ],
+      "relatedFunctions": [
+        "FSMC_GetECC",
+        "FSMC_NANDInit",
+        "FSMC_NANDCmd",
+        "FSMC_GetFlagStatus"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，本函数在 C8T6 上无实际用途",
+        "ECC 结果是「读到 ECCR 时自动清零」的，一次页传输结束后必须马上 FSMC_GetECC 取走；晚了会被下一次访问的中间值覆盖，算出看起来随机的结果",
+        "FSMC_ECCPageSize 必须与器件实际页大小一致（512/2048/4096 等），设错会导致 ECC 永远不匹配，很容易误判成一堆坏块",
+        "硬件 ECC 只覆盖数据区，spare 区的读写不受 ECC 保护，坏块标记要自己维护",
+        "ECC 只对该 Bank 生效；两个 NAND Bank 各有一套 ECCR（ECCR2/ECCR3），互不影响",
+        "关闭 ECC 后 ECCR 的值不再更新，此时读 FSMC_GetECC 得到的是上一次的残留值"
+      ],
+      "exampleCode": "/* 方式一：在 FSMC_NANDInit 里用 FSMC_ECC_Enable 一起配好 */\n/* 方式二：单独开关 */\nFSMC_NANDECCCmd(FSMC_Bank2_NAND, ENABLE);\n\n/* 读完一整页后立刻取走 ECC 结果 */\nwhile (FSMC_GetFlagStatus(FSMC_Bank2_NAND, FSMC_FLAG_FEMPT) == SET) { }\nuint32_t ecc = FSMC_GetECC(FSMC_Bank2_NAND);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FSMC_Bank2_NAND",
+        "FSMC_Bank3_NAND",
+        "FSMC_ECC_Enable",
+        "FSMC_FLAG_FEMPT",
+        "FSMC_GetECC",
+        "FSMC_GetFlagStatus",
+        "FSMC_NANDCmd",
+        "FSMC_NANDInit",
+        "FunctionalState",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_FSMC",
+        "SET"
+      ],
+      "headerLine": 708,
+      "sourceLine": 564,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_GetECC",
+      "name": "FSMC_GetECC",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec4",
+      "prototype": "uint32_t FSMC_GetECC(uint32_t FSMC_Bank);",
+      "returnType": "uint32_t",
+      "params": [
+        {
+          "name": "FSMC_Bank",
+          "type": "uint32_t",
+          "descEn": "specifies the FSMC Bank to be used This parameter can be one of the following values:",
+          "descZh": "目标 NAND 存储块，FSMC_Bank2_NAND 或 FSMC_Bank3_NAND。传其它值会触发 assert 失败。"
+        }
+      ],
+      "returnDescEn": "The Error Correction Code (ECC) value.",
+      "returnDescZh": "返回 32 位 ECC 值（Error Correction Code）。与主机算出的期望 ECC 不同即表示数据出错；全 0 通常意味着这一页从未被合法读取过。",
+      "briefEn": "Returns the error correction code register value.",
+      "briefZh": "读取指定 NAND Bank 的 ECC 计算结果寄存器（ECCR）的值。",
+      "usageZh": "在完成一次「读取一个 ECC 页的数据区」之后调用，拿到硬件算出的 32 位 ECC 值，与主机端按同一算法（STM32 用的是 4 位纠错汉明码）算出的期望值比对：相等说明数据正确；不相等说明这一页出错，通常判为坏块或触发重读。\n\n读取 ECCR 会**自动清除** ECC 计算器，所以一次页传输只能取一次。\n\n**型号提醒**：STM32F103C8T6（LQFP48）无 FSMC 引脚引出，FMC/FSMC 的 ECC 在 C8T6 上无法使用；FSMC 只在 100 脚以上型号可用。",
+      "prerequisites": [
+        "该 Bank 已 FSMC_NANDInit 且 FSMC_NANDCmd(..., ENABLE)",
+        "ECC 已通过 FSMC_NANDECCCmd 或 FSMC_NANDInit 的 FSMC_ECC 字段打开",
+        "ECC 计算过程已结束（例如用 FSMC_FLAG_FEMPT 判断 FIFO 空、一次整页传输已完成）"
+      ],
+      "registers": [
+        "FSMC_ECCR2",
+        "FSMC_ECCR3"
+      ],
+      "relatedFunctions": [
+        "FSMC_NANDECCCmd",
+        "FSMC_GetFlagStatus",
+        "FSMC_NANDInit",
+        "FSMC_NANDCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，本函数在 C8T6 上无实际用途",
+        "读 ECCR 会清零 ECC 寄存器，所以必须「读一次就存起来比对」，在调试 printf 里顺手多读一次会把结果冲掉，导致后面比对失败——很典型的现象是单步调试时通过、全速跑就报错",
+        "必须在整页数据读完（FIFO 变空）之后才读，提前读拿到的是部分数据的中间 ECC，必然不匹配",
+        "ECC 页大小由 FSMC_NANDInit 的 FSMC_ECCPageSize 决定，与器件页大小不一致时该值永远对不上",
+        "本函数返回的是原始 32 位值，SPL 不提供「和期望值比对」的封装，比对逻辑要自己写",
+        "Bank2 用 ECCR2、Bank3 用 ECCR3，两个 Bank 的 ECC 独立计算，可以交替使用"
+      ],
+      "exampleCode": "uint32_t eccRead, eccCalc;\n\n/* 1. 触发一次整页读（以 0x70000000 为基址的 NAND 读页命令序列） */\nNAND_ReadPage(block, page);   /* 用户自己实现 */\n\n/* 2. 等 ECC 计算完成（FIFO 空标志） */\nwhile (FSMC_GetFlagStatus(FSMC_Bank2_NAND, FSMC_FLAG_FEMPT) == SET) { }\n\n/* 3. 取硬件 ECC 并与软件算出的期望值比对 */\neccRead = FSMC_GetECC(FSMC_Bank2_NAND);\neccCalc = NAND_CalcECC(pageBuf, 2048);\nif (eccRead != eccCalc)\n{\n  /* 校验失败：判坏块或重读 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "FSMC_Bank2_NAND",
+        "FSMC_Bank3_NAND",
+        "FSMC_FLAG_FEMPT",
+        "FSMC_GetFlagStatus",
+        "FSMC_NANDCmd",
+        "FSMC_NANDECCCmd",
+        "FSMC_NANDInit",
+        "SET"
+      ],
+      "headerLine": 709,
+      "sourceLine": 603,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_ITConfig",
+      "name": "FSMC_ITConfig",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec5",
+      "prototype": "void FSMC_ITConfig(uint32_t FSMC_Bank, uint32_t FSMC_IT, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_Bank",
+          "type": "uint32_t",
+          "descEn": "specifies the FSMC Bank to be used This parameter can be one of the following values:",
+          "descZh": "目标 NAND 存储块，FSMC_Bank2_NAND 或 FSMC_Bank3_NAND。"
+        },
+        {
+          "name": "FSMC_IT",
+          "type": "uint32_t",
+          "descEn": "specifies the FSMC interrupt sources to be enabled or disabled. This parameter can be any combination of the following values:",
+          "descZh": "中断源，取值 FSMC_IT_RisingEdge（R/B 上升沿）、FSMC_IT_Level（电平触发）、FSMC_IT_FallingEdge（下降沿），可用 | 组合。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the specified FSMC interrupts. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能选中的中断源，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified FSMC interrupts.",
+      "briefZh": "使能或关闭指定 FSMC Bank 的中断源（上升沿、下降沿、电平三类）。",
+      "usageZh": "FSMC 的中断来自 NAND 的 R/B 信号，只有 NAND Bank（Bank2/Bank3）有意义；NOR/SRAM 存储块不支持 FSMC 中断，传 FSMC_Bank1_NORSRAMx 会触发 assert 失败。典型用法是把 R/B 引脚中断打开，NAND 操作后进中断再取数据，从而不必轮询。\n\n要真正进中断还必须 NVIC_Init 使能对应的 FSMC_IRQn，并在中断服务函数里清楚地挂起位。\n\n**型号提醒**：STM32F103C8T6（LQFP48）无 FSMC 引脚引出，本函数在 C8T6 上无实际硬件效果；FSMC 只在 100 脚以上型号可用。",
+      "prerequisites": [
+        "已使能 FSMC 时钟（RCC_AHBPeriphClockCmd(RCC_AHBPeriph_FSMC, ENABLE)）",
+        "已用 FSMC_NANDInit 配置好该 NAND Bank 并 FSMC_NANDCmd(..., ENABLE)",
+        "已用 NVIC_Init 使能对应的中断通道（FSMC_IRQn）"
+      ],
+      "registers": [
+        "FSMC_SR2",
+        "FSMC_SR3"
+      ],
+      "relatedFunctions": [
+        "FSMC_GetITStatus",
+        "FSMC_ClearITPendingBit",
+        "FSMC_GetFlagStatus",
+        "NVIC_Init",
+        "FSMC_NANDInit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，本函数在 C8T6 上无实际用途",
+        "只有 NAND Bank（Bank2/Bank3）支持中断；传 NOR/SRAM 的 Bank 参数在开了 USE_FULL_ASSERT 时会停在 assert_failed 里",
+        "只调 FSMC_ITConfig 不调 NVIC_Init，中断永远不会触发，也不会报错",
+        "FSMC 的中断源与「标志」是分开的两套参数：使能/查询中断用 FSMC_IT_xxx，查询/清除标志用 FSMC_FLAG_xxx，混用会导致判断永远不成立",
+        "中断里必须 FSMC_ClearITPendingBit，否则会反复进中断把 CPU 占满",
+        "FSMC 的中断来自 R/B 引脚电平变化，若硬件没把 NAND 的 R/B 接到 FSMC 的 R/B 引脚，中断永远不会来"
+      ],
+      "exampleCode": "NVIC_InitTypeDef NVIC_InitStructure;\n\n/* 1. 使能 R/B 上升沿中断 */\nFSMC_ITConfig(FSMC_Bank2_NAND, FSMC_IT_RisingEdge, ENABLE);\n\n/* 2. 别忘了 NVIC，否则中断永远不会进 */\nNVIC_InitStructure.NVIC_IRQChannel = FSMC_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x02;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x00;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\n/* 3. 中断服务函数里必须清挂起位 */\nvoid FSMC_IRQHandler(void)\n{\n  if (FSMC_GetITStatus(FSMC_Bank2_NAND, FSMC_IT_RisingEdge) != RESET)\n  {\n    FSMC_ClearITPendingBit(FSMC_Bank2_NAND, FSMC_IT_RisingEdge);\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FSMC_Bank2_NAND",
+        "FSMC_Bank3_NAND",
+        "FSMC_ClearITPendingBit",
+        "FSMC_GetITStatus",
+        "FSMC_IT_FallingEdge",
+        "FSMC_IT_Level",
+        "FSMC_IT_RisingEdge",
+        "FSMC_NANDCmd",
+        "FSMC_NANDInit",
+        "FunctionalState",
+        "NVIC",
+        "NVIC_Init",
+        "NVIC_InitTypeDef",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_FSMC",
+        "RESET",
+        "USE_FULL_ASSERT"
+      ],
+      "headerLine": 710,
+      "sourceLine": 637,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_GetFlagStatus",
+      "name": "FSMC_GetFlagStatus",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec6",
+      "prototype": "FlagStatus FSMC_GetFlagStatus(uint32_t FSMC_Bank, uint32_t FSMC_FLAG);",
+      "returnType": "FlagStatus",
+      "params": [
+        {
+          "name": "FSMC_Bank",
+          "type": "uint32_t",
+          "descEn": "specifies the FSMC Bank to be used This parameter can be one of the following values:",
+          "descZh": "目标 NAND 存储块，FSMC_Bank2_NAND 或 FSMC_Bank3_NAND。"
+        },
+        {
+          "name": "FSMC_FLAG",
+          "type": "uint32_t",
+          "descEn": "specifies the flag to check. This parameter can be one of the following values:",
+          "descZh": "要查询的标志，取值 FSMC_FLAG_RisingEdge（R/B 上升沿）、FSMC_FLAG_FallingEdge（下降沿）、FSMC_FLAG_Level（R/B 电平）、FSMC_FLAG_FEMPT（FIFO 空，即 ECC 计算完成）。"
+        }
+      ],
+      "returnDescEn": "The new state of FSMC_FLAG (SET or RESET).",
+      "returnDescZh": "SET 表示该标志已置位；RESET 表示未置位。",
+      "briefEn": "Checks whether the specified FSMC flag is set or not.",
+      "briefZh": "查询指定 FSMC Bank 的状态标志（上升沿/下降沿/电平/FIFO 空），不受中断使能位影响。",
+      "usageZh": "两类用途：一是轮询 NAND 的 R/B 状态（用 FSMC_FLAG_RisingEdge / FSMC_FLAG_FallingEdge / FSMC_FLAG_Level），二是判断 ECC 计算是否结束（FSMC_FLAG_FEMPT，FIFO 空）。它只看 FSMC_SR 寄存器本身，即使没有使能中断也能查，所以在纯轮询的 NAND 驱动里比中断更好用。\n\n**型号提醒**：STM32F103C8T6（LQFP48）无 FSMC 引脚引出，本函数在 C8T6 上只会返回复位默认值（RESET）；FSMC 只在 100 脚以上型号可用。",
+      "prerequisites": [
+        "已使能 FSMC 时钟并初始化、使能该 NAND Bank",
+        "查询 R/B 类标志时硬件已把 NAND 的 R/B 接到 FSMC 的 R/B 引脚"
+      ],
+      "registers": [
+        "FSMC_SR2",
+        "FSMC_SR3"
+      ],
+      "relatedFunctions": [
+        "FSMC_ClearFlag",
+        "FSMC_GetITStatus",
+        "FSMC_GetECC",
+        "FSMC_NANDCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，本函数在 C8T6 上只能读到复位值，别据此以为是「NAND 一直没就绪」",
+        "一个时间只能传一个 FSMC_FLAG 值，多个标志要分开查询（与 FSMC_ClearFlag 不同，那个可以组合）",
+        "FSMC_FLAG_FEMPT 的语义是「ECC FIFO 为空」，即数据已经全部搬完、可以取 ECC 结果；写反了条件会立刻通过，取到残缺的 ECC",
+        "R/B 标志置位后不会自动清除，必须用 FSMC_ClearFlag 清；不清的话下一次轮询判断会被上一次的残留状态骗过",
+        "纯轮询一定要带超时退出，否则 NAND 掉线或接线错误时程序会卡死在 while 里",
+        "本函数不受 FSMC_ITConfig 影响，没开中断也能用；反过来 FSMC_GetITStatus 在没开中断时永远返回 RESET"
+      ],
+      "exampleCode": "/* 轮询等待 NAND 操作完成（不用中断的写法） */\nvoid NAND_WaitReady(void)\n{\n  uint32_t t = 0;\n  /* 等 R/B 回到高电平 */\n  while (FSMC_GetFlagStatus(FSMC_Bank2_NAND, FSMC_FLAG_Level) == RESET)\n  {\n    if (++t > 1000000u) { break; }   /* 一定要有超时，否则会死等 */\n  }\n  FSMC_ClearFlag(FSMC_Bank2_NAND, FSMC_FLAG_RisingEdge | FSMC_FLAG_FallingEdge);\n}\n\n/* 等 ECC 计算结束再取值 */\nwhile (FSMC_GetFlagStatus(FSMC_Bank2_NAND, FSMC_FLAG_FEMPT) == SET) { }",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FSMC_Bank2_NAND",
+        "FSMC_Bank3_NAND",
+        "FSMC_ClearFlag",
+        "FSMC_FLAG_FEMPT",
+        "FSMC_FLAG_FallingEdge",
+        "FSMC_FLAG_Level",
+        "FSMC_FLAG_RisingEdge",
+        "FSMC_GetITStatus",
+        "FSMC_ITConfig",
+        "FlagStatus",
+        "RESET",
+        "SET"
+      ],
+      "headerLine": 711,
+      "sourceLine": 697,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_ClearFlag",
+      "name": "FSMC_ClearFlag",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec6",
+      "prototype": "void FSMC_ClearFlag(uint32_t FSMC_Bank, uint32_t FSMC_FLAG);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_Bank",
+          "type": "uint32_t",
+          "descEn": "specifies the FSMC Bank to be used This parameter can be one of the following values:",
+          "descZh": "目标 NAND 存储块，FSMC_Bank2_NAND 或 FSMC_Bank3_NAND。"
+        },
+        {
+          "name": "FSMC_FLAG",
+          "type": "uint32_t",
+          "descEn": "specifies the flag to clear. This parameter can be any combination of the following values:",
+          "descZh": "要清除的标志，取值 FSMC_FLAG_RisingEdge、FSMC_FLAG_FallingEdge、FSMC_FLAG_Level、FSMC_FLAG_FEMPT，可用 | 组合。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Clears the FSMC's pending flags.",
+      "briefZh": "清除指定 FSMC Bank 的挂起标志位（写 1 清除）。",
+      "usageZh": "轮询或中断处理完事件后清除标志，避免下一次判断被上一次的残留状态影响。参数可以用 | 组合多个标志一次清掉。\n\n**型号提醒**：STM32F103C8T6（LQFP48）无 FSMC 引脚引出，本函数在 C8T6 上无实际硬件效果；FSMC 只在 100 脚以上型号可用。",
+      "prerequisites": [
+        "该 Bank 已初始化并使能",
+        "已用 FSMC_GetFlagStatus 确认过标志状态（或明确知道要无条件清除）"
+      ],
+      "registers": [
+        "FSMC_SR2",
+        "FSMC_SR3"
+      ],
+      "relatedFunctions": [
+        "FSMC_GetFlagStatus",
+        "FSMC_ClearITPendingBit",
+        "FSMC_GetECC"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，本函数在 C8T6 上无实际用途",
+        "FSMC_ClearFlag 清的是「标志位」，FSMC_ClearITPendingBit 清的是「中断挂起位」，两者不是一回事，用中断时通常要清后者",
+        "不要在取 ECC 结果之前清 FSMC_FLAG_FEMPT，否则轮询条件会瞬间通过，拿到不完整的 ECC",
+        "标志自始至终不清，会导致下一次轮询一开始就判断为「事件已发生」，表现为 NAND 操作时序整体错乱",
+        "FSMC_SR 的位是写 1 清除，本函数内部已做移位处理，直接传 FSMC_FLAG_xxx 宏即可"
+      ],
+      "exampleCode": "/* 等待 R/B 上升沿事件后清标志 */\nwhile (FSMC_GetFlagStatus(FSMC_Bank2_NAND, FSMC_FLAG_RisingEdge) == RESET) { }\n\n/* 业务处理 */\nNAND_ReadPageDone();\n\n/* 清掉本次事件标志，防止下次误判 */\nFSMC_ClearFlag(FSMC_Bank2_NAND, FSMC_FLAG_RisingEdge);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FSMC_Bank2_NAND",
+        "FSMC_Bank3_NAND",
+        "FSMC_ClearITPendingBit",
+        "FSMC_FLAG_FEMPT",
+        "FSMC_FLAG_FallingEdge",
+        "FSMC_FLAG_Level",
+        "FSMC_FLAG_RisingEdge",
+        "FSMC_GetFlagStatus",
+        "RESET"
+      ],
+      "headerLine": 712,
+      "sourceLine": 747,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_GetITStatus",
+      "name": "FSMC_GetITStatus",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec5",
+      "prototype": "ITStatus FSMC_GetITStatus(uint32_t FSMC_Bank, uint32_t FSMC_IT);",
+      "returnType": "ITStatus",
+      "params": [
+        {
+          "name": "FSMC_Bank",
+          "type": "uint32_t",
+          "descEn": "specifies the FSMC Bank to be used This parameter can be one of the following values:",
+          "descZh": "目标 NAND 存储块，FSMC_Bank2_NAND 或 FSMC_Bank3_NAND。"
+        },
+        {
+          "name": "FSMC_IT",
+          "type": "uint32_t",
+          "descEn": "specifies the FSMC interrupt source to check. This parameter can be one of the following values:",
+          "descZh": "要查询的中断源，取值 FSMC_IT_RisingEdge、FSMC_IT_Level、FSMC_IT_FallingEdge 之一。"
+        }
+      ],
+      "returnDescEn": "The new state of FSMC_IT (SET or RESET).",
+      "returnDescZh": "SET 表示该中断已发生且已使能；RESET 表示未发生或该中断未使能。",
+      "briefEn": "Checks whether the specified FSMC interrupt has occurred or not.",
+      "briefZh": "查询指定 FSMC Bank 的某个中断源是否发生了（同时看状态寄存器与中断屏蔽寄存器）。",
+      "usageZh": "在中断服务函数里用，判断到底是哪个事件触发了中断。它会同时检查 FSMC_SR 的对应标志位和 FSMC_PCR 的对应中断使能位：只有「发生了」且「已使能中断」才返回 SET。所以它比 FSMC_GetFlagStatus 更严格，适合在 ISR 里判因。\n\n**型号提醒**：STM32F103C8T6（LQFP48）无 FSMC 引脚引出，本函数在 C8T6 上读到的只会是复位默认值；FSMC 只在 100 脚以上型号可用。",
+      "prerequisites": [
+        "已用 FSMC_ITConfig 使能该中断源",
+        "已用 NVIC_Init 使能 FSMC_IRQn 中断通道",
+        "已用 FSMC_NANDInit 初始化并使能该 NAND Bank"
+      ],
+      "registers": [
+        "FSMC_SR2",
+        "FSMC_SR3"
+      ],
+      "relatedFunctions": [
+        "FSMC_ITConfig",
+        "FSMC_ClearITPendingBit",
+        "FSMC_GetFlagStatus",
+        "NVIC_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，本函数在 C8T6 上读到的永远是复位值，没有实际意义",
+        "没调 FSMC_ITConfig 使能该中断源时，即使标志已经置位本函数也返回 RESET——调试时「明明标志是 1 却进不来判断」多半是这个原因",
+        "FSMC_IT 只能填一个值（不能像 FSMC_ITConfig 那样多个或起来），要判多个源就多调几次",
+        "查询完记得用 FSMC_ClearITPendingBit 清除对应挂起位，否则中断会反复触发",
+        "想绕过中断使能位、只看硬件标志本身，用 FSMC_GetFlagStatus 配合 FSMC_FLAG_RisingEdge 之类的标志参数"
+      ],
+      "exampleCode": "void FSMC_IRQHandler(void)\n{\n  /* 判断具体是哪个中断源触发 */\n  if (FSMC_GetITStatus(FSMC_Bank2_NAND, FSMC_IT_RisingEdge) != RESET)\n  {\n    FSMC_ClearITPendingBit(FSMC_Bank2_NAND, FSMC_IT_RisingEdge);\n    /* R/B 变高：NAND 空闲，可以去读数据了 */\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FSMC_Bank2_NAND",
+        "FSMC_Bank3_NAND",
+        "FSMC_ClearITPendingBit",
+        "FSMC_FLAG_RisingEdge",
+        "FSMC_GetFlagStatus",
+        "FSMC_ITConfig",
+        "FSMC_IT_FallingEdge",
+        "FSMC_IT_Level",
+        "FSMC_IT_RisingEdge",
+        "FSMC_NANDInit",
+        "ITStatus",
+        "NVIC_Init",
+        "RESET",
+        "SET"
+      ],
+      "headerLine": 713,
+      "sourceLine": 782,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FSMC_ClearITPendingBit",
+      "name": "FSMC_ClearITPendingBit",
+      "peripheral": "FSMC",
+      "sectionId": "FSMC#sec5",
+      "prototype": "void FSMC_ClearITPendingBit(uint32_t FSMC_Bank, uint32_t FSMC_IT);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FSMC_Bank",
+          "type": "uint32_t",
+          "descEn": "specifies the FSMC Bank to be used This parameter can be one of the following values:",
+          "descZh": "目标 NAND 存储块，FSMC_Bank2_NAND 或 FSMC_Bank3_NAND。"
+        },
+        {
+          "name": "FSMC_IT",
+          "type": "uint32_t",
+          "descEn": "specifies the interrupt pending bit to clear. This parameter can be any combination of the following values:",
+          "descZh": "要清除的中断挂起位，取值 FSMC_IT_RisingEdge、FSMC_IT_Level、FSMC_IT_FallingEdge，可用 | 组合。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Clears the FSMC's interrupt pending bits.",
+      "briefZh": "清除指定 FSMC Bank 的中断挂起位（写 1 清除）。",
+      "usageZh": "在中断服务函数处理完事件后必须调用，否则该中断源会一直保持挂起状态，导致中断反复触发、CPU 被打满。参数可以多个 FSMC_IT_xxx 或起来一次清多个。\n\n**型号提醒**：STM32F103C8T6（LQFP48）无 FSMC 引脚引出，本函数在 C8T6 上无实际硬件效果；FSMC 只在 100 脚以上型号可用。",
+      "prerequisites": [
+        "已在中断服务函数中确认了中断来源（通常用 FSMC_GetITStatus 判断）",
+        "目标 Bank 已初始化并使能"
+      ],
+      "registers": [
+        "FSMC_SR2",
+        "FSMC_SR3"
+      ],
+      "relatedFunctions": [
+        "FSMC_GetITStatus",
+        "FSMC_ITConfig",
+        "FSMC_ClearFlag"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 无 FSMC 引脚引出，本函数在 C8T6 上无实际用途",
+        "漏掉这一句的现象是：程序一进中断就出不来（中断反复触发），主循环完全不跑",
+        "清除的是「中断挂起位」，与 FSMC_ClearFlag 清「标志位」是两套位，清错了中断还会再来",
+        "FSMC_SR 的位是「写 1 清除」，本函数内部已经做了移位，直接传 FSMC_IT_xxx 宏即可，不要自己传数值",
+        "如果同时开了上升沿和下降沿中断，两个挂起位要分别清（或一次用 | 组合传入）"
+      ],
+      "exampleCode": "void FSMC_IRQHandler(void)\n{\n  if (FSMC_GetITStatus(FSMC_Bank2_NAND, FSMC_IT_RisingEdge) != RESET)\n  {\n    /* 先处理业务，再清挂起位 */\n    NAND_OnReady();\n    FSMC_ClearITPendingBit(FSMC_Bank2_NAND, FSMC_IT_RisingEdge);\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FSMC_Bank2_NAND",
+        "FSMC_Bank3_NAND",
+        "FSMC_ClearFlag",
+        "FSMC_GetITStatus",
+        "FSMC_IT_FallingEdge",
+        "FSMC_IT_Level",
+        "FSMC_IT_RisingEdge",
+        "RESET"
+      ],
+      "headerLine": 714,
+      "sourceLine": 833,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    }
+  ]
+}

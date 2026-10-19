@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://local/stm32_spl_helper/symbols.schema.json",
+  "title": "SymbolBundle",
+  "description": "assets/data/symbols.json —— 宏 / 枚举值 / 枚举类型 / 结构体 / typedef，关键词跳转的目标对象。",
+  "type": "object",
+  "required": ["schemaVersion", "symbols"],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "symbols": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "kind", "peripheral"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "description": "等于符号名" },
+          "name": { "type": "string" },
+          "kind": {
+            "type": "string",
+            "enum": ["macro", "enum_value", "enum_type", "struct", "typedef"],
+            "description": "符号种类；未知值在 Dart 侧解析为 unknown"
+          },
+          "peripheral": { "type": "string" },
+          "value": { "type": ["string", "null"], "description": "宏替换体或枚举值" },
+          "valueKind": { "type": ["string", "null"], "enum": ["hex", "dec", "expression", "string", null] },
+          "enumType": { "type": ["string", "null"], "description": "枚举值所属枚举类型名" },
+          "memberOf": { "type": ["string", "null"], "description": "所属结构体/枚举的符号 id" },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name"],
+              "additionalProperties": true,
+              "properties": {
+                "name": { "type": "string" },
+                "type": { "type": ["string", "null"], "description": "结构体成员类型，其中的类型名可点击跳转" },
+                "value": { "type": ["string", "null"] },
+                "descEn": { "type": "string" },
+                "descZh": { "type": "string" },
+                "line": { "type": "integer", "minimum": 0 }
+              }
+            }
+          },
+          "briefEn": { "type": "string" },
+          "briefZh": { "type": "string" },
+          "usageZh": { "type": "string" },
+          "definedIn": { "type": "string" },
+          "definedLine": { "type": "integer", "minimum": 0 },
+          "visibility": { "type": "string", "enum": ["public", "internal"] },
+          "functionLike": { "type": "boolean" },
+          "params": { "type": "array", "items": { "type": "string" }, "description": "函数式宏的参数名" },
+          "usedBy": { "type": "array", "items": { "type": "string" }, "description": "反向索引：用到它的函数 id" },
+          "relatedSymbols": { "type": "array", "items": { "type": "string" } },
+          "notesZh": { "type": "array", "items": { "type": "string" } },
+          "ai": { "type": ["object", "null"] },
+          "zhSource": { "type": "string", "enum": ["base", "overlay"] }
+        }
+      }
+    }
+  }
+}

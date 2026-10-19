@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://local/stm32_spl_helper/functions.schema.json",
+  "title": "FunctionBundle",
+  "description": "assets/data/functions/<外设>.json —— 某外设的全部库函数。",
+  "type": "object",
+  "required": ["schemaVersion", "peripheral", "functions"],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "peripheral": { "type": "string" },
+    "functions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "peripheral", "prototype", "returnType", "params"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "description": "等于函数名" },
+          "name": { "type": "string" },
+          "peripheral": { "type": "string" },
+          "sectionId": { "type": "string", "description": "所属分组 id，如 GPIO#sec1" },
+          "prototype": { "type": "string", "description": "完整函数原型" },
+          "returnType": { "type": "string" },
+          "params": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "type"],
+              "additionalProperties": true,
+              "properties": {
+                "name": { "type": "string" },
+                "type": { "type": "string", "description": "参数类型，其中的枚举/结构体名要能点击跳转" },
+                "descEn": { "type": "string", "description": "@param 英文原文" },
+                "descZh": { "type": "string" }
+              }
+            }
+          },
+          "returnDescEn": { "type": "string", "description": "@retval 英文原文" },
+          "returnDescZh": { "type": "string" },
+          "briefEn": { "type": "string", "description": "ST 原始 @brief" },
+          "briefZh": { "type": "string" },
+          "usageZh": { "type": "string", "description": "什么时候用、怎么用" },
+          "prerequisites": { "type": "array", "items": { "type": "string" } },
+          "registers": { "type": "array", "items": { "type": "string" } },
+          "relatedFunctions": { "type": "array", "items": { "type": "string" }, "description": "相关函数 id，必须存在于函数表" },
+          "remarks": { "type": "array", "items": { "type": "string" }, "description": "ST @note 原文" },
+          "notesZh": { "type": "array", "items": { "type": "string" } },
+          "exampleCode": { "type": "string" },
+          "exampleLanguage": { "type": "string", "enum": ["c"], "default": "c" },
+          "symbolRefs": { "type": "array", "items": { "type": "string" }, "description": "本文本里出现的库内符号，关键词跳转白名单" },
+          "headerLine": { "type": "integer", "minimum": 0 },
+          "sourceLine": { "type": "integer", "minimum": 0 },
+          "flags": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "deprecated": { "type": "boolean" },
+              "isrSafe": { "type": "boolean" },
+              "inline": { "type": "boolean" },
+              "macroLike": { "type": "boolean" }
+            }
+          },
+          "ai": { "type": ["object", "null"], "description": "预留 AI 字段，本期为 null" },
+          "zhSource": { "type": "string", "enum": ["base", "overlay"] }
+        }
+      }
+    }
+  }
+}

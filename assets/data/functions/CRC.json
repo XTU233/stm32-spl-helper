@@ -1,0 +1,352 @@
+{
+  "schemaVersion": 1,
+  "peripheral": "CRC",
+  "functions": [
+    {
+      "id": "CRC_ResetDR",
+      "name": "CRC_ResetDR",
+      "peripheral": "CRC",
+      "sectionId": "CRC#sec1",
+      "prototype": "void CRC_ResetDR(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Resets the CRC Data register (DR).",
+      "briefZh": "复位 CRC 数据寄存器（把 CRC 值恢复为 0xFFFFFFFF 初值）。",
+      "usageZh": "每次开始计算一段新数据的 CRC 之前**必须调用**，否则会把上一段数据的残留值接着往下算。硬件 CRC 的初值是 0xFFFFFFFF，复位后 CRC_GetCRC 读回来就是 0xFFFFFFFF。\n\n典型用法：算前 CRC_ResetDR → 累加数据（CRC_CalcCRC / CRC_CalcBlockCRC）→ CRC_GetCRC 取结果。",
+      "prerequisites": [
+        "已调用 RCC_AHBPeriphClockCmd(RCC_AHBPeriph_CRC, ENABLE) 打开 CRC 时钟（CRC 挂 AHB 总线，不是 APB1/APB2）"
+      ],
+      "registers": [
+        "CRC_DR"
+      ],
+      "relatedFunctions": [
+        "CRC_CalcCRC",
+        "CRC_CalcBlockCRC",
+        "CRC_GetCRC",
+        "RCC_AHBPeriphClockCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "漏调 CRC_ResetDR 是「CRC 校验时对时不对」的最常见原因：算第二段数据时结果带上了第一段的残留",
+        "复位后 DR 的值是 0xFFFFFFFF 而不是 0，这一点和某些软件的 CRC 初值习惯不同",
+        "复位只影响数据寄存器，不会清 ID 寄存器",
+        "软件复位芯片后 CRC_DR 也是 0xFFFFFFFF，但重复调用本函数是更明确的写法"
+      ],
+      "exampleCode": "/* 1. CRC 挂在 AHB 上，时钟使能方式和其它外设不同 */\nRCC_AHBPeriphClockCmd(RCC_AHBPeriph_CRC, ENABLE);\n\n/* 2. 算新数据前复位，否则会接着上一段的结果继续算 */\nCRC_ResetDR();\n\n/* 3. 累加数据 */\nCRC_CalcBlockCRC((uint32_t*)buf, len / 4);\n\n/* 4. 取结果 */\nuint32_t crc = CRC_GetCRC();",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "CRC",
+        "CRC_CalcBlockCRC",
+        "CRC_CalcCRC",
+        "CRC_GetCRC",
+        "ENABLE",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_CRC"
+      ],
+      "headerLine": 69,
+      "sourceLine": 83,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "CRC_CalcCRC",
+      "name": "CRC_CalcCRC",
+      "peripheral": "CRC",
+      "sectionId": "CRC#sec2",
+      "prototype": "uint32_t CRC_CalcCRC(uint32_t Data);",
+      "returnType": "uint32_t",
+      "params": [
+        {
+          "name": "Data",
+          "type": "uint32_t",
+          "descEn": "data word(32-bit) to compute its CRC",
+          "descZh": "要送入计算的 32 位字。逐字节数据需要自己移位拼字。"
+        }
+      ],
+      "returnDescEn": "32-bit CRC",
+      "returnDescZh": "累计到当前的 32 位 CRC 值。注意它返回的是「到目前为止」的结果，不是「这一个字的」CRC。",
+      "briefEn": "Computes the 32-bit CRC of a given data word(32-bit).",
+      "briefZh": "把一个 32 位字送入 CRC 计算单元，返回累加后的 32 位 CRC 值。",
+      "usageZh": "硬件 CRC 是**流式累加**的：每送入一个字，内部就按固定的多项式 x³²+x²⁶+x²³+x²²+x¹⁶+x¹²+x¹¹+x¹⁰+x⁸+x⁷+x⁵+x⁴+x²+x+1（即 0x04C11DB7）更新一次。函数返回的是**到目前为止的累计值**，所以连续调用天然就是接着算。\n\n**这是最容易误解的地方：单位是 32 位字，不是字节。** 想逐字节计算，必须自己把 4 个字节拼成一个 uint32_t 再送进去，且要明确字节序：\n`word = b0 | (b1<<8) | (b2<<16) | (b3<<24);`（小端，与 STM32 内存布局一致）\n\n如果数据长度不是 4 的倍数，最后一组要补 0xFF 或 0x00 凑成 4 字节——补什么值会改变结果，收发两端约定一致即可。",
+      "prerequisites": [
+        "已开 CRC 时钟（RCC_AHBPeriph_CRC）",
+        "已调用 CRC_ResetDR 开始新一段计算"
+      ],
+      "registers": [
+        "CRC_DR"
+      ],
+      "relatedFunctions": [
+        "CRC_CalcBlockCRC",
+        "CRC_GetCRC",
+        "CRC_ResetDR"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "单位是 32 位字：把字节当参数传（CRC_CalcCRC(buf[0])）算出来的结果毫无意义",
+        "拼字的字节序会直接改变结果；STM32 是小端，用 `b0 | b1<<8 | b2<<16 | b3<<24` 与内存布局一致，跨平台通信时对端要按同样规则拼",
+        "长度不是 4 的倍数时必须补齐，补 0x00 与补 0xFF 结果完全不同，务必与接收端约定",
+        "返回值是累计值，不是单字结果；只需要最终值时算完再调一次 CRC_GetCRC 更清晰",
+        "多项式与初值在 F103 上固定不可配（初值 0xFFFFFFFF、无输入/输出反转），与标准 CRC-32/ISO-HDLC 的「输入输出反射」版本结果不同，不能直接拿去和 zlib.crc32 对比",
+        "C8T6 有 CRC 外设，可以正常使用；但整个流程不需要任何引脚"
+      ],
+      "exampleCode": "/* 逐字节数据必须自己拼成 32 位字；长度不足 4 的倍数要补齐 */\nuint32_t crc32_of_bytes(const uint8_t *buf, uint32_t len)\n{\n  uint32_t i = 0;\n  uint32_t word;\n\n  CRC_ResetDR();\n\n  while (i + 4 <= len)\n  {\n    /* 小端拼字，与 STM32 内存布局一致 */\n    word = (uint32_t)buf[i]\n         | ((uint32_t)buf[i + 1] << 8)\n         | ((uint32_t)buf[i + 2] << 16)\n         | ((uint32_t)buf[i + 3] << 24);\n    CRC_CalcCRC(word);\n    i += 4;\n  }\n\n  /* 尾部不足 4 字节：用 0xFF 补齐（收发两端必须约定一致） */\n  if (i < len)\n  {\n    word = 0xFFFFFFFF;\n    uint8_t *p = (uint8_t *)&word;\n    uint32_t k = 0;\n    while (i < len)\n    {\n      p[k++] = buf[i++];\n    }\n    CRC_CalcCRC(word);\n  }\n\n  return CRC_GetCRC();\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "CRC",
+        "CRC_GetCRC",
+        "CRC_ResetDR",
+        "RCC_AHBPeriph_CRC"
+      ],
+      "headerLine": 71,
+      "sourceLine": 94,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "CRC_CalcBlockCRC",
+      "name": "CRC_CalcBlockCRC",
+      "peripheral": "CRC",
+      "sectionId": "CRC#sec2",
+      "prototype": "uint32_t CRC_CalcBlockCRC(uint32_t pBuffer[], uint32_t BufferLength);",
+      "returnType": "uint32_t",
+      "params": [
+        {
+          "name": "pBuffer",
+          "type": "uint32_t",
+          "descEn": "pointer to the buffer containing the data to be computed",
+          "descZh": "指向数据缓冲区的指针。参数在头文件里声明为 uint32_t pBuffer[]，实际按指针传递；传 uint8_t 数组时必须强制转换 `(uint32_t*)buf`，同时确保 4 字节对齐，否则在 Cortex-M3 上访问非对齐地址会触发 HardFault。"
+        },
+        {
+          "name": "BufferLength",
+          "type": "uint32_t",
+          "descEn": "length of the buffer to be computed",
+          "descZh": "缓冲区长度，**单位是 32 位字（word）的个数，不是字节数**。字节数组请传 sizeof(buf)/4。"
+        }
+      ],
+      "returnDescEn": "32-bit CRC",
+      "returnDescZh": "该缓冲区累计计算后的 32 位 CRC 值。",
+      "briefEn": "Computes the 32-bit CRC of a given buffer of data word(32-bit).",
+      "briefZh": "计算一段 32 位字缓冲区（数组）的 32 位 CRC。",
+      "usageZh": "最常用的 CRC 函数，一次算完整个 32 位数组。**注意 BufferLength 单位是「字数」不是字节数**：传字节长度会让计算结果错（会多算一半的垃圾数据，甚至越界读取造成 HardFault）。正确写法是 `CRC_CalcBlockCRC((uint32_t*)buf, sizeof(buf)/4)`。\n\n它内部是按字循环调用 CRC_CalcCRC，所以长度不是 4 的倍数时依然要自己补齐。",
+      "prerequisites": [
+        "已开 CRC 时钟（RCC_AHBPeriph_CRC）",
+        "已调用 CRC_ResetDR",
+        "缓冲区按 4 字节对齐，且长度是 4 的倍数（否则要自己补齐后再算）"
+      ],
+      "registers": [
+        "CRC_DR"
+      ],
+      "relatedFunctions": [
+        "CRC_CalcCRC",
+        "CRC_GetCRC",
+        "CRC_ResetDR"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "BufferLength 传成字节数是最常见错误：算一半数据还好说，长度超过实际数组会让硬件连续读越界内存",
+        "传 uint8_t 数组必须 (uint32_t*) 强转并保证 4 字节对齐，未对齐访问在 Cortex-M3 上直接 HardFault",
+        "和 CRC_CalcCRC 一样，它不会自动复位 DR，连续算两段数据之间必须 CRC_ResetDR",
+        "长度不是 4 的倍数的尾部数据不会参与计算，必须自己补成完整的字",
+        "它返回累计值，与随后 CRC_GetCRC 的返回值相同"
+      ],
+      "exampleCode": "uint32_t data[64];   /* 必须是 4 字节对齐的 uint32_t 数组 */\nuint32_t crc;\n\nRCC_AHBPeriphClockCmd(RCC_AHBPeriph_CRC, ENABLE);\n\nCRC_ResetDR();\n\n/* 长度单位是「字数」：数组有 64 个字就传 64 */\ncrc = CRC_CalcBlockCRC(data, 64);\n\n/* 如果源数据是 uint8_t 数组，用法如下 */\n/* uint8_t raw[256] __attribute__((aligned(4))); */\n/* crc = CRC_CalcBlockCRC((uint32_t*)raw, 256 / 4); */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "CRC",
+        "CRC_CalcCRC",
+        "CRC_GetCRC",
+        "CRC_ResetDR",
+        "ENABLE",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_CRC"
+      ],
+      "headerLine": 72,
+      "sourceLine": 107,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "CRC_GetCRC",
+      "name": "CRC_GetCRC",
+      "peripheral": "CRC",
+      "sectionId": "CRC#sec3",
+      "prototype": "uint32_t CRC_GetCRC(void);",
+      "returnType": "uint32_t",
+      "params": [],
+      "returnDescEn": "32-bit CRC",
+      "returnDescZh": "当前的 32 位 CRC 值。刚 CRC_ResetDR 后读回来是 0xFFFFFFFF。",
+      "briefEn": "Returns the current CRC value.",
+      "briefZh": "读取当前 CRC 数据寄存器中的计算结果。",
+      "usageZh": "取最终校验值。可以随时读取，也可以在 CRC_CalcCRC / CRC_CalcBlockCRC 调用后读。因为 CRC 计算单元是流式的，本函数读到的就是「到目前为止」的累计值，非常适合做分块数据的增量校验（例如一边从串口收一边算）。",
+      "prerequisites": [
+        "已开 CRC 时钟（RCC_AHBPeriph_CRC）",
+        "已调用 CRC_ResetDR 并送入过数据（否则读到的是初值或上一段数据的残留）"
+      ],
+      "registers": [
+        "CRC_DR"
+      ],
+      "relatedFunctions": [
+        "CRC_CalcCRC",
+        "CRC_CalcBlockCRC",
+        "CRC_ResetDR"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "读操作不会改变 CRC 值，可以反复读（这一点和 CAN 那些「读后清」的标志不同）",
+        "在 CRC 计算之外写 CRC->DR 是等价的，但用本函数可读性更好",
+        "读之前忘记 CRC_ResetDR 会拿到带残留的结果，表现为「第一帧对、后面全错」",
+        "F103 的 CRC 没有输出反转，结果与常见的标准 CRC-32 工具（如 zlib）不一致，比对时要用同样的实现"
+      ],
+      "exampleCode": "/* 增量校验：边收边算，最后取一次结果 */\nCRC_ResetDR();\n\nwhile (收到一个新字)\n{\n  CRC_CalcCRC(new_word);\n}\n\nuint32_t crc = CRC_GetCRC();   /* 最终校验值 */\n\n/* 与发送端比对 */\nif (crc != expected_crc)\n{\n  /* 数据损坏 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "CRC",
+        "CRC_CalcBlockCRC",
+        "CRC_CalcCRC",
+        "CRC_ResetDR",
+        "RCC_AHBPeriph_CRC"
+      ],
+      "headerLine": 73,
+      "sourceLine": 123,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "CRC_SetIDRegister",
+      "name": "CRC_SetIDRegister",
+      "peripheral": "CRC",
+      "sectionId": "CRC#sec1",
+      "prototype": "void CRC_SetIDRegister(uint8_t IDValue);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "IDValue",
+          "type": "uint8_t",
+          "descEn": "8-bit value to be stored in the ID register",
+          "descZh": "要写入 ID 寄存器的 8 位值（0x00~0xFF）。仅低 8 位有效，超出会被截断。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Stores a 8-bit data in the Independent Data(ID) register.",
+      "briefZh": "向独立数据寄存器（ID 寄存器）写入一个 8 位值。",
+      "usageZh": "CRCC 的 ID 寄存器是一个 8 位自由存储单元，硬件**不参与 CRC 计算**，可用于存放版本号、节点 ID、序列号等，随 CRC 一起被读取用于校验比对。用法通常是先写 ID 再算 CRC，接收端用 CRC_GetIDRegister 读回比对。\n\n**重要：该函数只在部分型号的 CRC 外设上存在（互联型等），STM32F103C8T6 的 CRC 没有 ID 寄存器**，在 C8T6 工程里调用它要么编译报错（库头文件里按型号宏条件编译）要么访问保留地址无效。C8T6 上请改用普通变量或 Flash 中的固定位置保存这类信息。",
+      "prerequisites": [
+        "已开 CRC 时钟（RCC_AHBPeriph_CRC）",
+        "目标型号的 CRC 外设确实带 ID 寄存器（C8T6 没有）"
+      ],
+      "registers": [
+        "CRC_IDR"
+      ],
+      "relatedFunctions": [
+        "CRC_GetIDRegister",
+        "CRC_ResetDR",
+        "CRC_GetCRC"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 的 CRC 没有 ID 寄存器，调用本函数不会得到预期效果——请改用普通全局变量或 Flash 固定地址存版本信息",
+        "ID 值不参与 CRC 计算，不要指望它影响 CRC_GetCRC 的结果",
+        "如果在 C8T6 上写了这段代码，很可能是从别的型号的例程直接抄来的",
+        "与 CRC_ResetDR 相互独立，复位数据寄存器不会清掉 ID"
+      ],
+      "exampleCode": "/* 仅在有 CRC ID 寄存器的型号上可用；C8T6 没有该寄存器 */\n#ifdef STM32F10X_CL   /* 互联型才有 ID 寄存器 */\n  CRC_SetIDRegister(0x5A);      /* 例如写入固件版本号 */\n#endif",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "CRC",
+        "CRC_GetCRC",
+        "CRC_GetIDRegister",
+        "CRC_ResetDR",
+        "RCC_AHBPeriph_CRC"
+      ],
+      "headerLine": 74,
+      "sourceLine": 133,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "CRC_GetIDRegister",
+      "name": "CRC_GetIDRegister",
+      "peripheral": "CRC",
+      "sectionId": "CRC#sec3",
+      "prototype": "uint8_t CRC_GetIDRegister(void);",
+      "returnType": "uint8_t",
+      "params": [],
+      "returnDescEn": "8-bit value of the ID register",
+      "returnDescZh": "ID 寄存器中保存的 8 位值（0x00~0xFF）。",
+      "briefEn": "Returns the 8-bit data stored in the Independent Data(ID) register",
+      "briefZh": "读回独立数据寄存器（ID 寄存器）中保存的 8 位值。",
+      "usageZh": "与 CRC_SetIDRegister 配对，用于读回之前写入的版本号、节点 ID 等信息，常与 CRC 一起做固件标识校验。\n\n**重要：该寄存器只在部分型号的 CRC 外设上存在，STM32F103C8T6 的 CRC 没有 ID 寄存器**，C8T6 上调用它拿到的不是有效数据。C8T6 请改用普通变量或 Flash 固定地址保存这类信息。",
+      "prerequisites": [
+        "已开 CRC 时钟（RCC_AHBPeriph_CRC）",
+        "目标型号的 CRC 外设确实带 ID 寄存器（C8T6 没有）",
+        "之前已用 CRC_SetIDRegister 写入过值"
+      ],
+      "registers": [
+        "CRC_IDR"
+      ],
+      "relatedFunctions": [
+        "CRC_SetIDRegister",
+        "CRC_GetCRC",
+        "CRC_ResetDR"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 没有这个寄存器，读回来的值没有意义，不要依赖它做校验",
+        "它不影响也不反映 CRC 计算结果，只存 8 位用户数据",
+        "CRC_ResetDR 不会清掉 ID 寄存器的值",
+        "芯片复位后 ID 寄存器为 0"
+      ],
+      "exampleCode": "/* 仅在有 CRC ID 寄存器的型号上可用；C8T6 没有该寄存器 */\n#ifdef STM32F10X_CL\n  uint8_t id = CRC_GetIDRegister();\n  if (id != EXPECTED_FW_ID)\n  {\n    /* 固件标识不匹配 */\n  }\n#endif",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "CRC",
+        "CRC_ResetDR",
+        "CRC_SetIDRegister",
+        "RCC_AHBPeriph_CRC"
+      ],
+      "headerLine": 75,
+      "sourceLine": 143,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    }
+  ]
+}

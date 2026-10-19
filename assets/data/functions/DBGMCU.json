@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 1,
+  "peripheral": "DBGMCU",
+  "functions": [
+    {
+      "id": "DBGMCU_GetREVID",
+      "name": "DBGMCU_GetREVID",
+      "peripheral": "DBGMCU",
+      "sectionId": "DBGMCU#sec1",
+      "prototype": "uint32_t DBGMCU_GetREVID(void);",
+      "returnType": "uint32_t",
+      "params": [],
+      "returnDescEn": "Device revision identifier",
+      "returnDescZh": "32 位值，实际有效内容在高 16 位（修订版本号）；低 16 位为 0，设备 ID 请用 DBGMCU_GetDEVID。",
+      "briefEn": "Returns the device revision identifier.",
+      "briefZh": "读取芯片的修订版本号（Revision ID）。",
+      "usageZh": "返回 DBGMCU_IDCODE 的高 16 位，用于区分同一型号的不同硅片版本（例如 STM32F103 的 A 版 / Z 版，对应已知的 USB、CAN 等勘误）。写通用驱动或排查「同型号不同批次行为不一样」时可以用它做分支判断，也可以用它在调试串口里打印芯片信息。\n\n典型返回值需要对照参考手册的 IDCODE 表格解读，例如 0x1000 对应 Rev A、0x1001 对应 Rev Z。",
+      "prerequisites": [
+        "无。DBGMCU 是调试组件的寄存器，**不需要开任何 RCC 时钟**，任何时候都能读"
+      ],
+      "registers": [
+        "DBGMCU_IDCODE"
+      ],
+      "relatedFunctions": [
+        "DBGMCU_GetDEVID"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "返回值的有效内容在高 16 位，直接和 0x1000 这类小数字比较是对的，但别把它当成 16 位返回值再做左移",
+        "不需要开时钟；DBGMCU 不是普通外设，复位后立即可读",
+        "同一型号的不同批次可能有不同 REVID，依赖它做逻辑判断要留好默认分支",
+        "它和 DBGMCU_GetDEVID 读的是同一个寄存器 DBGMCU_IDCODE 的不同字段"
+      ],
+      "exampleCode": "/* 开机时打印芯片信息，便于定位批次差异 */\nprintf(\"REVID = 0x%04X\\r\\n\", (unsigned)DBGMCU_GetREVID());\nprintf(\"DEVID = 0x%04X\\r\\n\", (unsigned)DBGMCU_GetDEVID());\n\n/* 注意返回值的高 16 位才是修订号，低 16 位是 0 */\nif (DBGMCU_GetREVID() == 0x1000)\n{\n  /* Rev A 硅片，部分外设有已知勘误，必要时做规避 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DBGMCU",
+        "DBGMCU_GetDEVID",
+        "RCC"
+      ],
+      "headerLine": 97,
+      "sourceLine": 84,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "DBGMCU_GetDEVID",
+      "name": "DBGMCU_GetDEVID",
+      "peripheral": "DBGMCU",
+      "sectionId": "DBGMCU#sec1",
+      "prototype": "uint32_t DBGMCU_GetDEVID(void);",
+      "returnType": "uint32_t",
+      "params": [],
+      "returnDescEn": "Device identifier",
+      "returnDescZh": "设备标识符（DBGMCU_IDCODE 的低 12 位）。STM32F103C8T6 返回 0x410（中容量）。",
+      "briefEn": "Returns the device identifier.",
+      "briefZh": "读取设备标识符（Device ID，用于识别芯片型号/容量）。",
+      "usageZh": "返回 DBGMCU_IDCODE 的低 12 位，用于运行时识别具体芯片。常见取值：0x410 是 STM32F10x 中容量（Medium-density，含 C8T6）、0x414 是大容量、0x418 是互联型、0x430 是 XL 系列。写需要跨型号复用的固件时，可用它做外设可用性判断。",
+      "prerequisites": [
+        "无。不需要开任何时钟，任何时候都能读"
+      ],
+      "registers": [
+        "DBGMCU_IDCODE"
+      ],
+      "relatedFunctions": [
+        "DBGMCU_GetREVID"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "0x410 对应中容量（Medium-density），STM32F103C8T6 就是这一类；它与「有没有 DAC」直接相关（中容量没有 DAC）",
+        "返回的是低 12 位，不要整段拿去和 0x1000410 比较",
+        "不需要开时钟，读它不会有任何副作用",
+        "要区分具体 Flash 容量（64KB/128KB）要靠 Flash 容量寄存器，DEVID 只区分产品类别"
+      ],
+      "exampleCode": "/* 运行时识别芯片容量，决定可用外设 */\nswitch (DBGMCU_GetDEVID())\n{\n  case 0x410:  /* 中容量：C8T6 属于这一类，无 DAC/FSMC/SDIO */\n    break;\n  case 0x414:  /* 大容量：有 DAC、FSMC */\n    break;\n  default:\n    break;\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DAC",
+        "SDIO"
+      ],
+      "headerLine": 99,
+      "sourceLine": 94,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "DBGMCU_Config",
+      "name": "DBGMCU_Config",
+      "peripheral": "DBGMCU",
+      "sectionId": "DBGMCU#sec2",
+      "prototype": "void DBGMCU_Config(uint32_t DBGMCU_Periph, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "DBGMCU_Periph",
+          "type": "uint32_t",
+          "descEn": "specifies the peripheral and low power mode. This parameter can be any combination of the following values:",
+          "descZh": "要配置的外设或低功耗模式，可用 | 组合多个。常用值：DBGMCU_IWDG_STOP（冻结独立看门狗）、DBGMCU_WWDG_STOP（冻结窗口看门狗）、DBGMCU_TIM1_STOP ~ DBGMCU_TIM17_STOP（冻结对应定时器，C8T6 上实际存在的是 TIM1~TIM4）、DBGMCU_CAN1_STOP（冻结 CAN1）、DBGMCU_I2C1_SMBUS_TIMEOUT / DBGMCU_I2C2_SMBUS_TIMEOUT、DBGMCU_SLEEP（睡眠模式下保持调试）、DBGMCU_STOP（停止模式下保持调试）、DBGMCU_STANDBY（待机模式下保持调试）。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the specified peripheral in Debug mode. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 冻结（调试停机时暂停该外设），DISABLE 不冻结。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the specified peripheral and low power mode behavior when the MCU under Debug mode.",
+      "briefZh": "配置调试模式下指定外设与低功耗模式的行为（主要是「冻结」以暂停计数）。",
+      "usageZh": "调试时的救命函数。**它只在调试器连接且内核停机（命中断点、单步）时生效**，脱机运行时完全无影响，所以代码可以长期保留。典型场景有两个：\n\n**① 冻结看门狗**：`DBGMCU_Config(DBGMCU_IWDG_STOP, ENABLE)` 让断点期间 IWDG 停止计数，否则一停下来就被复位，根本没法单步调试。WWDG 同理用 DBGMCU_WWDG_STOP。\n\n**② 冻结定时器**：`DBGMCU_Config(DBGMCU_TIM2_STOP, ENABLE)` 让内核停机时定时器不再计数，否则断点期间定时器还在跑，恢复运行后中断会集中爆发，你看到的时序全是错的。调试 PWM、输入捕获、精确定时时必须打开。\n\n还可以冻结 CAN（DBGMCU_CAN1_STOP）、I2C 的 SMBUS 超时（DBGMCU_I2C1_SMBUS_TIMEOUT），以及允许在低功耗模式下保持调试连接（DBGMCU_SLEEP/DBGMCU_STOP/DBGMCU_STANDBY）。多个外设可用 `|` 组合一次调用。",
+      "prerequisites": [
+        "无特殊前置条件：不需要开 RCC 时钟，DBGMCU 在任何时候都可写",
+        "要冻结的定时器/看门狗本身应当已经初始化过（否则冻结一个没在跑的外设没有意义）"
+      ],
+      "registers": [
+        "DBGMCU_CR"
+      ],
+      "relatedFunctions": [
+        "DBGMCU_GetDEVID",
+        "DBGMCU_GetREVID",
+        "IWDG_Enable",
+        "TIM_Cmd",
+        "CAN_DBGFreeze"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "只在调试模式（调试器连接且内核停机）下生效，脱机运行完全无影响，可以放心留在正式代码里",
+        "不冻结 IWDG 的后果：命中断点几毫秒内就被看门狗复位，表现为「一调试就重启，不调试反而正常」",
+        "不冻结定时器的后果：断点期间定时器继续跑、中断标志持续累积，恢复运行后中断集中触发，看到的时序和真实运行不一致",
+        "DBGMCU_TIMx_STOP 只对存在的定时器有意义：C8T6 只有 TIM1~TIM4，写 TIM5~TIM17 不报错也没有效果",
+        "DBGMCU_SLEEP/STOP/STANDBY 是「低功耗模式下是否保持调试连接」，配错会让你在调试低功耗代码时连接中断，需要重新上电",
+        "不需要也不应该为它开 RCC 时钟——DBGMCU 属于调试组件，始终可访问",
+        "一次写多个外设时用 | 连接比多次调用更清晰；重复调用同一个外设不会出错",
+        "DBGMCU_CAN1_STOP 与 CAN_DBGFreeze 是两套机制，前者是调试组件的冻结控制，后者写的是 CAN 自己的 MCR 寄存器"
+      ],
+      "exampleCode": "/* 在 main 开头、初始化外设之前调用最稳妥 */\nint main(void)\n{\n  /* 1. 冻结看门狗：断点期间不被复位，否则单步调试根本进行不下去 */\n  DBGMCU_Config(DBGMCU_IWDG_STOP, ENABLE);\n  DBGMCU_Config(DBGMCU_WWDG_STOP, ENABLE);\n\n  /* 2. 冻结定时器：断点期间停止计数，避免恢复后中断集中爆发 */\n  DBGMCU_Config(DBGMCU_TIM1_STOP | DBGMCU_TIM2_STOP\n              | DBGMCU_TIM3_STOP | DBGMCU_TIM4_STOP, ENABLE);\n\n  /* 3. 冻结 CAN：避免断点期间 FIFO 被总线上其它节点塞满 */\n  DBGMCU_Config(DBGMCU_CAN1_STOP, ENABLE);\n\n  /* 4. 之后才是常规外设初始化 */\n  IWDG_Enable();\n  /* ... */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "CAN1",
+        "CAN_DBGFreeze",
+        "DBGMCU",
+        "DBGMCU_CAN1_STOP",
+        "DBGMCU_I2C1_SMBUS_TIMEOUT",
+        "DBGMCU_I2C2_SMBUS_TIMEOUT",
+        "DBGMCU_IWDG_STOP",
+        "DBGMCU_SLEEP",
+        "DBGMCU_STANDBY",
+        "DBGMCU_STOP",
+        "DBGMCU_TIM17_STOP",
+        "DBGMCU_TIM1_STOP",
+        "DBGMCU_TIM2_STOP",
+        "DBGMCU_TIM3_STOP",
+        "DBGMCU_TIM4_STOP",
+        "DBGMCU_WWDG_STOP",
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "IWDG",
+        "IWDG_Enable",
+        "RCC",
+        "TIM1",
+        "TIM17",
+        "TIM4",
+        "TIM5",
+        "WWDG"
+      ],
+      "headerLine": 100,
+      "sourceLine": 134,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    }
+  ]
+}

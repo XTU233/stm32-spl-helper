@@ -1,0 +1,2493 @@
+{
+  "schemaVersion": 1,
+  "peripheral": "RCC",
+  "functions": [
+    {
+      "id": "RCC_DeInit",
+      "name": "RCC_DeInit",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec1",
+      "prototype": "void RCC_DeInit(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Resets the RCC clock configuration to the default reset state.",
+      "briefZh": "把 RCC 相关寄存器恢复为复位默认值，系统时钟切回 HSI。",
+      "usageZh": "仅在需要把时钟树彻底推倒重来时使用，日常几乎用不到。调用后 SYSCLK 变为 HSI 8MHz，所有外设时钟使能位被清零，依赖原时钟的外设（如已初始化的 USART）会停止工作，必须重新配置。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_CR",
+        "RCC_CFGR",
+        "RCC_CIR",
+        "RCC_APB2RSTR",
+        "RCC_APB1RSTR",
+        "RCC_AHBENR",
+        "RCC_APB2ENR",
+        "RCC_APB1ENR"
+      ],
+      "relatedFunctions": [
+        "RCC_HSEConfig",
+        "RCC_PLLConfig",
+        "RCC_SYSCLKConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "调用后所有外设时钟都被关闭，之前初始化的外设全部失效，必须重新初始化",
+        "SystemInit 里不会调用它，正常工程不需要用它"
+      ],
+      "exampleCode": "/* 极少使用：把时钟树恢复到上电状态 */\nRCC_DeInit();",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RCC"
+      ],
+      "headerLine": 646,
+      "sourceLine": 217,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_HSEConfig",
+      "name": "RCC_HSEConfig",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_HSEConfig(uint32_t RCC_HSE);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_HSE",
+          "type": "uint32_t",
+          "descEn": "specifies the new state of the HSE. This parameter can be one of the following values:",
+          "descZh": "RCC_HSE_OFF 关闭、RCC_HSE_ON 开启、RCC_HSE_Bypass 旁路（用外部有源晶振直接输入，不驱动内部振荡电路）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the External High Speed oscillator (HSE).",
+      "briefZh": "配置并开启/关闭外部高速晶振（HSE）。",
+      "usageZh": "系统时钟配置的第一步。传 RCC_HSE_ON 开启外部晶振（最小系统板通常是 8MHz），随后必须用 RCC_WaitForHSEStartUp 等待起振成功。若晶振没焊、频率不对或负载电容不合适，HSE 会起振失败并自动回退到内部 HSI，导致主频不是预期的 72MHz。",
+      "prerequisites": [
+        "板上有 8MHz 晶振且负载电容匹配（通常 20pF）",
+        "若用旁路模式，需从 OSC_IN 引脚输入外部时钟信号"
+      ],
+      "registers": [
+        "RCC_CR"
+      ],
+      "relatedFunctions": [
+        "RCC_WaitForHSEStartUp",
+        "RCC_PLLConfig",
+        "RCC_SYSCLKConfig"
+      ],
+      "remarks": [
+        "HSE can not be stopped if it is used directly or through the PLL as system clock."
+      ],
+      "notesZh": [
+        "只调用 RCC_HSEConfig 不会等待起振，晶振需要几百微秒到几毫秒才能稳定，必须配合 RCC_WaitForHSEStartUp",
+        "起振失败不会报错，芯片静默回退到 HSI，表现为串口乱码、定时不准，是极隐蔽的坑",
+        "用 RCC_HSE_Bypass 时引脚接法不同：OSC_IN 接外部时钟，OSC_OUT 悬空"
+      ],
+      "exampleCode": "ErrorStatus HSEStartUpStatus;\n\n/* 1. 开启 HSE */\nRCC_HSEConfig(RCC_HSE_ON);\n\n/* 2. 必须等待起振成功，否则后面全部白配 */\nHSEStartUpStatus = RCC_WaitForHSEStartUp();\nif (HSEStartUpStatus == SUCCESS)\n{\n  /* 3. HSE 就绪，继续配置 PLL */\n}\nelse\n{\n  /* HSE 起振失败，芯片会退回 HSI 8MHz */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ErrorStatus",
+        "RCC_HSE_Bypass",
+        "RCC_HSE_OFF",
+        "RCC_HSE_ON",
+        "RCC_WaitForHSEStartUp",
+        "SUCCESS"
+      ],
+      "headerLine": 648,
+      "sourceLine": 270,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_WaitForHSEStartUp",
+      "name": "RCC_WaitForHSEStartUp",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec3",
+      "prototype": "ErrorStatus RCC_WaitForHSEStartUp(void);",
+      "returnType": "ErrorStatus",
+      "params": [],
+      "returnDescEn": "An ErrorStatus enumuration value: - SUCCESS: HSE oscillator is stable and ready to use - ERROR: HSE oscillator not yet ready",
+      "returnDescZh": "SUCCESS 表示 HSE 起振成功；ERROR 表示超时失败（芯片会回退到 HSI）。",
+      "briefEn": "Waits for HSE start-up.",
+      "briefZh": "等待 HSE 起振稳定，返回是否成功。",
+      "usageZh": "紧跟 RCC_HSEConfig(RCC_HSE_ON) 之后调用，是判断晶振是否正常工作的唯一手段。内部有超时计数，起振失败会返回 ERROR 而不是死等。返回值必须判断——不判断的话，HSE 失败时芯片会以 HSI 8MHz 运行，而你的 PLL 配置是按 8MHz 输入算的，表面上没错，但实际主频只有标称值的 1/9 都不到。",
+      "prerequisites": [
+        "已调用 RCC_HSEConfig(RCC_HSE_ON)"
+      ],
+      "registers": [
+        "RCC_CR"
+      ],
+      "relatedFunctions": [
+        "RCC_HSEConfig",
+        "RCC_PLLConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "返回值类型是 ErrorStatus，取值 SUCCESS / ERROR，不要和 FlagStatus 的 SET/RESET 混淆",
+        "起振时间受晶振与负载电容影响，若经常失败优先检查这两个硬件因素"
+      ],
+      "exampleCode": "RCC_HSEConfig(RCC_HSE_ON);\n\nif (RCC_WaitForHSEStartUp() == SUCCESS)\n{\n  /* 晶振正常，可以配 PLL 到 72MHz */\n  RCC_PLLConfig(RCC_PLLSource_HSE_Div1, RCC_PLLMul_9);\n}\nelse\n{\n  /* 晶振异常：检查焊接、负载电容、晶振频率 */\n  while (1);\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ERROR",
+        "ErrorStatus",
+        "FlagStatus",
+        "RCC_HSEConfig",
+        "RCC_HSE_ON",
+        "RCC_PLLConfig",
+        "RCC_PLLMul_9",
+        "RCC_PLLSource_HSE_Div1",
+        "RESET",
+        "SET",
+        "SUCCESS"
+      ],
+      "headerLine": 649,
+      "sourceLine": 304,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_AdjustHSICalibrationValue",
+      "name": "RCC_AdjustHSICalibrationValue",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec3",
+      "prototype": "void RCC_AdjustHSICalibrationValue(uint8_t HSICalibrationValue);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "HSICalibrationValue",
+          "type": "uint8_t",
+          "descEn": "specifies the calibration trimming value. This parameter must be a number between 0 and 0x1F.",
+          "descZh": "校准值 0~31，默认值 16。值越大频率越高。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Adjusts the Internal High Speed oscillator (HSI) calibration value.",
+      "briefZh": "调整内部高速时钟（HSI）的校准值。",
+      "usageZh": "HSI 出厂校准后精度约 ±1%，通常够用，不需要调用。只有在宽温环境或需要更高精度、又不想用外部晶振时才微调。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_CR"
+      ],
+      "relatedFunctions": [
+        "RCC_HSICmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "校准值掉电不保存，每次上电都要重新设置",
+        "没有频率计不要乱调，会导致串口波特率偏移"
+      ],
+      "exampleCode": "/* 极少使用：微调 HSI 频率 */\nRCC_AdjustHSICalibrationValue(16);   /* 恢复默认校准值 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [],
+      "headerLine": 650,
+      "sourceLine": 334,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_HSICmd",
+      "name": "RCC_HSICmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_HSICmd(FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the HSI. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 开启 HSI，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the Internal High Speed oscillator (HSI).",
+      "briefZh": "开启或关闭内部高速时钟（HSI，8MHz）。",
+      "usageZh": "HSI 是上电默认时钟源，SystemInit 会自动开启。若你的时钟树以 HSE+PLL 为最终时钟源，HSI 仍需保持开启：因为一旦 HSE 失效，时钟安全系统（CSS）会切换到 HSI，关掉 HSI 会导致死机。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_CR"
+      ],
+      "relatedFunctions": [
+        "RCC_HSEConfig",
+        "RCC_ClockSecuritySystemCmd"
+      ],
+      "remarks": [
+        "HSI can not be stopped if it is used directly or through the PLL as system clock."
+      ],
+      "notesZh": [
+        "用 HSE 作为最终时钟源时不要关闭 HSI，否则 CSS 触发后无时钟可用会死机",
+        "HSI 精度只有 ±1%，做串口通信（尤其高波特率）建议用 HSE"
+      ],
+      "exampleCode": "/* 正常工程不需要手动调用，SystemInit 已开启 HSI */\nRCC_HSICmd(ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState"
+      ],
+      "headerLine": 651,
+      "sourceLine": 354,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_PLLConfig",
+      "name": "RCC_PLLConfig",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_PLLConfig(uint32_t RCC_PLLSource, uint32_t RCC_PLLMul);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_PLLSource",
+          "type": "uint32_t",
+          "descEn": "specifies the PLL entry clock source. For @b STM32_Connectivity_line_devices or @b STM32_Value_line_devices, this parameter can be one of the following values:",
+          "descZh": "PLL 输入时钟源。用 HSE 时填 RCC_PLLSource_HSE_Div1（8MHz 直接输入）或 RCC_PLLSource_HSE_Div2（4MHz 输入）。C8T6 上常用 Div1。"
+        },
+        {
+          "name": "RCC_PLLMul",
+          "type": "uint32_t",
+          "descEn": "specifies the PLL multiplication factor. For @b STM32_Connectivity_line_devices, this parameter can be RCC_PLLMul_x where x:{[4,9], 6_5} For @b other_STM32_devices, this parameter can be RCC_PLLMul_x where x:[2,16]",
+          "descZh": "倍频系数，RCC_PLLMul_2 ~ RCC_PLLMul_16。8MHz × 9 = 72MHz 是标准配置。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the PLL clock source and multiplication factor.",
+      "briefZh": "配置 PLL 的时钟源与倍频系数。",
+      "usageZh": "把 8MHz HSE 倍频到 72MHz 的核心步骤。STM32F103 的 PLL 输入必须为 8MHz（HSE 直接输入或 2 分频后），倍频可选 2~16 倍。配完必须调用 RCC_PLLCmd(ENABLE) 使能 PLL，再用 RCC_SYSCLKConfig 把 PLL 切为系统时钟。",
+      "prerequisites": [
+        "已确认 HSE 起振成功（RCC_WaitForHSEStartUp 返回 SUCCESS）",
+        "最终 SYSCLK 不得超过 72MHz"
+      ],
+      "registers": [
+        "RCC_CFGR"
+      ],
+      "relatedFunctions": [
+        "RCC_PLLCmd",
+        "RCC_SYSCLKConfig",
+        "RCC_HSEConfig",
+        "RCC_GetClocksFreq"
+      ],
+      "remarks": [
+        "This function must be used only when the PLL is disabled."
+      ],
+      "notesZh": [
+        "72MHz 是 STM32F103 的上限，超过会导致运行不稳定甚至无法启动",
+        "切换 SYSCLK 到 PLL 后必须等待 RCC_GetSYSCLKSource 返回 0x08 确认切换完成",
+        "别忘了 FLASH_SetLatency(FLASH_Latency_2)：72MHz 下 Flash 需要 2 个等待周期，不设置会取指出错",
+        "PLL 输入必须为 8MHz 才能得到标准频率；若晶振是 12MHz，应配 RCC_PLLSource_HSE_Div2 后再倍频"
+      ],
+      "exampleCode": "/* 8MHz HSE × 9 = 72MHz */\nRCC_PLLConfig(RCC_PLLSource_HSE_Div1, RCC_PLLMul_9);\n\n/* 使能 PLL 并等待锁定 */\nRCC_PLLCmd(ENABLE);\nwhile (RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET);\n\n/* 切换系统时钟到 PLL */\nRCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);\nwhile (RCC_GetSYSCLKSource() != 0x08);   /* 0x08 表示当前是 PLL */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "FLASH_Latency_2",
+        "FLASH_SetLatency",
+        "RCC_FLAG_PLLRDY",
+        "RCC_GetFlagStatus",
+        "RCC_GetSYSCLKSource",
+        "RCC_PLLCmd",
+        "RCC_PLLMul_16",
+        "RCC_PLLMul_2",
+        "RCC_PLLMul_9",
+        "RCC_PLLSource_HSE_Div1",
+        "RCC_PLLSource_HSE_Div2",
+        "RCC_SYSCLKConfig",
+        "RCC_SYSCLKSource_PLLCLK",
+        "RCC_WaitForHSEStartUp",
+        "RESET",
+        "SUCCESS"
+      ],
+      "headerLine": 652,
+      "sourceLine": 378,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_PLLCmd",
+      "name": "RCC_PLLCmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_PLLCmd(FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the PLL. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 开启 PLL，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the PLL.",
+      "briefZh": "使能或关闭 PLL。",
+      "usageZh": "配置完 RCC_PLLConfig 后必须调用它开启 PLL，然后等待 RCC_FLAG_PLLRDY 置位才能切换系统时钟。",
+      "prerequisites": [
+        "已调用 RCC_PLLConfig 配置好时钟源与倍频"
+      ],
+      "registers": [
+        "RCC_CR"
+      ],
+      "relatedFunctions": [
+        "RCC_PLLConfig",
+        "RCC_GetFlagStatus",
+        "RCC_SYSCLKConfig"
+      ],
+      "remarks": [
+        "The PLL can not be disabled if it is used as system clock."
+      ],
+      "notesZh": [
+        "不等待 PLLRDY 就切换系统时钟会导致芯片运行异常或直接卡死",
+        "关闭 PLL 前必须先切走系统时钟，否则芯片失去时钟源"
+      ],
+      "exampleCode": "RCC_PLLCmd(ENABLE);\n\n/* 等待 PLL 锁定，锁定后才能作为系统时钟 */\nwhile (RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET)\n{\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "RCC_FLAG_PLLRDY",
+        "RCC_GetFlagStatus",
+        "RCC_PLLConfig",
+        "RESET"
+      ],
+      "headerLine": 653,
+      "sourceLine": 401,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_PREDIV1Config",
+      "name": "RCC_PREDIV1Config",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_PREDIV1Config(uint32_t RCC_PREDIV1_Source, uint32_t RCC_PREDIV1_Div);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_PREDIV1_Source",
+          "type": "uint32_t",
+          "descEn": "specifies the PREDIV1 clock source. This parameter can be one of the following values:",
+          "descZh": "PREDIV1 输入源（HSE 或 PLL2）。"
+        },
+        {
+          "name": "RCC_PREDIV1_Div",
+          "type": "uint32_t",
+          "descEn": "specifies the PREDIV1 clock division factor. This parameter can be RCC_PREDIV1_Divx where x:[1,16]",
+          "descZh": "分频系数 1~16。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the PREDIV1 division factor.",
+      "briefZh": "配置 PREDIV1 预分频器（互联型/超大容量型号专用）。",
+      "usageZh": "STM32F103C8T6 没有 PREDIV1，此函数不适用。它只在互联型（如 STM32F107）与超大容量型号上用于给 PLL 提供更灵活的输入分频。",
+      "prerequisites": [
+        "仅互联型/超大容量器件支持"
+      ],
+      "registers": [
+        "RCC_CFGR2"
+      ],
+      "relatedFunctions": [
+        "RCC_PLLConfig"
+      ],
+      "remarks": [
+        "- This function must be used only when the PLL is disabled. - This function applies only to STM32 Connectivity line and Value line devices.",
+        "For @b STM32_Value_line_devices this parameter is always RCC_PREDIV1_Source_HSE"
+      ],
+      "notesZh": [
+        "STM32F103C8T6 上不适用，调用无意义",
+        "C8T6 的 PLL 输入分频只有 HSE 的 Div1/Div2 两档，由 RCC_PLLSource_HSE_Div1/Div2 指定"
+      ],
+      "exampleCode": "/* C8T6 不适用 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RCC_PLLSource_HSE_Div1",
+        "RCC_PREDIV1_Source_HSE"
+      ],
+      "headerLine": 656,
+      "sourceLine": 426,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_PREDIV2Config",
+      "name": "RCC_PREDIV2Config",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_PREDIV2Config(uint32_t RCC_PREDIV2_Div);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_PREDIV2_Div",
+          "type": "uint32_t",
+          "descEn": "specifies the PREDIV2 clock division factor. This parameter can be RCC_PREDIV2_Divx where x:[1,16]",
+          "descZh": "分频系数 1~16。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the PREDIV2 division factor.",
+      "briefZh": "配置 PREDIV2 预分频器（互联型/超大容量型号专用）。",
+      "usageZh": "STM32F103C8T6 上不适用。用于给 PLL2/PLL3 提供输入分频，仅互联型与超大容量型号有。",
+      "prerequisites": [
+        "仅互联型/超大容量器件支持"
+      ],
+      "registers": [
+        "RCC_CFGR2"
+      ],
+      "relatedFunctions": [
+        "RCC_PLL2Config",
+        "RCC_PLL3Config"
+      ],
+      "remarks": [
+        "- This function must be used only when both PLL2 and PLL3 are disabled. - This function applies only to STM32 Connectivity line devices."
+      ],
+      "notesZh": [
+        "STM32F103C8T6 上不适用，调用无意义"
+      ],
+      "exampleCode": "/* C8T6 不适用 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [],
+      "headerLine": 660,
+      "sourceLine": 454,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_PLL2Config",
+      "name": "RCC_PLL2Config",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_PLL2Config(uint32_t RCC_PLL2Mul);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_PLL2Mul",
+          "type": "uint32_t",
+          "descEn": "specifies the PLL2 multiplication factor. This parameter can be RCC_PLL2Mul_x where x:{[8,14], 16, 20}",
+          "descZh": "倍频系数 8~16。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the PLL2 multiplication factor.",
+      "briefZh": "配置 PLL2 的倍频系数（互联型/超大容量型号专用）。",
+      "usageZh": "STM32F103C8T6 上没有 PLL2，此函数不适用。互联型用它产生 I2S、以太网等所需的额外时钟。",
+      "prerequisites": [
+        "仅互联型/超大容量器件支持"
+      ],
+      "registers": [
+        "RCC_CFGR2"
+      ],
+      "relatedFunctions": [
+        "RCC_PLL2Cmd",
+        "RCC_PREDIV2Config"
+      ],
+      "remarks": [
+        "- This function must be used only when the PLL2 is disabled. - This function applies only to STM32 Connectivity line devices."
+      ],
+      "notesZh": [
+        "STM32F103C8T6 上不适用，调用无意义"
+      ],
+      "exampleCode": "/* C8T6 不适用 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [],
+      "headerLine": 661,
+      "sourceLine": 479,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_PLL2Cmd",
+      "name": "RCC_PLL2Cmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_PLL2Cmd(FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the PLL2. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 开启，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the PLL2.",
+      "briefZh": "使能或关闭 PLL2（互联型/超大容量型号专用）。",
+      "usageZh": "STM32F103C8T6 上不适用。",
+      "prerequisites": [
+        "仅互联型/超大容量器件支持"
+      ],
+      "registers": [
+        "RCC_CR"
+      ],
+      "relatedFunctions": [
+        "RCC_PLL2Config"
+      ],
+      "remarks": [
+        "- The PLL2 can not be disabled if it is used indirectly as system clock (i.e. it is used as PLL clock entry that is used as System clock). - This function applies only to STM32 Connectivity line devices."
+      ],
+      "notesZh": [
+        "STM32F103C8T6 上不适用，调用无意义"
+      ],
+      "exampleCode": "/* C8T6 不适用 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState"
+      ],
+      "headerLine": 662,
+      "sourceLine": 505,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_PLL3Config",
+      "name": "RCC_PLL3Config",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_PLL3Config(uint32_t RCC_PLL3Mul);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_PLL3Mul",
+          "type": "uint32_t",
+          "descEn": "specifies the PLL3 multiplication factor. This parameter can be RCC_PLL3Mul_x where x:{[8,14], 16, 20}",
+          "descZh": "倍频系数 8~16。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the PLL3 multiplication factor.",
+      "briefZh": "配置 PLL3 的倍频系数（互联型/超大容量型号专用）。",
+      "usageZh": "STM32F103C8T6 上没有 PLL3，此函数不适用。",
+      "prerequisites": [
+        "仅互联型/超大容量器件支持"
+      ],
+      "registers": [
+        "RCC_CFGR2"
+      ],
+      "relatedFunctions": [
+        "RCC_PLL3Cmd",
+        "RCC_PREDIV2Config"
+      ],
+      "remarks": [
+        "- This function must be used only when the PLL3 is disabled. - This function applies only to STM32 Connectivity line devices."
+      ],
+      "notesZh": [
+        "STM32F103C8T6 上不适用，调用无意义"
+      ],
+      "exampleCode": "/* C8T6 不适用 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [],
+      "headerLine": 663,
+      "sourceLine": 523,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_PLL3Cmd",
+      "name": "RCC_PLL3Cmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_PLL3Cmd(FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the PLL3. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 开启，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the PLL3.",
+      "briefZh": "使能或关闭 PLL3（互联型/超大容量型号专用）。",
+      "usageZh": "STM32F103C8T6 上不适用。",
+      "prerequisites": [
+        "仅互联型/超大容量器件支持"
+      ],
+      "registers": [
+        "RCC_CR"
+      ],
+      "relatedFunctions": [
+        "RCC_PLL3Config"
+      ],
+      "remarks": [
+        "This function applies only to STM32 Connectivity line devices."
+      ],
+      "notesZh": [
+        "STM32F103C8T6 上不适用，调用无意义"
+      ],
+      "exampleCode": "/* C8T6 不适用 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState"
+      ],
+      "headerLine": 664,
+      "sourceLine": 546,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_SYSCLKConfig",
+      "name": "RCC_SYSCLKConfig",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_SYSCLKConfig(uint32_t RCC_SYSCLKSource);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_SYSCLKSource",
+          "type": "uint32_t",
+          "descEn": "specifies the clock source used as system clock. This parameter can be one of the following values:",
+          "descZh": "RCC_SYSCLKSource_HSI（8MHz）、RCC_SYSCLKSource_HSE（外部晶振）、RCC_SYSCLKSource_PLLCLK（PLL 输出，最常用）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the system clock (SYSCLK).",
+      "briefZh": "选择系统时钟（SYSCLK）的来源。",
+      "usageZh": "时钟配置的关键一步，把 SYSCLK 从默认的 HSI 切到 PLL（72MHz）或 HSE（8MHz）。切换后必须用 RCC_GetSYSCLKSource 确认切换成功，不能想当然认为已经生效。",
+      "prerequisites": [
+        "若选 PLLCLK，PLL 必须已使能并锁定（RCC_FLAG_PLLRDY 置位）",
+        "若选 HSE，HSE 必须已起振"
+      ],
+      "registers": [
+        "RCC_CFGR"
+      ],
+      "relatedFunctions": [
+        "RCC_GetSYSCLKSource",
+        "RCC_PLLCmd",
+        "RCC_HCLKConfig",
+        "RCC_PCLK1Config",
+        "RCC_PCLK2Config"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "切换后一定要用 RCC_GetSYSCLKSource 确认，返回 0x08 才表示当前是 PLL",
+        "忘记切 SYSCLK 是最隐蔽的错误：PLL 配好了但系统还跑在 HSI 8MHz，串口、定时全都不对",
+        "切换 SYSCLK 后所有下游总线时钟（HCLK/PCLK1/PCLK2）会按新的 SYSCLK 重新分频"
+      ],
+      "exampleCode": "/* 切到 PLL（72MHz） */\nRCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);\n\n/* 必须确认切换完成，否则后续外设时钟全错 */\nwhile (RCC_GetSYSCLKSource() != 0x08)\n{\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RCC_FLAG_PLLRDY",
+        "RCC_GetSYSCLKSource",
+        "RCC_SYSCLKSource_HSE",
+        "RCC_SYSCLKSource_HSI",
+        "RCC_SYSCLKSource_PLLCLK"
+      ],
+      "headerLine": 666,
+      "sourceLine": 564,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_GetSYSCLKSource",
+      "name": "RCC_GetSYSCLKSource",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec5",
+      "prototype": "uint8_t RCC_GetSYSCLKSource(void);",
+      "returnType": "uint8_t",
+      "params": [],
+      "returnDescEn": "The clock source used as system clock. The returned value can be one of the following: - 0x00: HSI used as system clock - 0x04: HSE used as system clock - 0x08: PLL used as system clock",
+      "returnDescZh": "返回 8 位编码值：0x00 表示 HSI，0x04 表示 HSE，0x08 表示 PLL。",
+      "briefEn": "Returns the clock source used as system clock.",
+      "briefZh": "读取当前系统时钟的来源。",
+      "usageZh": "用于确认 RCC_SYSCLKConfig 是否真的切换成功。返回值是编码值不是枚举：0x00=HSI、0x04=HSE、0x08=PLL。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_CFGR"
+      ],
+      "relatedFunctions": [
+        "RCC_SYSCLKConfig",
+        "RCC_GetClocksFreq"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "返回值是原始编码（0x00/0x04/0x08），不是 RCC_SYSCLKSource_xxx 枚举，别直接比较枚举",
+        "想拿到实际频率（Hz）用 RCC_GetClocksFreq，它会把分频都算进去"
+      ],
+      "exampleCode": "/* 确认系统时钟已切到 PLL */\nif (RCC_GetSYSCLKSource() == 0x08)\n{\n  /* 当前运行在 PLL 输出 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RCC_GetClocksFreq",
+        "RCC_SYSCLKConfig"
+      ],
+      "headerLine": 668,
+      "sourceLine": 587,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_HCLKConfig",
+      "name": "RCC_HCLKConfig",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_HCLKConfig(uint32_t RCC_SYSCLK);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_SYSCLK",
+          "type": "uint32_t",
+          "descEn": "defines the AHB clock divider. This clock is derived from the system clock (SYSCLK). This parameter can be one of the following values:",
+          "descZh": "RCC_SYSCLK_Div1（不分频，最常用）、Div2、Div4、Div8、Div16、Div64、Div128、Div256、Div512。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the AHB clock (HCLK).",
+      "briefZh": "配置 AHB 总线时钟（HCLK）的分频系数。",
+      "usageZh": "HCLK 是 Cortex-M3 内核、DMA、SRAM、Flash 接口的时钟，通常与 SYSCLK 同频（不分频）。标准 72MHz 配置里填 RCC_SYSCLK_Div1。",
+      "prerequisites": [
+        "通常先配置 RCC_SYSCLKConfig"
+      ],
+      "registers": [
+        "RCC_CFGR"
+      ],
+      "relatedFunctions": [
+        "RCC_SYSCLKConfig",
+        "RCC_PCLK1Config",
+        "RCC_PCLK2Config",
+        "RCC_GetClocksFreq"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "HCLK 影响 SysTick 与内核执行速度，降频会拖慢整个程序",
+        "低功耗场景才会用分频，正常应用都是 Div1"
+      ],
+      "exampleCode": "/* HCLK = SYSCLK = 72MHz */\nRCC_HCLKConfig(RCC_SYSCLK_Div1);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RCC_SYSCLKConfig",
+        "RCC_SYSCLK_Div1",
+        "SysTick"
+      ],
+      "headerLine": 669,
+      "sourceLine": 608,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_PCLK1Config",
+      "name": "RCC_PCLK1Config",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_PCLK1Config(uint32_t RCC_HCLK);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_HCLK",
+          "type": "uint32_t",
+          "descEn": "defines the APB1 clock divider. This clock is derived from the AHB clock (HCLK). This parameter can be one of the following values:",
+          "descZh": "RCC_HCLK_Div1、Div2（72MHz 系统的标准配置，得 36MHz）、Div4、Div8、Div16。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the Low Speed APB clock (PCLK1).",
+      "briefZh": "配置 APB1 低速总线时钟（PCLK1）的分频系数。",
+      "usageZh": "APB1 挂载 USART2/3、TIM2~7、I2C1/2、SPI2、CAN、PWR、BKP、WWDG、RTC 等外设，最高只能到 36MHz。标准 72MHz 配置里必须填 RCC_HCLK_Div2。",
+      "prerequisites": [
+        "已配置 RCC_HCLKConfig"
+      ],
+      "registers": [
+        "RCC_CFGR"
+      ],
+      "relatedFunctions": [
+        "RCC_HCLKConfig",
+        "RCC_PCLK2Config",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_GetClocksFreq"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "APB1 上限 36MHz，配成 Div1（72MHz）会超出规格导致外设工作异常",
+        "APB1 的分频直接决定 USART2/3 的波特率：36MHz 下算出的分频值才正确，这也是串口乱码的常见原因",
+        "注意：当 APB 分频不为 1 时，定时器时钟会是 APB 时钟的 2 倍（36MHz × 2 = 72MHz），TIM2~7 因此仍能跑在 72MHz"
+      ],
+      "exampleCode": "/* APB1 = HCLK / 2 = 36MHz（上限） */\nRCC_PCLK1Config(RCC_HCLK_Div2);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "BKP",
+        "I2C1",
+        "PWR",
+        "RCC_HCLKConfig",
+        "RCC_HCLK_Div1",
+        "RCC_HCLK_Div2",
+        "RTC",
+        "SPI2",
+        "TIM2",
+        "USART2",
+        "WWDG"
+      ],
+      "headerLine": 670,
+      "sourceLine": 634,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_PCLK2Config",
+      "name": "RCC_PCLK2Config",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_PCLK2Config(uint32_t RCC_HCLK);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_HCLK",
+          "type": "uint32_t",
+          "descEn": "defines the APB2 clock divider. This clock is derived from the AHB clock (HCLK). This parameter can be one of the following values:",
+          "descZh": "RCC_HCLK_Div1（72MHz 系统的标准配置）、Div2、Div4、Div8、Div16。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the High Speed APB clock (PCLK2).",
+      "briefZh": "配置 APB2 高速总线时钟（PCLK2）的分频系数。",
+      "usageZh": "APB2 挂载 GPIO、USART1、SPI1、ADC1/2、TIM1、AFIO、EXTI 等外设，可跑满 72MHz。标准配置里填 RCC_HCLK_Div1。",
+      "prerequisites": [
+        "已配置 RCC_HCLKConfig"
+      ],
+      "registers": [
+        "RCC_CFGR"
+      ],
+      "relatedFunctions": [
+        "RCC_HCLKConfig",
+        "RCC_PCLK1Config",
+        "RCC_APB2PeriphClockCmd",
+        "RCC_ADCCLKConfig",
+        "RCC_GetClocksFreq"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "USART1 挂 APB2，其波特率按 72MHz 计算；USART2/3 挂 APB1 按 36MHz 算，搞混会乱码",
+        "ADC 时钟由 PCLK2 再分频得到，且不得超过 14MHz——PCLK2 为 72MHz 时 ADC 至少要 6 分频"
+      ],
+      "exampleCode": "/* APB2 = HCLK = 72MHz */\nRCC_PCLK2Config(RCC_HCLK_Div1);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ADC1",
+        "AFIO",
+        "EXTI",
+        "RCC_HCLKConfig",
+        "RCC_HCLK_Div1",
+        "SPI1",
+        "TIM1",
+        "USART1",
+        "USART2"
+      ],
+      "headerLine": 671,
+      "sourceLine": 660,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_ITConfig",
+      "name": "RCC_ITConfig",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec6",
+      "prototype": "void RCC_ITConfig(uint8_t RCC_IT, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_IT",
+          "type": "uint8_t",
+          "descEn": "specifies the RCC interrupt sources to be enabled or disabled. For @b STM32_Connectivity_line_devices, this parameter can be any combination of the following values",
+          "descZh": "RCC_IT_LSIRDY、RCC_IT_LSERDY、RCC_IT_HSIRDY、RCC_IT_HSERDY、RCC_IT_PLLRDY、RCC_IT_CSS（时钟安全系统中断）。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the specified RCC interrupts. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified RCC interrupts.",
+      "briefZh": "使能或关闭 RCC 相关中断（主要是时钟安全系统 CSS 与 HSE 就绪中断）。",
+      "usageZh": "用于开启时钟失效检测中断。典型用法是配合 RCC_ClockSecuritySystemCmd 开启 CSS 中断：当 HSE 意外失效时进入中断，在中断里做紧急处理（如切到 HSI、关闭危险外设）。",
+      "prerequisites": [
+        "使能 RCC_IT_CSS 前通常先调用 RCC_ClockSecuritySystemCmd(ENABLE)",
+        "需要在 NVIC 里使能 RCC_IRQn 中断通道"
+      ],
+      "registers": [
+        "RCC_CIR"
+      ],
+      "relatedFunctions": [
+        "RCC_ClockSecuritySystemCmd",
+        "RCC_GetITStatus",
+        "RCC_ClearITPendingBit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "开了中断必须在 NVIC 里使能 RCC_IRQn，否则中断不会进",
+        "CSS 中断里要 RCC_ClearITPendingBit(RCC_IT_CSS) 清标志"
+      ],
+      "exampleCode": "/* 开启时钟安全系统与其中断 */\nRCC_ClockSecuritySystemCmd(ENABLE);\nRCC_ITConfig(RCC_IT_CSS, ENABLE);\n\n/* NVIC 里还要使能 RCC_IRQn */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "NVIC",
+        "RCC",
+        "RCC_ClearITPendingBit",
+        "RCC_ClockSecuritySystemCmd",
+        "RCC_IT_CSS",
+        "RCC_IT_HSERDY",
+        "RCC_IT_HSIRDY",
+        "RCC_IT_LSERDY",
+        "RCC_IT_LSIRDY",
+        "RCC_IT_PLLRDY"
+      ],
+      "headerLine": 672,
+      "sourceLine": 700,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_USBCLKConfig",
+      "name": "RCC_USBCLKConfig",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_USBCLKConfig(uint32_t RCC_USBCLKSource);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_USBCLKSource",
+          "type": "uint32_t",
+          "descEn": "specifies the USB clock source. This clock is derived from the PLL output. This parameter can be one of the following values:",
+          "descZh": "RCC_USBCLKSource_PLLCLK_1Div5（PLL 的 1.5 分频，72/1.5=48MHz，C8T6 用这个）或 RCC_USBCLKSource_PLLCLK_Div1（PLL 直接输出，需 PLL=48MHz）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the USB clock (USBCLK).",
+      "briefZh": "配置 USB 时钟分频（互联型/带 USB 型号）。",
+      "usageZh": "STM32F103C8T6 有 USB 外设，USB 需要精确的 48MHz 时钟。PLL 输出 72MHz 时用 RCC_USBCLKSource_PLLCLK_1Div5 得到 48MHz。",
+      "prerequisites": [
+        "PLL 输出必须是 72MHz（用 1Div5 时）或 48MHz（用 Div1 时）"
+      ],
+      "registers": [
+        "RCC_CFGR"
+      ],
+      "relatedFunctions": [
+        "RCC_PLLConfig",
+        "RCC_APB1PeriphClockCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "USB 时钟必须是 48MHz，偏一点都会枚举失败",
+        "PLL 不是 72MHz 时不能简单套用 1Div5，要重新算"
+      ],
+      "exampleCode": "/* 72MHz PLL → 48MHz USB 时钟 */\nRCC_USBCLKConfig(RCC_USBCLKSource_PLLCLK_1Div5);\n\n/* 还要使能 USB 外设时钟 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_USB, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_USB",
+        "RCC_USBCLKSource_PLLCLK_1Div5",
+        "RCC_USBCLKSource_PLLCLK_Div1"
+      ],
+      "headerLine": 675,
+      "sourceLine": 728,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_OTGFSCLKConfig",
+      "name": "RCC_OTGFSCLKConfig",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_OTGFSCLKConfig(uint32_t RCC_OTGFSCLKSource);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_OTGFSCLKSource",
+          "type": "uint32_t",
+          "descEn": "specifies the USB OTG FS clock source. This clock is derived from the PLL output. This parameter can be one of the following values:",
+          "descZh": "OTG FS 时钟源分频选项。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the USB OTG FS clock (OTGFSCLK). This function applies only to STM32 Connectivity line devices.",
+      "briefZh": "配置 USB OTG FS 时钟分频（仅互联型型号）。",
+      "usageZh": "STM32F103C8T6 没有 USB OTG FS，此函数不适用。只有互联型（如 STM32F107）才有 OTG 控制器。",
+      "prerequisites": [
+        "仅互联型器件支持"
+      ],
+      "registers": [
+        "RCC_CFGR"
+      ],
+      "relatedFunctions": [
+        "RCC_USBCLKConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "STM32F103C8T6 只有 USB Device（全速），没有 OTG FS，此函数不适用"
+      ],
+      "exampleCode": "/* C8T6 不适用 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [],
+      "headerLine": 677,
+      "sourceLine": 746,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_ADCCLKConfig",
+      "name": "RCC_ADCCLKConfig",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_ADCCLKConfig(uint32_t RCC_PCLK2);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_PCLK2",
+          "type": "uint32_t",
+          "descEn": "defines the ADC clock divider. This clock is derived from the APB2 clock (PCLK2). This parameter can be one of the following values:",
+          "descZh": "RCC_PCLK2_Div2（36MHz，超标！）、Div4（18MHz，超标！）、Div6（12MHz，标准配置）、Div8（9MHz）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the ADC clock (ADCCLK).",
+      "briefZh": "配置 ADC 时钟（ADCCLK）的分频系数。",
+      "usageZh": "ADC 时钟由 PCLK2 分频得到，**不得超过 14MHz**。PCLK2 为 72MHz 时，最小分频是 6（得 12MHz），所以标准配置填 RCC_PCLK2_Div6。超频会导致采样值不准、跳动大，甚至完全错误。",
+      "prerequisites": [
+        "已配置 RCC_PCLK2Config",
+        "已使能 ADC 时钟（RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE)）"
+      ],
+      "registers": [
+        "RCC_CFGR"
+      ],
+      "relatedFunctions": [
+        "RCC_PCLK2Config",
+        "RCC_APB2PeriphClockCmd",
+        "ADC_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "14MHz 是硬上限，Div2/Div4 在 72MHz 系统下都会超标",
+        "ADC 时钟超标是「读数不准、跳动大」的常见根因，且不会有任何报错",
+        "采样时间设置也影响精度：信号源内阻大时要用更长的采样时间"
+      ],
+      "exampleCode": "/* PCLK2 = 72MHz，6 分频得 12MHz（≤14MHz） */\nRCC_ADCCLKConfig(RCC_PCLK2_Div6);\n\n/* 再使能 ADC1 时钟 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ADC1",
+        "ENABLE",
+        "RCC_APB2PeriphClockCmd",
+        "RCC_APB2Periph_ADC1",
+        "RCC_PCLK2Config",
+        "RCC_PCLK2_Div2",
+        "RCC_PCLK2_Div6"
+      ],
+      "headerLine": 679,
+      "sourceLine": 766,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_I2S2CLKConfig",
+      "name": "RCC_I2S2CLKConfig",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_I2S2CLKConfig(uint32_t RCC_I2S2CLKSource);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_I2S2CLKSource",
+          "type": "uint32_t",
+          "descEn": "specifies the I2S2 clock source. This parameter can be one of the following values:",
+          "descZh": "I2S2 时钟源选择（PLL3 或 SYSCLK）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the I2S2 clock source(I2S2CLK).",
+      "briefZh": "配置 I2S2 时钟源（仅大容量/互联型型号）。",
+      "usageZh": "STM32F103C8T6 是中容量，没有 I2S 外设，此函数不适用。I2S 只在大容量（如 RCT6、ZET6）与互联型型号上存在。",
+      "prerequisites": [
+        "仅大容量/互联型器件支持"
+      ],
+      "registers": [
+        "RCC_CFGR2"
+      ],
+      "relatedFunctions": [
+        "RCC_PLL3Config"
+      ],
+      "remarks": [
+        "- This function must be called before enabling I2S2 APB clock. - This function applies only to STM32 Connectivity line devices."
+      ],
+      "notesZh": [
+        "STM32F103C8T6 是中容量产品，没有 I2S2 外设，此函数不适用"
+      ],
+      "exampleCode": "/* C8T6 不适用 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [],
+      "headerLine": 683,
+      "sourceLine": 792,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_I2S3CLKConfig",
+      "name": "RCC_I2S3CLKConfig",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_I2S3CLKConfig(uint32_t RCC_I2S3CLKSource);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_I2S3CLKSource",
+          "type": "uint32_t",
+          "descEn": "specifies the I2S3 clock source. This parameter can be one of the following values:",
+          "descZh": "I2S3 时钟源选择（PLL3 或 SYSCLK）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the I2S3 clock source(I2S2CLK).",
+      "briefZh": "配置 I2S3 时钟源（仅大容量/互联型型号）。",
+      "usageZh": "STM32F103C8T6 上没有 I2S3，此函数不适用。",
+      "prerequisites": [
+        "仅大容量/互联型器件支持"
+      ],
+      "registers": [
+        "RCC_CFGR2"
+      ],
+      "relatedFunctions": [
+        "RCC_PLL3Config"
+      ],
+      "remarks": [
+        "- This function must be called before enabling I2S3 APB clock. - This function applies only to STM32 Connectivity line devices."
+      ],
+      "notesZh": [
+        "STM32F103C8T6 上没有 I2S3 外设，此函数不适用"
+      ],
+      "exampleCode": "/* C8T6 不适用 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [],
+      "headerLine": 684,
+      "sourceLine": 811,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_LSEConfig",
+      "name": "RCC_LSEConfig",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_LSEConfig(uint8_t RCC_LSE);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_LSE",
+          "type": "uint8_t",
+          "descEn": "specifies the new state of the LSE. This parameter can be one of the following values:",
+          "descZh": "RCC_LSE_OFF 关闭、RCC_LSE_ON 开启、RCC_LSE_Bypass 旁路（外部直接输入 32.768kHz 信号）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the External Low Speed oscillator (LSE).",
+      "briefZh": "配置并开启/关闭外部低速晶振（LSE，32.768kHz）。",
+      "usageZh": "使用 RTC 实时时钟或需要低功耗唤醒时才需要。开启后必须等待起振就绪（RCC_FLAG_LSERDY）。LSE 起振比 HSE 慢得多，通常需要 1~2 秒，这是 RTC 初始化卡住的常见原因。",
+      "prerequisites": [
+        "板上焊有 32.768kHz 晶振（接 PC14/PC15）",
+        "需先使能 PWR 与 BKP 时钟才能操作备份域"
+      ],
+      "registers": [
+        "RCC_BDCR"
+      ],
+      "relatedFunctions": [
+        "RCC_RTCCLKConfig",
+        "RCC_RTCCLKCmd",
+        "RCC_GetFlagStatus",
+        "PWR_BackupAccessCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "LSE 起振时间远长于 HSE，卡在这里通常是晶振没焊或负载电容不对",
+        "操作 RCC_BDCR 前必须解除备份域写保护，否则写入无效",
+        "没接 32.768kHz 晶振时可以用 LSI 作为 RTC 时钟，但精度差很多"
+      ],
+      "exampleCode": "/* 开 PWR/BKP 时钟，解除备份域写保护 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);\n\n/* 开启 LSE */\nRCC_LSEConfig(RCC_LSE_ON);\n\n/* LSE 起振慢，必须等待，可能要 1~2 秒 */\nwhile (RCC_GetFlagStatus(RCC_FLAG_LSERDY) == RESET)\n{\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "BKP",
+        "ENABLE",
+        "PWR",
+        "PWR_BackupAccessCmd",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_BKP",
+        "RCC_APB1Periph_PWR",
+        "RCC_FLAG_LSERDY",
+        "RCC_GetFlagStatus",
+        "RCC_LSE_Bypass",
+        "RCC_LSE_OFF",
+        "RCC_LSE_ON",
+        "RESET",
+        "RTC"
+      ],
+      "headerLine": 686,
+      "sourceLine": 829,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_LSICmd",
+      "name": "RCC_LSICmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_LSICmd(FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the LSI. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 开启，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the Internal Low Speed oscillator (LSI).",
+      "briefZh": "开启或关闭内部低速时钟（LSI，约 40kHz）。",
+      "usageZh": "LSI 用于独立看门狗（IWDG）与 RTC 的低精度时钟源。IWDG 强制使用 LSI，无法选择。若没有 32.768kHz 晶振又要用 RTC，可以用 LSI，但日误差可能达到几十秒。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_CSR"
+      ],
+      "relatedFunctions": [
+        "RCC_RTCCLKConfig",
+        "RCC_GetFlagStatus",
+        "IWDG_Enable"
+      ],
+      "remarks": [
+        "LSI can not be disabled if the IWDG is running."
+      ],
+      "notesZh": [
+        "LSI 频率约 40kHz 但个体差异大（30~60kHz），不适合做精确计时",
+        "IWDG 只能用 LSI，用 RCC_LSICmd 关闭 LSI 会让看门狗停止工作"
+      ],
+      "exampleCode": "/* 开启 LSI 并等待就绪 */\nRCC_LSICmd(ENABLE);\nwhile (RCC_GetFlagStatus(RCC_FLAG_LSIRDY) == RESET)\n{\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "IWDG",
+        "RCC_FLAG_LSIRDY",
+        "RCC_GetFlagStatus",
+        "RESET",
+        "RTC"
+      ],
+      "headerLine": 688,
+      "sourceLine": 862,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_RTCCLKConfig",
+      "name": "RCC_RTCCLKConfig",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_RTCCLKConfig(uint32_t RCC_RTCCLKSource);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_RTCCLKSource",
+          "type": "uint32_t",
+          "descEn": "specifies the RTC clock source. This parameter can be one of the following values:",
+          "descZh": "RCC_RTCCLKSource_LSE（推荐，最准）、RCC_RTCCLKSource_LSI（无晶振时用）、RCC_RTCCLKSource_HSE_Div128。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the RTC clock (RTCCLK).",
+      "briefZh": "选择 RTC 的时钟源。",
+      "usageZh": "RTC 可选 LSE（32.768kHz，最准）、LSI（约 40kHz，精度差）或 HSE 的 128 分频。选好后必须调用 RCC_RTCCLKCmd(ENABLE) 使能。",
+      "prerequisites": [
+        "所选时钟源已开启并就绪（LSE 要等 LSERDY）",
+        "已使能 PWR 与 BKP 时钟，并解除备份域写保护"
+      ],
+      "registers": [
+        "RCC_BDCR"
+      ],
+      "relatedFunctions": [
+        "RCC_LSEConfig",
+        "RCC_RTCCLKCmd",
+        "RTC_SetPrescaler",
+        "PWR_BackupAccessCmd"
+      ],
+      "remarks": [
+        "Once the RTC clock is selected it can't be changed unless the Backup domain is reset."
+      ],
+      "notesZh": [
+        "RTC 时钟源一旦选定并写入，只能通过备份域复位才能更改",
+        "用 LSI 做 RTC 时钟源时精度很差，不适合需要准确时间的场合"
+      ],
+      "exampleCode": "/* 用 LSE 作为 RTC 时钟源 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);\n\nRCC_LSEConfig(RCC_LSE_ON);\nwhile (RCC_GetFlagStatus(RCC_FLAG_LSERDY) == RESET);\n\nRCC_RTCCLKConfig(RCC_RTCCLKSource_LSE);\nRCC_RTCCLKCmd(ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "BKP",
+        "ENABLE",
+        "PWR",
+        "PWR_BackupAccessCmd",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_BKP",
+        "RCC_APB1Periph_PWR",
+        "RCC_FLAG_LSERDY",
+        "RCC_GetFlagStatus",
+        "RCC_LSEConfig",
+        "RCC_LSE_ON",
+        "RCC_RTCCLKCmd",
+        "RCC_RTCCLKSource_HSE_Div128",
+        "RCC_RTCCLKSource_LSE",
+        "RCC_RTCCLKSource_LSI",
+        "RESET",
+        "RTC"
+      ],
+      "headerLine": 689,
+      "sourceLine": 879,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_RTCCLKCmd",
+      "name": "RCC_RTCCLKCmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_RTCCLKCmd(FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the RTC clock. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能 RTC 时钟，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the RTC clock.",
+      "briefZh": "使能或关闭 RTC 时钟。",
+      "usageZh": "在 RCC_RTCCLKConfig 选好时钟源后调用，是 RTC 初始化流程的必需步骤。不使能的话 RTC 寄存器写入无效。",
+      "prerequisites": [
+        "已调用 RCC_RTCCLKConfig 选定时钟源",
+        "所选时钟源已就绪"
+      ],
+      "registers": [
+        "RCC_BDCR"
+      ],
+      "relatedFunctions": [
+        "RCC_RTCCLKConfig",
+        "RTC_SetPrescaler"
+      ],
+      "remarks": [
+        "This function must be used only after the RTC clock was selected using the RCC_RTCCLKConfig function."
+      ],
+      "notesZh": [
+        "必须在 RCC_RTCCLKConfig 之后调用，顺序颠倒无效"
+      ],
+      "exampleCode": "RCC_RTCCLKConfig(RCC_RTCCLKSource_LSE);\nRCC_RTCCLKCmd(ENABLE);\n\n/* 之后才能配置 RTC */\nRTC_SetPrescaler(32767);   /* 32768Hz / 32768 = 1Hz */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "RCC_RTCCLKConfig",
+        "RCC_RTCCLKSource_LSE",
+        "RTC",
+        "RTC_SetPrescaler"
+      ],
+      "headerLine": 690,
+      "sourceLine": 893,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_GetClocksFreq",
+      "name": "RCC_GetClocksFreq",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec5",
+      "prototype": "void RCC_GetClocksFreq(RCC_ClocksTypeDef* RCC_Clocks);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_Clocks",
+          "type": "RCC_ClocksTypeDef*",
+          "descEn": "pointer to a RCC_ClocksTypeDef structure which will hold the clocks frequencies.",
+          "descZh": "指向 RCC_ClocksTypeDef 结构体的指针，函数会把 SYSCLK_Frequency、HCLK_Frequency、PCLK1_Frequency、PCLK2_Frequency、ADCCLK_Frequency 五个字段填好（单位 Hz）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值，结果通过参数指针输出。",
+      "briefEn": "Returns the frequencies of different on chip clocks.",
+      "briefZh": "获取当前 SYSCLK、HCLK、PCLK1、PCLK2、ADCCLK 的实际频率。",
+      "usageZh": "调试时钟配置的利器，也是编写与时钟相关的代码（如自定义延时、波特率计算）时的依据。它把当前所有分频系数都算进去，返回真实频率。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_CFGR",
+        "RCC_CR"
+      ],
+      "relatedFunctions": [
+        "RCC_SYSCLKConfig",
+        "RCC_HCLKConfig",
+        "RCC_PCLK1Config",
+        "RCC_PCLK2Config",
+        "RCC_GetSYSCLKSource"
+      ],
+      "remarks": [
+        "The result of this function could be not correct when using fractional value for HSE crystal."
+      ],
+      "notesZh": [
+        "单位是 Hz，不是 MHz，打印时注意换算",
+        "用它可以在调试时快速确认时钟树是否符合预期，比示波器测 MCO 更方便",
+        "如果 HSE 起振失败退回 HSI，这里读到的值会明显偏小（8MHz 系列），能立刻发现问题"
+      ],
+      "exampleCode": "RCC_ClocksTypeDef RCC_Clocks;\n\nRCC_GetClocksFreq(&RCC_Clocks);\n\n/* 标准 72MHz 配置下应为：\n   SYSCLK=72000000  HCLK=72000000\n   PCLK1 =36000000  PCLK2=72000000  ADCCLK=12000000 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RCC_ClocksTypeDef"
+      ],
+      "headerLine": 691,
+      "sourceLine": 908,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_AHBPeriphClockCmd",
+      "name": "RCC_AHBPeriphClockCmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_AHBPeriphClockCmd(uint32_t RCC_AHBPeriph, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_AHBPeriph",
+          "type": "uint32_t",
+          "descEn": "specifies the AHB peripheral to gates its clock. For @b STM32_Connectivity_line_devices, this parameter can be any combination of the following values:",
+          "descZh": "要操作的外设，取 RCC_AHBPeriph_xxx 宏，多个可用按位或。C8T6 常用：RCC_AHBPeriph_DMA1、RCC_AHBPeriph_CRC、RCC_AHBPeriph_SRAM、RCC_AHBPeriph_FLITF。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the specified peripheral clock. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the AHB peripheral clock.",
+      "briefZh": "使能或关闭 AHB 总线上的外设时钟。",
+      "usageZh": "AHB 上主要挂 DMA、SRAM、Flash 接口。C8T6 上最常用的是 DMA1/DMA2 时钟（注意 C8T6 只有 DMA1）与 CRC 时钟。使用 DMA 前必须使能，否则 DMA 传输静默失败。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_AHBENR"
+      ],
+      "relatedFunctions": [
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB2PeriphClockCmd",
+        "DMA_Init"
+      ],
+      "remarks": [
+        "SRAM and FLITF clock can be disabled only during sleep mode."
+      ],
+      "notesZh": [
+        "C8T6 没有 DMA2，写 RCC_AHBPeriph_DMA2 不会报错但也没用",
+        "忘记使能外设时钟是最常见的「配置了但没反应」原因，且不会有任何报错"
+      ],
+      "exampleCode": "/* 使能 DMA1 时钟（C8T6 只有 DMA1） */\nRCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "CRC",
+        "DISABLE",
+        "DMA1",
+        "DMA2",
+        "ENABLE",
+        "FunctionalState",
+        "RCC_AHBPeriph_CRC",
+        "RCC_AHBPeriph_DMA1",
+        "RCC_AHBPeriph_DMA2",
+        "RCC_AHBPeriph_FLITF",
+        "RCC_AHBPeriph_SRAM"
+      ],
+      "headerLine": 692,
+      "sourceLine": 1064,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_APB2PeriphClockCmd",
+      "name": "RCC_APB2PeriphClockCmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_APB2PeriphClockCmd(uint32_t RCC_APB2Periph, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_APB2Periph",
+          "type": "uint32_t",
+          "descEn": "specifies the APB2 peripheral to gates its clock. This parameter can be any combination of the following values:",
+          "descZh": "要操作的外设，多个可用按位或。常用：RCC_APB2Periph_GPIOA/GPIOB/GPIOC、RCC_APB2Periph_AFIO、RCC_APB2Periph_USART1、RCC_APB2Periph_SPI1、RCC_APB2Periph_ADC1、RCC_APB2Periph_TIM1。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the specified peripheral clock. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the High Speed APB (APB2) peripheral clock.",
+      "briefZh": "使能或关闭 APB2 总线上的外设时钟。",
+      "usageZh": "**最常用的 RCC 函数**。GPIO 全部挂 APB2，所以每个用 GPIO 的工程都要调用它。APB2 还挂 USART1、SPI1、ADC1/2、TIM1、AFIO、EXTI。任何外设使用前都必须先开时钟，否则寄存器写入静默失效。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_APB2ENR"
+      ],
+      "relatedFunctions": [
+        "RCC_APB1PeriphClockCmd",
+        "RCC_AHBPeriphClockCmd",
+        "GPIO_Init",
+        "GPIO_PinRemapConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "用引脚重映射（GPIO_PinRemapConfig）或外部中断（GPIO_EXTILineConfig）时必须开 RCC_APB2Periph_AFIO，忘了会静默失效",
+        "GPIO 全在 APB2，不要误用 RCC_APB1PeriphClockCmd",
+        "USART1 在 APB2（72MHz），USART2/3 在 APB1（36MHz），这决定波特率算得对不对",
+        "关闭外设时钟会立即让该外设停止工作，可用于低功耗"
+      ],
+      "exampleCode": "/* 一次开多个外设时钟，用按位或 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB |\n                       RCC_APB2Periph_AFIO, ENABLE);\n\n/* 串口 1 也挂 APB2 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ADC1",
+        "AFIO",
+        "DISABLE",
+        "ENABLE",
+        "EXTI",
+        "FunctionalState",
+        "GPIOB",
+        "GPIOC",
+        "GPIO_EXTILineConfig",
+        "GPIO_PinRemapConfig",
+        "RCC",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB2Periph_ADC1",
+        "RCC_APB2Periph_AFIO",
+        "RCC_APB2Periph_GPIOA",
+        "RCC_APB2Periph_GPIOB",
+        "RCC_APB2Periph_SPI1",
+        "RCC_APB2Periph_TIM1",
+        "RCC_APB2Periph_USART1",
+        "SPI1",
+        "TIM1",
+        "USART1",
+        "USART2"
+      ],
+      "headerLine": 693,
+      "sourceLine": 1095,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_APB1PeriphClockCmd",
+      "name": "RCC_APB1PeriphClockCmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_APB1PeriphClockCmd(uint32_t RCC_APB1Periph, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_APB1Periph",
+          "type": "uint32_t",
+          "descEn": "specifies the APB1 peripheral to gates its clock. This parameter can be any combination of the following values:",
+          "descZh": "要操作的外设，多个可用按位或。常用：RCC_APB1Periph_USART2/USART3、RCC_APB1Periph_TIM2/TIM3/TIM4、RCC_APB1Periph_I2C1/I2C2、RCC_APB1Periph_SPI2、RCC_APB1Periph_PWR、RCC_APB1Periph_BKP、RCC_APB1Periph_CAN1。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the specified peripheral clock. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the Low Speed APB (APB1) peripheral clock.",
+      "briefZh": "使能或关闭 APB1 总线上的外设时钟。",
+      "usageZh": "APB1 挂载 USART2/3、TIM2~7、I2C1/2、SPI2、CAN、USB、PWR、BKP、WWDG、RTC 等。用串口 2/3、I2C、CAN、低功耗或备份域功能时必须先使能对应时钟。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_APB1ENR"
+      ],
+      "relatedFunctions": [
+        "RCC_APB2PeriphClockCmd",
+        "RCC_AHBPeriphClockCmd",
+        "USART_Init",
+        "I2C_Init",
+        "TIM_TimeBaseInit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "USART2/3 挂 APB1（36MHz），算波特率时要用 36MHz 而不是 72MHz",
+        "用 RTC/BKP 时忘了开 PWR 时钟，会导致备份域写保护无法解除",
+        "TIM2/3/4 挂 APB1，但因为 APB1 有 2 分频，定时器实际时钟是 72MHz（APB 分频不为 1 时定时器时钟 = APB×2）"
+      ],
+      "exampleCode": "/* 用串口 2 与定时器 3，都在 APB1 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2 | RCC_APB1Periph_TIM3, ENABLE);\n\n/* 用 RTC 或 BKP 时，PWR 与 BKP 时钟都要开 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "BKP",
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "PWR",
+        "RCC_APB1Periph_BKP",
+        "RCC_APB1Periph_CAN1",
+        "RCC_APB1Periph_I2C1",
+        "RCC_APB1Periph_PWR",
+        "RCC_APB1Periph_SPI2",
+        "RCC_APB1Periph_TIM2",
+        "RCC_APB1Periph_TIM3",
+        "RCC_APB1Periph_USART2",
+        "RTC",
+        "SPI2",
+        "TIM2",
+        "TIM3",
+        "TIM4",
+        "USART2",
+        "USART3",
+        "WWDG"
+      ],
+      "headerLine": 694,
+      "sourceLine": 1126,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_AHBPeriphResetCmd",
+      "name": "RCC_AHBPeriphResetCmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_AHBPeriphResetCmd(uint32_t RCC_AHBPeriph, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_AHBPeriph",
+          "type": "uint32_t",
+          "descEn": "specifies the AHB peripheral to reset. This parameter can be any combination of the following values:",
+          "descZh": "要复位的外设，如 RCC_AHBPeriph_DMA1。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the specified peripheral reset. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 保持复位状态，DISABLE 释放复位（正常工作时必须 DISABLE）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Forces or releases AHB peripheral reset.",
+      "briefZh": "复位 AHB 总线上的外设。",
+      "usageZh": "把指定外设强制恢复到复位状态，用于从异常状态恢复或重新初始化。大多数外设的 DeInit 函数内部就是调用它。日常开发很少直接用。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_AHBRSTR"
+      ],
+      "relatedFunctions": [
+        "RCC_APB1PeriphResetCmd",
+        "RCC_APB2PeriphResetCmd"
+      ],
+      "remarks": [
+        "This function applies only to STM32 Connectivity line devices."
+      ],
+      "notesZh": [
+        "复位后必须 DISABLE 释放，否则外设一直处于复位状态无法工作",
+        "复位会清除该外设所有寄存器配置，需要重新初始化"
+      ],
+      "exampleCode": "/* 复位 DMA1：先拉高再释放 */\nRCC_AHBPeriphResetCmd(RCC_AHBPeriph_DMA1, ENABLE);\nRCC_AHBPeriphResetCmd(RCC_AHBPeriph_DMA1, DISABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "DMA1",
+        "ENABLE",
+        "FunctionalState",
+        "RCC_AHBPeriph_DMA1"
+      ],
+      "headerLine": 697,
+      "sourceLine": 1153,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_APB2PeriphResetCmd",
+      "name": "RCC_APB2PeriphResetCmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_APB2PeriphResetCmd(uint32_t RCC_APB2Periph, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_APB2Periph",
+          "type": "uint32_t",
+          "descEn": "specifies the APB2 peripheral to reset. This parameter can be any combination of the following values:",
+          "descZh": "要复位的外设，如 RCC_APB2Periph_GPIOA、RCC_APB2Periph_USART1。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the specified peripheral reset. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 保持复位，DISABLE 释放复位。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Forces or releases High Speed APB (APB2) peripheral reset.",
+      "briefZh": "复位 APB2 总线上的外设。",
+      "usageZh": "把 APB2 外设强制恢复到复位状态。各外设的 DeInit 函数（如 GPIO_DeInit）内部就是调用它实现的。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_APB2RSTR"
+      ],
+      "relatedFunctions": [
+        "RCC_APB1PeriphResetCmd",
+        "RCC_AHBPeriphResetCmd",
+        "GPIO_DeInit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "必须成对调用（ENABLE 后跟 DISABLE），只拉高不释放会让外设永久停摆"
+      ],
+      "exampleCode": "/* GPIO_DeInit 内部就是这么做的 */\nRCC_APB2PeriphResetCmd(RCC_APB2Periph_GPIOA, ENABLE);\nRCC_APB2PeriphResetCmd(RCC_APB2Periph_GPIOA, DISABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "GPIO_DeInit",
+        "RCC_APB2Periph_GPIOA",
+        "RCC_APB2Periph_USART1"
+      ],
+      "headerLine": 699,
+      "sourceLine": 1185,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_APB1PeriphResetCmd",
+      "name": "RCC_APB1PeriphResetCmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_APB1PeriphResetCmd(uint32_t RCC_APB1Periph, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_APB1Periph",
+          "type": "uint32_t",
+          "descEn": "specifies the APB1 peripheral to reset. This parameter can be any combination of the following values:",
+          "descZh": "要复位的外设，如 RCC_APB1Periph_USART2、RCC_APB1Periph_TIM2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the specified peripheral clock. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 保持复位，DISABLE 释放复位。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Forces or releases Low Speed APB (APB1) peripheral reset.",
+      "briefZh": "复位 APB1 总线上的外设。",
+      "usageZh": "把 APB1 外设强制恢复到复位状态，各 APB1 外设的 DeInit 函数内部调用它。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_APB1RSTR"
+      ],
+      "relatedFunctions": [
+        "RCC_APB2PeriphResetCmd",
+        "RCC_AHBPeriphResetCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "必须成对调用，释放复位后才能重新配置外设"
+      ],
+      "exampleCode": "/* 复位 USART2 */\nRCC_APB1PeriphResetCmd(RCC_APB1Periph_USART2, ENABLE);\nRCC_APB1PeriphResetCmd(RCC_APB1Periph_USART2, DISABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "RCC_APB1Periph_TIM2",
+        "RCC_APB1Periph_USART2",
+        "USART2"
+      ],
+      "headerLine": 701,
+      "sourceLine": 1216,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_BackupResetCmd",
+      "name": "RCC_BackupResetCmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_BackupResetCmd(FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the Backup domain reset. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 保持备份域复位，DISABLE 释放。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Forces or releases the Backup domain reset.",
+      "briefZh": "复位整个备份域（BKP 寄存器 + RTC）。",
+      "usageZh": "当 RTC 配置混乱、或想彻底清空备份寄存器时使用。注意它会把备份域全部内容清零，包括 RTC 的计数器与备份寄存器里的数据——如果里面存着掉电不该丢的数据，会一起丢失。",
+      "prerequisites": [
+        "已使能 PWR 与 BKP 时钟",
+        "已调用 PWR_BackupAccessCmd(ENABLE) 解除备份域写保护"
+      ],
+      "registers": [
+        "RCC_BDCR"
+      ],
+      "relatedFunctions": [
+        "PWR_BackupAccessCmd",
+        "BKP_WriteBackupRegister",
+        "RTC_SetCounter"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "会清空 RTC 计数与所有备份寄存器，用之前确认数据可以丢",
+        "想修改 RTC 时钟源（RCC_BDCR 的部分位）时必须先做备份域复位"
+      ],
+      "exampleCode": "RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);\n\n/* 清空备份域（RTC 与备份寄存器都会丢） */\nRCC_BackupResetCmd(ENABLE);\nRCC_BackupResetCmd(DISABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "BKP",
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "PWR",
+        "PWR_BackupAccessCmd",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_BKP",
+        "RCC_APB1Periph_PWR",
+        "RTC"
+      ],
+      "headerLine": 702,
+      "sourceLine": 1237,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_ClockSecuritySystemCmd",
+      "name": "RCC_ClockSecuritySystemCmd",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec4",
+      "prototype": "void RCC_ClockSecuritySystemCmd(FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the Clock Security System.. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 开启 CSS，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the Clock Security System.",
+      "briefZh": "使能或关闭时钟安全系统（CSS）。",
+      "usageZh": "CSS 会持续监测 HSE。一旦 HSE 意外失效（晶振损坏、虚焊、外部干扰），硬件自动切换到 HSI 并产生中断，避免系统失去时钟而死机。对可靠性要求高的产品建议开启。",
+      "prerequisites": [
+        "系统时钟使用 HSE 或 HSE 驱动的 PLL（CSS 只监测 HSE）",
+        "若要响应中断，需 RCC_ITConfig(RCC_IT_CSS, ENABLE) 并在 NVIC 使能 RCC_IRQn"
+      ],
+      "registers": [
+        "RCC_CR",
+        "RCC_CIR"
+      ],
+      "relatedFunctions": [
+        "RCC_ITConfig",
+        "RCC_HSEConfig",
+        "RCC_GetITStatus"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "CSS 只监测 HSE，用 HSI 作为时钟源时开它没意义",
+        "触发 CSS 后系统时钟变成 HSI 8MHz，依赖原主频的外设（串口、定时）都会失准，中断里要重新配置",
+        "CSS 触发后 HSE 会被自动关闭，需要软件重新开启"
+      ],
+      "exampleCode": "/* 开启 CSS，HSE 失效时自动切到 HSI */\nRCC_ClockSecuritySystemCmd(ENABLE);\n\n/* 如需中断处理 */\nRCC_ITConfig(RCC_IT_CSS, ENABLE);\n/* NVIC 里还要使能 RCC_IRQn */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "NVIC",
+        "RCC_ITConfig",
+        "RCC_IT_CSS"
+      ],
+      "headerLine": 703,
+      "sourceLine": 1250,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_MCOConfig",
+      "name": "RCC_MCOConfig",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec2",
+      "prototype": "void RCC_MCOConfig(uint8_t RCC_MCO);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_MCO",
+          "type": "uint8_t",
+          "descEn": "specifies the clock source to output. For @b STM32_Connectivity_line_devices, this parameter can be one of the following values:",
+          "descZh": "RCC_MCO_NoClock（不输出）、RCC_MCO_SYSCLK（系统时钟）、RCC_MCO_HSI、RCC_MCO_HSE、RCC_MCO_PLLCLK_Div2（PLL 的 2 分频）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Selects the clock source to output on MCO pin.",
+      "briefZh": "配置 MCO 引脚（PA8）输出的时钟信号。",
+      "usageZh": "把内部时钟引到 PA8 引脚上，用示波器或频率计测量，是**验证时钟配置是否正确的最直接手段**。调试「串口乱码」「定时不准」这类问题时，先测 MCO 确认主频，比盲猜快得多。",
+      "prerequisites": [
+        "PA8 必须配置为复用推挽输出（GPIO_Mode_AF_PP）",
+        "已使能 GPIOA 与 AFIO 时钟"
+      ],
+      "registers": [
+        "RCC_CFGR"
+      ],
+      "relatedFunctions": [
+        "RCC_GetClocksFreq",
+        "GPIO_Init",
+        "RCC_PLLConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "输出 PLLCLK_Div2 时，72MHz 系统在 PA8 上测到 36MHz",
+        "MCO 输出会占用 PA8，正常功能里 PA8 就不能再作他用了",
+        "调试完记得关掉（RCC_MCO_NoClock），否则白白增加 EMI 和功耗"
+      ],
+      "exampleCode": "GPIO_InitTypeDef GPIO_InitStructure;\n\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_AFIO, ENABLE);\n\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;\nGPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;\nGPIO_Init(GPIOA, &GPIO_InitStructure);\n\n/* 输出 HSE，PA8 上应测到 8MHz */\nRCC_MCOConfig(RCC_MCO_HSE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "AFIO",
+        "ENABLE",
+        "GPIOA",
+        "GPIO_Init",
+        "GPIO_InitTypeDef",
+        "GPIO_Mode_AF_PP",
+        "GPIO_Pin_8",
+        "GPIO_Speed_50MHz",
+        "RCC_APB2PeriphClockCmd",
+        "RCC_APB2Periph_AFIO",
+        "RCC_APB2Periph_GPIOA",
+        "RCC_MCO_HSE",
+        "RCC_MCO_HSI",
+        "RCC_MCO_NoClock",
+        "RCC_MCO_PLLCLK_Div2",
+        "RCC_MCO_SYSCLK"
+      ],
+      "headerLine": 704,
+      "sourceLine": 1282,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_GetFlagStatus",
+      "name": "RCC_GetFlagStatus",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec7",
+      "prototype": "FlagStatus RCC_GetFlagStatus(uint8_t RCC_FLAG);",
+      "returnType": "FlagStatus",
+      "params": [
+        {
+          "name": "RCC_FLAG",
+          "type": "uint8_t",
+          "descEn": "specifies the flag to check. For @b STM32_Connectivity_line_devices, this parameter can be one of the following values:",
+          "descZh": "要检查的标志：RCC_FLAG_HSERDY、RCC_FLAG_HSIRDY、RCC_FLAG_LSERDY、RCC_FLAG_LSIRDY、RCC_FLAG_PLLRDY、RCC_FLAG_PLL2RDY、RCC_FLAG_PLL3RDY。"
+        }
+      ],
+      "returnDescEn": "The new state of RCC_FLAG (SET or RESET).",
+      "returnDescZh": "SET 表示标志已置位（就绪），RESET 表示未置位。",
+      "briefEn": "Checks whether the specified RCC flag is set or not.",
+      "briefZh": "检查 RCC 相关标志位是否置位。",
+      "usageZh": "等待各种时钟就绪的必需手段：HSERDY（HSE 起振完成）、LSERDY（LSE 就绪）、HSIRDY、LSIRDY、PLLRDY（PLL 锁定）。时钟配置流程里几乎每一步都要用它轮询等待。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_CR",
+        "RCC_CSR"
+      ],
+      "relatedFunctions": [
+        "RCC_ClearFlag",
+        "RCC_HSEConfig",
+        "RCC_LSEConfig",
+        "RCC_PLLCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "返回值是 SET/RESET（FlagStatus 类型），不是 SUCCESS/ERROR（ErrorStatus 类型），两者别混",
+        "轮询死等要小心：晶振损坏时会永久卡住，实际产品里建议加超时计数"
+      ],
+      "exampleCode": "/* 等待 PLL 锁定 */\nRCC_PLLCmd(ENABLE);\nwhile (RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET)\n{\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "ERROR",
+        "ErrorStatus",
+        "FlagStatus",
+        "RCC",
+        "RCC_FLAG_HSERDY",
+        "RCC_FLAG_HSIRDY",
+        "RCC_FLAG_LSERDY",
+        "RCC_FLAG_LSIRDY",
+        "RCC_FLAG_PLL2RDY",
+        "RCC_FLAG_PLL3RDY",
+        "RCC_FLAG_PLLRDY",
+        "RCC_PLLCmd",
+        "RESET",
+        "SET",
+        "SUCCESS"
+      ],
+      "headerLine": 705,
+      "sourceLine": 1326,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_ClearFlag",
+      "name": "RCC_ClearFlag",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec7",
+      "prototype": "void RCC_ClearFlag(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Clears the RCC reset flags.",
+      "briefZh": "清除 RCC 的标志位。",
+      "usageZh": "清除 CSS（时钟安全系统）标志。RCC 的就绪类标志由硬件在条件满足时自动置位、条件消失时自动清除，需要手动清的只有 CSS 标志。注意本函数没有参数——它一次性清除所有可清除的 RCC 标志。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_CIR"
+      ],
+      "relatedFunctions": [
+        "RCC_GetFlagStatus",
+        "RCC_ClearITPendingBit",
+        "RCC_ClockSecuritySystemCmd"
+      ],
+      "remarks": [
+        "The reset flags are: RCC_FLAG_PINRST, RCC_FLAG_PORRST, RCC_FLAG_SFTRST, RCC_FLAG_IWDGRST, RCC_FLAG_WWDGRST, RCC_FLAG_LPWRRST"
+      ],
+      "notesZh": [
+        "本函数原型是 void RCC_ClearFlag(void)，没有参数，不要试图传 RCC_FLAG_CSS",
+        "就绪类标志（HSERDY 等）是硬件状态，清了还会再置位，不要试图用 ClearFlag 关闭时钟",
+        "CSS 中断处理完必须清标志，否则会反复进中断"
+      ],
+      "exampleCode": "/* 清除 CSS 标志（无参数） */\nRCC_ClearFlag();",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RCC",
+        "RCC_FLAG_IWDGRST",
+        "RCC_FLAG_LPWRRST",
+        "RCC_FLAG_PINRST",
+        "RCC_FLAG_PORRST",
+        "RCC_FLAG_SFTRST",
+        "RCC_FLAG_WWDGRST"
+      ],
+      "headerLine": 706,
+      "sourceLine": 1371,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_GetITStatus",
+      "name": "RCC_GetITStatus",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec6",
+      "prototype": "ITStatus RCC_GetITStatus(uint8_t RCC_IT);",
+      "returnType": "ITStatus",
+      "params": [
+        {
+          "name": "RCC_IT",
+          "type": "uint8_t",
+          "descEn": "specifies the RCC interrupt source to check. For @b STM32_Connectivity_line_devices, this parameter can be one of the following values:",
+          "descZh": "要检查的中断源：RCC_IT_LSIRDY、RCC_IT_LSERDY、RCC_IT_HSIRDY、RCC_IT_HSERDY、RCC_IT_PLLRDY、RCC_IT_CSS。"
+        }
+      ],
+      "returnDescEn": "The new state of RCC_IT (SET or RESET).",
+      "returnDescZh": "SET 表示该中断已发生且使能，RESET 表示未发生或未使能。",
+      "briefEn": "Checks whether the specified RCC interrupt has occurred or not.",
+      "briefZh": "检查 RCC 中断是否发生且已使能。",
+      "usageZh": "在 RCC_IRQHandler 中断服务函数里判断是哪个 RCC 中断源触发的。与 RCC_GetFlagStatus 的区别：它同时检查「标志置位」与「中断已使能」两个条件。",
+      "prerequisites": [
+        "已在 NVIC 里使能 RCC_IRQn 中断通道",
+        "已用 RCC_ITConfig 使能对应中断源"
+      ],
+      "registers": [
+        "RCC_CIR"
+      ],
+      "relatedFunctions": [
+        "RCC_ClearITPendingBit",
+        "RCC_ITConfig",
+        "RCC_GetFlagStatus"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "中断服务函数里用这个，不要用 RCC_GetFlagStatus",
+        "处理完必须 RCC_ClearITPendingBit 清标志"
+      ],
+      "exampleCode": "void RCC_IRQHandler(void)\n{\n  /* CSS 中断：HSE 失效 */\n  if (RCC_GetITStatus(RCC_IT_CSS) != RESET)\n  {\n    /* 紧急处理：重新配置时钟、关闭危险外设 */\n    RCC_ClearITPendingBit(RCC_IT_CSS);\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ITStatus",
+        "NVIC",
+        "RCC",
+        "RCC_ClearITPendingBit",
+        "RCC_GetFlagStatus",
+        "RCC_ITConfig",
+        "RCC_IT_CSS",
+        "RCC_IT_HSERDY",
+        "RCC_IT_HSIRDY",
+        "RCC_IT_LSERDY",
+        "RCC_IT_LSIRDY",
+        "RCC_IT_PLLRDY",
+        "RESET",
+        "SET"
+      ],
+      "headerLine": 707,
+      "sourceLine": 1402,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RCC_ClearITPendingBit",
+      "name": "RCC_ClearITPendingBit",
+      "peripheral": "RCC",
+      "sectionId": "RCC#sec6",
+      "prototype": "void RCC_ClearITPendingBit(uint8_t RCC_IT);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RCC_IT",
+          "type": "uint8_t",
+          "descEn": "specifies the interrupt pending bit to clear. For @b STM32_Connectivity_line_devices, this parameter can be any combination of the following values:",
+          "descZh": "要清除的中断源标志，如 RCC_IT_CSS、RCC_IT_HSERDY。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Clears the RCC's interrupt pending bits.",
+      "briefZh": "清除 RCC 中断挂起标志。",
+      "usageZh": "RCC 中断服务函数里处理完必须调用，否则中断会反复触发。",
+      "prerequisites": [],
+      "registers": [
+        "RCC_CIR"
+      ],
+      "relatedFunctions": [
+        "RCC_GetITStatus",
+        "RCC_ITConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "忘记清标志会导致中断反复触发，程序看起来像卡死"
+      ],
+      "exampleCode": "void RCC_IRQHandler(void)\n{\n  if (RCC_GetITStatus(RCC_IT_CSS) != RESET)\n  {\n    /* 处理... */\n    RCC_ClearITPendingBit(RCC_IT_CSS);   /* 必须清 */\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RCC",
+        "RCC_GetITStatus",
+        "RCC_IT_CSS",
+        "RCC_IT_HSERDY",
+        "RESET"
+      ],
+      "headerLine": 708,
+      "sourceLine": 1448,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    }
+  ]
+}

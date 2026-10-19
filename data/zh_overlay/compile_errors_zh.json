@@ -1,0 +1,511 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    { "id": "compiler", "nameZh": "编译错误", "nameEn": "Compiler", "orderIndex": 1 },
+    { "id": "linker", "nameZh": "链接错误", "nameEn": "Linker", "orderIndex": 2 },
+    { "id": "download", "nameZh": "下载/调试错误", "nameEn": "Download & Debug", "orderIndex": 3 },
+    { "id": "runtime", "nameZh": "运行时故障", "nameEn": "Runtime", "orderIndex": 4 }
+  ],
+  "errors": [
+    {
+      "id": "err.undefined_reference",
+      "titleZh": "undefined reference to 'xxx'（GCC 链接错误）",
+      "categoryId": "linker",
+      "toolchain": "gcc-arm",
+      "messagePatterns": ["undefined reference to", "Undefined reference"],
+      "messageSample": "(.text+0x1c): undefined reference to `GPIO_Init'\ncollect2.exe: error: ld returned 1 exit status",
+      "explainZh": "链接器找不到某个函数或变量的实现体。编译器已经看到了它的声明（所以不报「未声明」），但找不到定义（函数体）。",
+      "causes": [
+        "对应的 stm32f10x_xxx.c 没有加入工程编译列表",
+        "函数名拼写错误或大小写不符（C 语言区分大小写，GPIO_init ≠ GPIO_Init）",
+        "实现该函数的 .c 文件被 #ifdef 条件编译掉了（如外设宏未定义）",
+        "在头文件里只写了声明却忘了写实现"
+      ],
+      "solutions": [
+        "把 Libraries/STM32F10x_StdPeriph_Driver/src/stm32f10x_gpio.c 等对应源文件加入工程",
+        "核对函数名的大小写，与头文件声明逐字符比对",
+        "确认 stm32f10x.h 中对应的外设宏已定义，且 stm32f10x_conf.h 里没有注释掉该外设的头文件",
+        "如果用的是标准外设库，确认宏 USE_STDPERIPH_DRIVER 已在工程预定义宏里"
+      ],
+      "codeSnippets": [
+        {
+          "language": "c",
+          "title": "正确写法：函数名与头文件声明一致",
+          "code": "GPIO_Init(GPIOC, &GPIO_InitStructure);"
+        }
+      ],
+      "relatedFunctionIds": ["GPIO_Init"],
+      "relatedSymbolIds": ["USE_STDPERIPH_DRIVER"],
+      "relatedPeripheralIds": ["GPIO"],
+      "tags": ["链接", "函数未定义", "GCC", "Makefile"]
+    },
+
+    {
+      "id": "err.keil_l6218e",
+      "titleZh": "L6218E: Undefined symbol xxx（Keil 版未定义符号）",
+      "categoryId": "linker",
+      "toolchain": "keil",
+      "messagePatterns": ["L6218E", "Undefined symbol"],
+      "messageSample": ".\\Objects\\project.axf: Error: L6218E: Undefined symbol GPIO_Init (referred from main.o).",
+      "explainZh": "Keil 链接器找不到符号定义，等价于 GCC 的 undefined reference。referred from main.o 表示是 main.c 里用到了它。",
+      "causes": [
+        "对应的 .c 文件没有添加到工程分组里（Keil 需要在工程窗口手动 Add Existing Files）",
+        "函数名拼写错误",
+        "外设驱动文件的「Include in Target Build」被取消勾选",
+        "stm32f10x_conf.h 里注释掉了该外设头文件，导致实现被条件编译排除"
+      ],
+      "solutions": [
+        "在 Keil 工程窗口右键对应分组 → Add Existing Files to Group，把 stm32f10x_gpio.c 等加进来",
+        "右键该 .c 文件 → Options，确认勾选了 Include in Target Build",
+        "检查 stm32f10x_conf.h，取消对应外设头文件行的注释",
+        "Rebuild All（不是 Build），避免旧的中间文件干扰"
+      ],
+      "codeSnippets": [
+        {
+          "language": "c",
+          "title": "stm32f10x_conf.h 里要放开用到的外设",
+          "code": "#include \"stm32f10x_gpio.h\"\n#include \"stm32f10x_rcc.h\"\n#include \"stm32f10x_usart.h\""
+        }
+      ],
+      "relatedFunctionIds": ["GPIO_Init"],
+      "relatedSymbolIds": [],
+      "relatedPeripheralIds": ["GPIO", "RCC"],
+      "tags": ["链接", "Keil", "L6218E", "未定义符号"]
+    },
+
+    {
+      "id": "err.multiple_definition",
+      "titleZh": "multiple definition of 'xxx'（多重定义）",
+      "categoryId": "linker",
+      "toolchain": "generic",
+      "messagePatterns": ["multiple definition of", "multiply defined", "L6200E"],
+      "messageSample": "stm32f10x_gpio.o:(.bss.GPIO_InitStructure+0x0): multiple definition of `GPIO_InitStructure'\nmain.o:(.bss.GPIO_InitStructure+0x0): first defined here",
+      "explainZh": "同一个符号在多个编译单元里都有定义，链接器不知道用哪个。最常见于在头文件里直接定义了变量。",
+      "causes": [
+        "在 .h 文件里直接写了变量定义（如 int count;）并被多个 .c 包含",
+        "同一个 .c 文件被重复添加到工程",
+        "函数在头文件里直接写了实现（没有 static 也没有 inline）"
+      ],
+      "solutions": [
+        "头文件里只放声明 extern int count;，把定义放到某一个 .c 文件里",
+        "检查工程文件列表，删除重复添加的源文件",
+        "头文件里的函数加 static inline，或把实现移到 .c 文件",
+        "C99 及以上可用 inline 配合一个 .c 里的 extern 定义"
+      ],
+      "codeSnippets": [
+        {
+          "language": "c",
+          "title": "头文件里声明，源文件里定义",
+          "code": "/* config.h */\nextern uint16_t g_sampleCount;   /* 只声明 */\n\n/* config.c */\nuint16_t g_sampleCount = 0;      /* 只在一处定义 */"
+        }
+      ],
+      "relatedFunctionIds": [],
+      "relatedSymbolIds": [],
+      "relatedPeripheralIds": [],
+      "tags": ["链接", "多重定义", "头文件"]
+    },
+
+    {
+      "id": "err.header_not_found",
+      "titleZh": "stm32f10x.h: No such file or directory",
+      "categoryId": "compiler",
+      "toolchain": "generic",
+      "messagePatterns": ["No such file or directory", "cannot open source input file", "fatal error:"],
+      "messageSample": "main.c:2:10: fatal error: stm32f10x.h: No such file or directory\n #include \"stm32f10x.h\"\n          ^~~~~~~~~~~~~\ncompilation terminated.",
+      "explainZh": "编译器在指定的头文件搜索路径里找不到 stm32f10x.h。这是路径配置问题，不是文件缺失。",
+      "causes": [
+        "工程的 Include Paths 没有添加库的 inc 目录",
+        "路径写错或用了中文/空格路径导致解析失败",
+        "库文件被移动了位置，工程里的相对路径失效"
+      ],
+      "solutions": [
+        "Keil：Options for Target → C/C++ → Include Paths，添加 Libraries\\CMSIS\\CM3\\DeviceSupport\\ST\\STM32F10x 与 Libraries\\STM32F10x_StdPeriph_Driver\\inc",
+        "GCC/Makefile：在 CFLAGS 里加 -I 路径",
+        "确认路径里没有中文或特殊字符（Android/嵌入式工具链对非 ASCII 路径支持很差）",
+        "确认 stm32f10x.h 文件确实存在于该目录"
+      ],
+      "codeSnippets": [
+        {
+          "language": "makefile",
+          "title": "Makefile 里添加头文件路径",
+          "code": "CFLAGS += -I./Libraries/CMSIS/CM3/DeviceSupport/ST/STM32F10x\nCFLAGS += -I./Libraries/STM32F10x_StdPeriph_Driver/inc\nCFLAGS += -I./User"
+        }
+      ],
+      "relatedFunctionIds": [],
+      "relatedSymbolIds": [],
+      "relatedPeripheralIds": [],
+      "tags": ["编译", "头文件", "路径", "Include Paths"]
+    },
+
+    {
+      "id": "err.cannot_open_conf",
+      "titleZh": "cannot open source input file \"stm32f10x_conf.h\"",
+      "categoryId": "compiler",
+      "toolchain": "keil",
+      "messagePatterns": ["stm32f10x_conf.h", "cannot open source input file"],
+      "messageSample": "..\\..\\Libraries\\CMSIS\\CM3\\DeviceSupport\\ST\\STM32F10x\\stm32f10x.h(8298): error:  #5: cannot open source input file \"stm32f10x_conf.h\": No such file or directory",
+      "explainZh": "stm32f10x.h 在定义了 USE_STDPERIPH_DRIVER 时会去包含 stm32f10x_conf.h，但编译器找不到它。该文件通常在工程的 User 目录下。",
+      "causes": [
+        "stm32f10x_conf.h 没有加入工程或不在 Include Paths 里",
+        "文件被误删",
+        "该文件在别的目录但没把那个目录加进搜索路径"
+      ],
+      "solutions": [
+        "把 stm32f10x_conf.h 放到工程 User 目录（或任意目录），并把该目录加入 Include Paths",
+        "如果不用标准外设库的 conf 机制，在预定义宏里去掉 USE_STDPERIPH_DRIVER",
+        "从库包的 Project\\STM32F10x_StdPeriph_Template 目录复制一份 stm32f10x_conf.h 过来"
+      ],
+      "codeSnippets": [
+        {
+          "language": "c",
+          "title": "stm32f10x_conf.h 的标准内容（按需放开）",
+          "code": "#include \"stm32f10x_gpio.h\"\n#include \"stm32f10x_rcc.h\"\n#include \"stm32f10x_usart.h\"\n#include \"stm32f10x_tim.h\"\n#include \"misc.h\"\n\n/* #define USE_FULL_ASSERT  1 */"
+        }
+      ],
+      "relatedFunctionIds": [],
+      "relatedSymbolIds": ["USE_STDPERIPH_DRIVER", "USE_FULL_ASSERT"],
+      "relatedPeripheralIds": [],
+      "tags": ["编译", "Keil", "conf", "头文件"]
+    },
+
+    {
+      "id": "err.select_target_device",
+      "titleZh": "#error \"Please select first the target STM32F10x device used in your application\"",
+      "categoryId": "compiler",
+      "toolchain": "generic",
+      "messagePatterns": ["Please select first the target STM32F10x device"],
+      "messageSample": "stm32f10x.h(298): error:  #35: #error directive: \"Please select first the target STM32F10x device used in your application (in stm32f10x.h file)\"",
+      "explainZh": "stm32f10x.h 需要知道目标芯片属于哪个容量档次（小/中/大/互联/超大容量），因为不同档次的外设与中断向量不同。这个宏必须由你在工程里定义。",
+      "causes": [
+        "工程预定义宏里没有定义 STM32F10X_MD（中容量）等器件宏",
+        "定义写错了名字（如写成 STM32F10X_MD_VL 而芯片是普通中容量）"
+      ],
+      "solutions": [
+        "确认 C8T6 属于中容量产品，应定义 STM32F10X_MD",
+        "Keil：Options for Target → C/C++ → Define 里填 USE_STDPERIPH_DRIVER, STM32F10X_MD",
+        "GCC：在 CFLAGS 里加 -DUSE_STDPERIPH_DRIVER -DSTM32F10X_MD",
+        "容量档次对照：小容量 LD（16-32KB Flash）、中容量 MD（64-128KB）、大容量 HD（256-512KB）、互联 CL、超大容量 XL"
+      ],
+      "codeSnippets": [
+        {
+          "language": "c",
+          "title": "C8T6 的预定义宏（Keil 的 Define 框里填）",
+          "code": "USE_STDPERIPH_DRIVER, STM32F10X_MD"
+        },
+        {
+          "language": "makefile",
+          "title": "GCC 版",
+          "code": "CFLAGS += -DUSE_STDPERIPH_DRIVER -DSTM32F10X_MD"
+        }
+      ],
+      "relatedFunctionIds": [],
+      "relatedSymbolIds": ["STM32F10X_MD", "USE_STDPERIPH_DRIVER"],
+      "relatedPeripheralIds": [],
+      "tags": ["编译", "器件宏", "容量档次", "STM32F10X_MD"]
+    },
+
+    {
+      "id": "err.identifier_undefined",
+      "titleZh": "main.c: Error: #20: identifier \"xxx\" is undefined",
+      "categoryId": "compiler",
+      "toolchain": "keil",
+      "messagePatterns": ["identifier", "is undefined", "#20"],
+      "messageSample": "main.c(25): error:  #20: identifier \"GPIO_InitTypeDef\" is undefined",
+      "explainZh": "编译器不认识这个标识符——它既不是变量也不是类型，说明对应的头文件没有被包含进来。",
+      "causes": [
+        "main.c 里没有 #include 对应的头文件",
+        "stm32f10x_conf.h 里注释掉了该外设的头文件",
+        "标识符拼写错误",
+        "该外设属于本芯片不支持的型号（如 C8T6 上用 DAC_InitTypeDef）"
+      ],
+      "solutions": [
+        "在 main.c 顶部 #include \"stm32f10x_gpio.h\" 等对应头文件",
+        "检查 stm32f10x_conf.h 是否放开了该外设",
+        "核对拼写与大小写",
+        "确认该外设确实存在于 STM32F103C8T6（DAC、FSMC、SDIO 在 C8T6 上不存在）"
+      ],
+      "codeSnippets": [
+        {
+          "language": "c",
+          "title": "main.c 顶部包含用到的外设头文件",
+          "code": "#include \"stm32f10x.h\"\n#include \"stm32f10x_gpio.h\"\n#include \"stm32f10x_rcc.h\""
+        }
+      ],
+      "relatedFunctionIds": [],
+      "relatedSymbolIds": ["GPIO_InitTypeDef"],
+      "relatedPeripheralIds": ["GPIO"],
+      "tags": ["编译", "Keil", "未声明", "头文件"]
+    },
+
+    {
+      "id": "err.circular_include",
+      "titleZh": "头文件循环包含（unknown type name / 类型重定义）",
+      "categoryId": "compiler",
+      "toolchain": "generic",
+      "messagePatterns": ["unknown type name", "redefinition of", "has no member named", "circular include"],
+      "messageSample": "In file included from b.h:3:0,\n                 from a.h:3:0,\n                 from main.c:2:\nb.h:10:5: error: unknown type name 'TypeA'",
+      "explainZh": "两个头文件互相 #include，或者包含链形成环，导致其中一个头文件的内容在另一个还没定义完时就被展开，类型声明不完整。",
+      "causes": [
+        "a.h 里 #include \"b.h\"，b.h 里又 #include \"a.h\"",
+        "头文件缺少防重复包含保护（#ifndef/#define/#endif）",
+        "在头文件里定义结构体并在另一个头文件里使用其完整类型，但只做了前向声明"
+      ],
+      "solutions": [
+        "给每个头文件加防重复包含保护",
+        "把相互依赖的类型抽到第三个公共头文件里",
+        "能用指针的地方用前向声明（struct Foo;）替代 #include",
+        "头文件里只 #include 必需的东西，其余放到 .c 文件里包含"
+      ],
+      "codeSnippets": [
+        {
+          "language": "c",
+          "title": "标准的防重复包含保护",
+          "code": "#ifndef __MY_HEADER_H\n#define __MY_HEADER_H\n\n/* 声明放这里 */\n\n#endif /* __MY_HEADER_H */"
+        }
+      ],
+      "relatedFunctionIds": [],
+      "relatedSymbolIds": [],
+      "relatedPeripheralIds": [],
+      "tags": ["编译", "循环包含", "头文件保护"]
+    },
+
+    {
+      "id": "err.no_space_execution_regions",
+      "titleZh": "No space in execution regions / Flash 或 RAM 溢出",
+      "categoryId": "linker",
+      "toolchain": "keil",
+      "messagePatterns": ["No space in execution regions", "region RAM overflowed", "region FLASH overflowed", "will not fit"],
+      "messageSample": ".\\Objects\\project.axf: Error: L6406E: No space in execution regions with .ANY selector matching main.o(.bss).\n.\\Objects\\project.axf: Error: L6407E: Sections of aggregate size 0x400 bytes could not fit into .ANY selector(s).",
+      "explainZh": "编译出来的代码或数据超过了芯片的 Flash（64KB）或 RAM（20KB）容量。链接器无法把所有段放进指定的存储区。",
+      "causes": [
+        "定义了过大的全局数组或缓冲区（RAM 溢出最常见的原因）",
+        "代码量本身超了（Flash 溢出，常见于引入了大量 printf 浮点格式化）",
+        "使用了 sprintf/printf 的浮点格式（会拉入几十 KB 的库代码）",
+        "链接脚本里的 RAM/Flash 大小配置与实际芯片不符"
+      ],
+      "solutions": [
+        "打开 .map 文件（Listings 目录）搜索「Memory Map」，看哪个目标文件占用最大",
+        "把大数组改成局部变量或加 const 放到 Flash；必要时用外部存储",
+        "去掉浮点 printf：用整数或定点运算代替，或改用精简的串口输出函数",
+        "把编译优化等级调到 -O2 / -Os 或 Keil 的 Level 1",
+        "检查 Keil 的 Target 页 RAM/Flash 配置：C8T6 应为 64KB Flash（0x10000）、20KB RAM（0x5000）"
+      ],
+      "codeSnippets": [
+        {
+          "language": "c",
+          "title": "把只读大表放到 Flash，节省 RAM",
+          "code": "/* 不加 const 会占用 20KB RAM，加了 const 放进 Flash */\nconst uint16_t g_sineTable[1024] = { /* ... */ };"
+        }
+      ],
+      "relatedFunctionIds": [],
+      "relatedSymbolIds": [],
+      "relatedPeripheralIds": ["FLASH"],
+      "tags": ["链接", "Keil", "Flash 溢出", "RAM 溢出", "L6406E"]
+    },
+
+    {
+      "id": "err.flash_download_failed",
+      "titleZh": "Error: Flash Download failed - \"Cortex-M3\"",
+      "categoryId": "download",
+      "toolchain": "keil",
+      "messagePatterns": ["Flash Download failed", "Cortex-M3"],
+      "messageSample": "Error: Flash Download failed - \"Cortex-M3\"",
+      "explainZh": "Keil 能连上调试器，但写 Flash 失败。通常是算法、时钟或芯片状态问题。",
+      "causes": [
+        "Flash 算法选错或没添加（Options → Utilities → Settings → Add Flash Programming Algorithm）",
+        "程序里禁用了 SWD/JTAG 或进了低功耗模式，芯片「跑飞」了",
+        "芯片被读保护（Read Out Protection）锁住",
+        "供电不足或复位电路异常",
+        "SWD 速率设太高，杜邦线太长导致通信不稳"
+      ],
+      "solutions": [
+        "确认 Flash 算法选了 STM32F10x Med-density Flash（C8T6 是 64KB 中容量），起始地址 0x08000000、大小 0x10000",
+        "按住复位键 → 点下载 → 立刻松开复位键，抢在程序禁用 SWD 之前完成下载",
+        "把 BOOT0 接高电平进 ISP 模式，用 ST-Link Utility 全片擦除后再改回 BOOT0=0",
+        "降低 SWD 时钟频率（Options → Debug → Settings → Clock 调到 1MHz 以下）",
+        "检查 3.3V 供电是否稳定，尽量用短排线"
+      ],
+      "codeSnippets": [
+        {
+          "language": "c",
+          "title": "危险写法：这行执行后就再也连不上下载器",
+          "code": "/* 不要这样做！会同时关闭 JTAG 和 SWD */\nGPIO_PinRemapConfig(GPIO_Remap_SWJ_Disable, ENABLE);\n\n/* 需要释放调试引脚时用这个，保留 SWD */\nGPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);"
+        }
+      ],
+      "relatedFunctionIds": ["GPIO_PinRemapConfig"],
+      "relatedSymbolIds": ["GPIO_Remap_SWJ_JTAGDisable", "GPIO_Remap_SWJ_Disable"],
+      "relatedPeripheralIds": ["GPIO", "FLASH"],
+      "tags": ["下载", "Keil", "ST-Link", "Flash 算法"]
+    },
+
+    {
+      "id": "err.could_not_stop_cortex",
+      "titleZh": "could not stop Cortex-M device（SWD 被占用 / 程序禁用了 SWD）",
+      "categoryId": "download",
+      "toolchain": "keil",
+      "messagePatterns": ["could not stop Cortex-M device", "Cannot access Memory", "No Cortex-M SW Device Found"],
+      "messageSample": "Error: Flash Download failed - Could not load file '...axf'\nCould not stop Cortex-M device! Please check the JTAG cable.",
+      "explainZh": "调试器无法让 CPU 停下来，通常是因为程序一上电就把 SWD 引脚改作他用或进了深度低功耗模式，调试器来不及接管。",
+      "causes": [
+        "程序里调用 GPIO_PinRemapConfig(GPIO_Remap_SWJ_Disable, ENABLE) 关闭了 SWD",
+        "把 PA13/PA14 配置成了普通 GPIO 或复用功能",
+        "程序很快进入待机/停止模式并关闭了调试时钟",
+        "上电后程序立刻进入死循环并关了中断"
+      ],
+      "solutions": [
+        "按住开发板复位键 → 在 Keil 里点下载 → 松开复位键，利用复位后的短暂窗口完成连接",
+        "把 BOOT0 接 3.3V 进系统存储器启动模式，芯片不跑用户程序，此时可直接连接并全片擦除",
+        "用 ST-Link Utility 的「Connect Under Reset」模式连接，然后 Erase Chip",
+        "改用 GPIO_Remap_SWJ_JTAGDisable 代替 SWJ_Disable，保留 SWD 下载能力",
+        "在禁用 SWD 的代码前加 2~3 秒延时，给自己留出连接窗口"
+      ],
+      "codeSnippets": [
+        {
+          "language": "c",
+          "title": "保留 SWD 的正确写法 + 调试保险延时",
+          "code": "/* 开机留出调试窗口（仅调试期使用） */\nfor (volatile uint32_t i = 0; i < 8000000; i++);\n\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);\n/* 只关 JTAG，保留 SWD，PA13/PA14 仍可下载 */\nGPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);"
+        }
+      ],
+      "relatedFunctionIds": ["GPIO_PinRemapConfig"],
+      "relatedSymbolIds": ["GPIO_Remap_SWJ_Disable", "GPIO_Remap_SWJ_JTAGDisable"],
+      "relatedPeripheralIds": ["GPIO"],
+      "tags": ["下载", "SWD", "调试口", "救砖", "Connect Under Reset"]
+    },
+
+    {
+      "id": "err.stlink_not_connected",
+      "titleZh": "st-link is not connected / No ST-LINK detected",
+      "categoryId": "download",
+      "toolchain": "st-link",
+      "messagePatterns": ["st-link is not connected", "No ST-LINK detected", "No STM32 target found", "ST-Link USB communication error"],
+      "messageSample": "Error: st-link is not connected\nNo ST-LINK detected",
+      "explainZh": "上位机软件（Keil / ST-Link Utility）找不到 ST-Link 调试器，或者调试器找不到目标芯片。要区分是「电脑认不到调试器」还是「调试器认不到芯片」。",
+      "causes": [
+        "ST-Link 驱动没装或装错（常见于山寨 ST-Link，需要替换为 WinUSB 驱动）",
+        "USB 线是「只充电不传数据」的线",
+        "调试器与开发板的 SWDIO/SWCLK/GND 接线错误或接触不良",
+        "目标板没有供电，或 3.3V 与调试器供电冲突",
+        "调试器固件损坏（山寨版常见）"
+      ],
+      "solutions": [
+        "设备管理器里看是否出现 STLink 设备；没有则换 USB 口/线，或重装驱动",
+        "确认四根线接对：SWDIO→PA13、SWCLK→PA14、GND→GND、3.3V→3.3V（若目标板已独立供电则不要接 3.3V）",
+        "用 ST-Link Utility 的 Firmware upgrade 更新调试器固件",
+        "换一根确认能传数据的 USB 线",
+        "在设备管理器里卸载设备后重新插拔，让系统重新枚举"
+      ],
+      "codeSnippets": [],
+      "relatedFunctionIds": [],
+      "relatedSymbolIds": [],
+      "relatedPeripheralIds": [],
+      "tags": ["下载", "ST-Link", "驱动", "接线"]
+    },
+
+    {
+      "id": "err.usart_garbled",
+      "titleZh": "串口乱码（时钟配置错误导致波特率不对）",
+      "categoryId": "runtime",
+      "toolchain": "generic",
+      "messagePatterns": ["乱码", "garbled", "波特率", "baud rate"],
+      "messageSample": "串口助手收到：\nþÿÿÿþÿÿÿ  或   \n\u0000\u0000\u0000\u0000   （应为 Hello）",
+      "explainZh": "串口助手收到的全是乱码。根因通常是波特率不匹配——而波特率由外设时钟除以 USART_InitStruct.USART_BaudRate 得出，外设时钟错了波特率就错了。",
+      "causes": [
+        "系统时钟不是预期的 72MHz（HSE 没起振，芯片退回 HSI 8MHz）",
+        "USART1 挂 APB2（72MHz），USART2/3 挂 APB1（36MHz），按错总线算波特率",
+        "串口助手的波特率、数据位、停止位、校验位与代码不一致",
+        "USART_InitTypeDef 结构体字段没全部赋值（栈上随机值）",
+        "外部晶振实际频率不是 8MHz（如用了 12MHz 晶振但代码按 8MHz 配 PLL）"
+      ],
+      "solutions": [
+        "先用 MCO 把系统时钟输出到 PA8，用示波器/频率计确认实际主频",
+        "确认 HSE 起振：RCC_WaitForHSEStartUp() 返回 SUCCESS，否则会回退到 HSI",
+        "核对 USART 挂在哪条总线：USART1→APB2(72MHz)，USART2/3→APB1(36MHz)",
+        "串口助手设置为 115200-8-N-1，与代码一致",
+        "用 USART_StructInit 先填默认值，再改需要的字段"
+      ],
+      "codeSnippets": [
+        {
+          "language": "c",
+          "title": "正确的 USART1 初始化（APB2 = 72MHz）",
+          "code": "USART_InitTypeDef USART_InitStructure;\n\nUSART_StructInit(&USART_InitStructure);   /* 先填默认值 */\nUSART_InitStructure.USART_BaudRate = 115200;\nUSART_InitStructure.USART_WordLength = USART_WordLength_8b;\nUSART_InitStructure.USART_StopBits = USART_StopBits_1;\nUSART_InitStructure.USART_Parity = USART_Parity_No;\nUSART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;\nUSART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;\nUSART_Init(USART1, &USART_InitStructure);\nUSART_Cmd(USART1, ENABLE);"
+        },
+        {
+          "language": "c",
+          "title": "把系统时钟输出到 PA8 用于测量",
+          "code": "GPIO_InitTypeDef GPIO_InitStructure;\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_AFIO, ENABLE);\n\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;\nGPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;\nGPIO_Init(GPIOA, &GPIO_InitStructure);\n\n/* 输出 HSE 不分频，PA8 上应测到 8MHz */\nRCC_MCOConfig(RCC_MCO_HSE);"
+        }
+      ],
+      "relatedFunctionIds": ["USART_Init", "USART_Cmd", "USART_StructInit", "RCC_MCOConfig"],
+      "relatedSymbolIds": ["USART_WordLength_8b", "USART_StopBits_1", "USART_Parity_No", "RCC_MCO_HSE"],
+      "relatedPeripheralIds": ["USART", "RCC", "GPIO"],
+      "tags": ["运行时", "串口", "乱码", "波特率", "时钟"]
+    },
+
+    {
+      "id": "err.assert_param",
+      "titleZh": "assert_param 相关报错（USE_FULL_ASSERT）",
+      "categoryId": "compiler",
+      "toolchain": "generic",
+      "messagePatterns": ["assert_param", "USE_FULL_ASSERT", "assert_failed", "assertion"],
+      "messageSample": "main.c(58): error:  #20: identifier \"assert_failed\" is undefined\n或运行后停在 assert_failed 函数里，参数为 stm32f10x_gpio.c, line 262",
+      "explainZh": "标准外设库的每个函数入口都有 assert_param 做参数合法性检查。默认它是空宏（不产生代码）；一旦定义了 USE_FULL_ASSERT，它就会调用 assert_failed，参数非法时停在那里。",
+      "causes": [
+        "定义了 USE_FULL_ASSERT 但没实现 assert_failed 函数（编译期报未定义）",
+        "运行期停在 assert_failed，说明传给库函数的参数不合法（如 GPIO_Pin 传了 0，或模式值超出枚举范围）",
+        "结构体字段没赋值，栈上是随机值，恰好不满足断言条件"
+      ],
+      "solutions": [
+        "编译期报错：在 main.c 里实现 assert_failed 函数（见代码片段）",
+        "运行期停住：看 assert_failed 的两个参数——第二个是源码行号，能直接定位是哪个函数哪个参数不合法",
+        "用 GPIO_StructInit / USART_StructInit 等先初始化结构体，避免随机值",
+        "确认引脚宏没传错：GPIO_Pin 必须用 GPIO_Pin_x（不是 GPIO_PinSourcex）",
+        "发布版本里注释掉 USE_FULL_ASSERT 以节省代码空间"
+      ],
+      "codeSnippets": [
+        {
+          "language": "c",
+          "title": "assert_failed 的标准实现（放在 main.c 里）",
+          "code": "#ifdef  USE_FULL_ASSERT\nvoid assert_failed(uint8_t* file, uint32_t line)\n{\n  /* 参数非法时停在这里，用调试器看 file 和 line */\n  printf(\"Wrong parameter value: file %s on line %d\\r\\n\", file, line);\n  while (1)\n  {\n  }\n}\n#endif"
+        }
+      ],
+      "relatedFunctionIds": [],
+      "relatedSymbolIds": ["USE_FULL_ASSERT"],
+      "relatedPeripheralIds": [],
+      "tags": ["编译", "断言", "assert_param", "参数检查"]
+    },
+
+    {
+      "id": "err.hardfault_isr_name",
+      "titleZh": "中断函数名拼写错误导致进 HardFault / 中断不响应",
+      "categoryId": "runtime",
+      "toolchain": "generic",
+      "messagePatterns": ["HardFault", "HardFault_Handler", "中断不响应", "IRQHandler"],
+      "messageSample": "程序运行后停在 HardFault_Handler 的 while(1) 里；\n或定时器中断写了代码但从未进入。",
+      "explainZh": "中断服务函数的名字必须与启动文件（startup_stm32f10x_md.s）里的向量表名字逐字符一致。名字写错时，你自己的函数永远不会被调用，而默认的弱定义处理函数（通常是死循环）会接管。",
+      "causes": [
+        "中断函数名拼写或大小写错误（如 TIM2_IRQHandler 写成 TIM2_IRQhandler）",
+        "写在了 .c 文件里但没在 .h 里声明，且编译器把它当普通函数优化掉了",
+        "启动文件选错容量档次（用了 startup_stm32f10x_hd.s 而芯片是中容量）",
+        "中断里没清中断标志，反复进出中断导致程序卡死"
+      ],
+      "solutions": [
+        "对照启动文件 startup_stm32f10x_md.s 里的向量表，逐字符核对函数名",
+        "确认启动文件是 md 版本（C8T6 是中容量），hd/ld 版本的中断向量表与芯片不符",
+        "在 stm32f10x_it.c / stm32f10x_it.h 里声明并实现中断函数",
+        "中断函数里必须清除中断标志：TIM_ClearITPendingBit / EXTI_ClearITPendingBit 等",
+        "用调试器在 HardFault_Handler 打断点，查看 LR 与堆栈定位出错位置"
+      ],
+      "codeSnippets": [
+        {
+          "language": "c",
+          "title": "正确的 TIM2 中断服务函数（名字必须与启动文件一致）",
+          "code": "void TIM2_IRQHandler(void)\n{\n  /* 先判断是不是该中断源 */\n  if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)\n  {\n    /* 必须清标志，否则会反复进中断 */\n    TIM_ClearITPendingBit(TIM2, TIM_IT_Update);\n\n    /* 用户代码 */\n  }\n}"
+        }
+      ],
+      "relatedFunctionIds": ["TIM_GetITStatus", "TIM_ClearITPendingBit", "EXTI_GetITStatus", "EXTI_ClearITPendingBit"],
+      "relatedSymbolIds": ["TIM_IT_Update", "EXTI_Line0"],
+      "relatedPeripheralIds": ["TIM", "EXTI", "MISC"],
+      "tags": ["运行时", "中断", "HardFault", "向量表", "IRQHandler"]
+    }
+  ]
+}

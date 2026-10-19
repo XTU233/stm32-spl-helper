@@ -1,0 +1,33 @@
+{
+  "_comment": "GPIO 枚举成员中文（面向 STM32F103C8T6）。",
+  "symbols": {
+    "GPIOMode_TypeDef": {
+      "briefZh": "GPIO 工作模式枚举，赋给 GPIO_InitTypeDef.GPIO_Mode；用 GPIO_Init 配置引脚前必须从这 8 个取值里选一个。",
+      "membersZh": {
+        "GPIO_Mode_AIN": "模拟输入（0x0）。施密特触发器关闭、上下拉断开，引脚直连 ADC 采样通道，输入阻抗最高。做 ADC 采集时对应引脚必须配这个模式（如 PA0~PA7 = ADC1_IN0~IN7）；若误配成浮空/上拉输入，ADC 读数会偏移、随干扰跳动。一旦配成 AIN，引脚的数字功能（GPIO 读、EXTI、定时器捕获）都无法使用。",
+        "GPIO_Mode_IN_FLOATING": "浮空输入（0x04）。施密特触发器打开，内部上、下拉都不接，电平完全由外部决定；引脚悬空时电平随机、读数乱跳。用于接收“外部已经有明确驱动源”的信号：USARTx_RX、SPIx_MISO、I2C 的 SDA/SCL（需外部 4.7k 上拉）、以及外部已经带上下拉或由推挽输出的信号。机械按键不要用它，否则悬空时读到随机值——按键请用 IPU/IPD。易混点：IN_FLOATING 不等于“高阻安全”，它是数字输入且不带上拉；空闲时要确定电平请用 IPU/IPD。",
+        "GPIO_Mode_IPD": "下拉输入（0x28）。内部约 40kΩ 下拉使能，没接外部信号时引脚稳定为低电平，施密特触发器打开。典型用法：按键另一端接 3.3V，按下为高电平，读 GPIO_ReadInputDataBit 得 1。与 IPU 成对出现：内部上下拉是 40kΩ 级弱上拉，长线或强干扰场合仍需外部上下拉。",
+        "GPIO_Mode_IPU": "上拉输入（0x48）。内部约 40kΩ 上拉使能，没接外部信号时引脚稳定为高电平，施密特触发器打开。典型用法：按键另一端接 GND，按下读到 0——这是 STM32 开发板上最常见的按键接法，也可用于 USART_RX/SPI NSS 等接收线，在无人驱动时保持空闲高电平。浮空输入（IN_FLOATING）与它只差一个内部上拉，但决定了空闲态是确定的高电平还是随机跳变。",
+        "GPIO_Mode_Out_OD": "开漏输出（0x14）。输出级只有 NMOS 下拉，输出 1 时引脚呈高阻，必须靠外部上拉电阻才能得到高电平；输出 0 时主动拉低。常用于：I2C 的 SDA/SCL（必须开漏 + 外部上拉）、多器件共享的“线与”总线、或不需要读回时用 GPIO_WriteBit 驱动 LED。注意：漏了上拉电阻就会“高电平出不来”，这是最常见的开漏踩坑点。需要既输出高又输出低、且带驱动能力时选 Out_PP。",
+        "GPIO_Mode_Out_PP": "推挽输出（0x10）。内部 PMOS 与 NMOS 组成互补输出级，能主动输出高（接近 VDD）也能主动拉低，带电流驱动能力。典型用法：驱动 LED（配合限流电阻，接法决定亮灯电平）、输出 PWM 方波、驱动蜂鸣器/继电器/三极管基极、片选和时钟等待输出线。注意：两个推挽输出引脚对面互连时不能同时驱向相反电平，会大电流对拉；共享总线上有多个驱动源应改用 Out_OD（开漏）避免冲突。",
+        "GPIO_Mode_AF_OD": "复用开漏（0x1C）。引脚交给片上外设（USART/SPI/I2C/TIM 等）驱动，但输出级仍为开漏，高电平依赖外部上拉。典型用法：I2C1/I2C2 的 SCL/SDA（PB6/PB7、PB10/PB11）；SPI 主模式的 NSS 若需多主共享也用开漏。与 AF_PP 的选择原则：信号需要“线与”或有多个驱动源/需外接上拉 → AF_OD；普通推挽信号（TX、SCK、MOSI）用 AF_PP，否则波形上升沿会被上拉电阻拖慢、高速时失真。",
+        "GPIO_Mode_AF_PP": "复用推挽（0x18）。引脚由片上外设以推挽方式驱动，主动输出高、低电平，带驱动能力。典型用法：USARTx_TX（PA9/PB6/PA2）、SPIx_SCK/MOSI（PA5/PA7/PB13/PB15）、TIMx 的 PWM/输出比较通道（如 PA8、PB0、PA2）、MCO 时钟输出。易混点：AF_PP 引脚不能用 GPIO_WriteBit 控制，电平由外设寄存器决定；配置完 AF 后别忘了外设自身的初始化和 xxx_Cmd，否则引脚不会有输出。"
+      }
+    },
+    "GPIOSpeed_TypeDef": {
+      "briefZh": "GPIO 输出速度枚举，赋给 GPIO_InitTypeDef.GPIO_Speed；只在输出/复用模式下有意义，决定驱动级翻转速率与 EMI。",
+      "membersZh": {
+        "GPIO_Speed_10MHz": "中速档（编码 0b01，2MHz）。上升/下降沿较缓，EMI 与功耗适中。用于 1~10MHz 级别的信号，如 I2C（400kHz）、低速 SPI、普通 LED/PWM 输出，多数通用 IO 的推荐默认值。",
+        "GPIO_Speed_2MHz": "低速档（编码 0b10，2MHz）。边沿最缓、EMI 最小、功耗最低，但驱动能力最弱。用于低速开关量：LED、按键扫描、继电器、LCD 控制脚；信号频率低时选它最省电也最安静。",
+        "GPIO_Speed_50MHz": "高速档（编码 0b11，50MHz）。驱动最强、边沿最陡，可跑几十 MHz。用于 SPIx_SCK（主模式 18MHz 时钟）、高速 PWM、SDIO/FSMC 等场合。注意：速度越高 EMI 与功耗越大，普通 LED 用它会白增干扰；F103C8T6 最高主频 72MHz，实际翻转速率还受 GPIO 负载与 SYSCLK 限制。"
+      }
+    },
+    "BitAction": {
+      "briefZh": "位操作枚举，只用来给 GPIO_WriteBit 这类“单 bit”接口传值，表示置位或清零。",
+      "membersZh": {
+        "Bit_RESET": "把指定引脚清为 0（低电平）。GPIO_WriteBit(GPIOx, pin, Bit_RESET) 等同 GPIO_ResetBits(GPIOx, pin)；常用于“低电平点亮”的 LED 开灯或片选拉低。",
+        "Bit_SET": "把指定引脚置为 1（高电平）。GPIO_WriteBit(GPIOx, pin, Bit_SET) 等同 GPIO_SetBits(GPIOx, pin)；注意它是补码形式的值 0xFFFFFFFE，不能直接与 1 比较，也别和 FlagStatus 的 SET 混用。"
+      }
+    }
+  }
+}

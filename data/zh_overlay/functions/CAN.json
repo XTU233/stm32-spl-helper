@@ -1,0 +1,539 @@
+{
+  "_comment": "CAN（bxCAN）的中文补充。重点是过滤器配置（CAN_FilterInit 最容易配错）、发送/接收握手流程与 C8T6 只有 CAN1 的硬件约束。",
+  "peripheral": "CAN",
+  "functions": {
+    "CAN_DeInit": {
+      "briefZh": "把 CAN 外设的寄存器恢复为复位默认值。",
+      "usageZh": "在重新初始化 CAN 之前调用，或在程序里想彻底重配 CAN 时用。它会复位 MCR/TSR/RF0R/RF1R/IER/ESR/BTR 以及全部过滤器寄存器，所以调用后**之前配好的过滤器和波特率全部丢失**，必须重新走一遍 CAN_Init + CAN_FilterInit。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CANx": "CAN 外设，CAN1 或 CAN2。STM32F103C8T6（LQFP48，中容量）只有 CAN1；写 CAN2 会访问到不存在的寄存器空间，行为未定义。"
+      },
+      "prerequisites": [
+        "已调用 RCC_APB1PeriphClockCmd(RCC_APB1Periph_CAN1, ENABLE) 打开 CAN1 时钟"
+      ],
+      "registers": ["CAN_MCR", "CAN_MSR", "CAN_TSR", "CAN_RF0R", "CAN_RF1R", "CAN_IER", "CAN_ESR", "CAN_BTR", "CAN_FMR"],
+      "relatedFunctions": ["CAN_Init", "CAN_FilterInit", "RCC_APB1PeriphResetCmd"],
+      "exampleCode": "/* 重新配置 CAN 前先复位 */\nCAN_DeInit(CAN1);\n\n/* 复位后必须重新初始化，否则波特率与过滤器都是默认值 */\nCAN_Init(CAN1, &CAN_InitStructure);\nCAN_FilterInit(&CAN_FilterInitStructure);",
+      "notesZh": [
+        "复位会清掉全部过滤器，只调 CAN_DeInit 不重新 CAN_FilterInit 的结果是：能发不能收",
+        "没有开 CAN1 时钟就调用，写进去的值会被硬件丢弃，函数不报错也不生效",
+        "如果只是想改波特率，不需要 CAN_DeInit，直接 CAN_Init 即可（CAN_Init 内部会自己进入初始化模式）",
+        "CAN2 只在互联型（STM32F105/107）上存在，C8T6 上写 CAN2 是错误用法"
+      ]
+    },
+
+    "CAN_Init": {
+      "briefZh": "按 CAN_InitTypeDef 初始化 CAN 外设（工作模式、波特率、自动重传等）。",
+      "usageZh": "CAN 使用的第二步（第一步是开时钟和配 GPIO）。函数内部会先请求进入初始化模式（INRQ）、等待硬件确认，再写 BTR 与 MCR，最后退出初始化模式。**波特率必须与总线上其它节点完全一致**，否则会出现只有错误帧、收不到任何数据的现象。波特率由 APB1 时钟（36MHz）、CAN_Prescaler、CAN_BS1、CAN_BS2 共同决定：\n\n`波特率 = 36MHz / (CAN_Prescaler × (1 + CAN_BS1 + CAN_BS2))`\n\n常用 500kbps：Prescaler=4、BS1=CAN_BS1_14tq、BS2=CAN_BS2_5tq（4×(1+14+5)=80，36MHz/80=450kbps，需按此公式自行配准）。\n\n最省事的做法是先用 CAN_StructInit 填默认值，再只改需要改的字段。",
+      "returnDescZh": "初始化状态：CAN_InitStatus_Success 表示成功；CAN_InitStatus_Failed 表示硬件未在超时前进入初始化模式（通常是时钟没开或 CAN 处于睡眠态）。务必判断返回值，不要当成 void 用。",
+      "paramsZh": {
+        "CANx": "CAN 外设，填 CAN1。C8T6 只有 CAN1。",
+        "CAN_InitStruct": "指向 CAN_InitTypeDef 的指针，字段含义：CAN_Prescaler（1~1024，分频系数）、CAN_Mode（CAN_Mode_Normal 正常 / CAN_Mode_LoopBack 回环自测 / CAN_Mode_Silent 静默 / CAN_Mode_Silent_LoopBack）、CAN_SJW（CAN_SJW_1tq~CAN_SJW_4tq，重同步跳宽）、CAN_BS1（CAN_BS1_1tq~CAN_BS1_16tq）、CAN_BS2（CAN_BS2_1tq~CAN_BS2_8tq）、CAN_TTCM（时间触发模式，一般 DISABLE）、CAN_ABOM（自动离线管理，一般 ENABLE）、CAN_AWUM（自动唤醒，一般 DISABLE）、CAN_NART（禁止自动重传，一般 DISABLE 即允许重传）、CAN_RFLM（接收 FIFO 锁定，一般 DISABLE 即溢出时覆盖旧报文）、CAN_TXFP（发送优先级按 FIFO 而非 ID，一般 DISABLE）。"
+      },
+      "prerequisites": [
+        "已开 CAN1 时钟（RCC_APB1Periph_CAN1）与 GPIO 时钟",
+        "CAN_RX 引脚配成上拉输入或浮空输入，CAN_TX 配成复用推挽 GPIO_Mode_AF_PP，否则总线发不出也收不到",
+        "已接好 CAN 收发器（如 TJA1050），且总线两端有 120Ω 终端电阻"
+      ],
+      "registers": ["CAN_MCR", "CAN_MSR", "CAN_BTR"],
+      "relatedFunctions": ["CAN_StructInit", "CAN_FilterInit", "CAN_OperatingModeRequest", "RCC_APB1PeriphClockCmd", "GPIO_Init"],
+      "exampleCode": "CAN_InitTypeDef CAN_InitStructure;\nGPIO_InitTypeDef GPIO_InitStructure;\n\n/* 1. 开时钟：CAN1 在 APB1，GPIO 与 AFIO 在 APB2 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_CAN1, ENABLE);\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_AFIO, ENABLE);\n\n/* 2. C8T6 上 CAN 默认在 PA11(RX)/PA12(TX)，也可重映射到 PB8/PB9 */\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;      /* RX 上拉输入 */\nGPIO_Init(GPIOA, &GPIO_InitStructure);\n\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_12;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;   /* TX 复用推挽 */\nGPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;\nGPIO_Init(GPIOA, &GPIO_InitStructure);\n\n/* 3. 需要重映射到 PB8/PB9 时才调用，否则跳过 */\n/* GPIO_PinRemapConfig(GPIO_Remap1_CAN1, ENABLE); */\n\n/* 4. 先取默认值，再改关心的字段，避免漏赋值导致随机行为 */\nCAN_StructInit(&CAN_InitStructure);\nCAN_InitStructure.CAN_Prescaler = 4;              /* 36MHz/4/(1+14+5)=450kbps */\nCAN_InitStructure.CAN_Mode = CAN_Mode_Normal;\nCAN_InitStructure.CAN_SJW = CAN_SJW_1tq;\nCAN_InitStructure.CAN_BS1 = CAN_BS1_14tq;\nCAN_InitStructure.CAN_BS2 = CAN_BS2_5tq;\nCAN_InitStructure.CAN_ABOM = ENABLE;              /* 出错后能自动恢复 */\n\n/* 5. 判断返回值，失败说明时钟没开或双 CAN 配置异常 */\nif (CAN_Init(CAN1, &CAN_InitStructure) == CAN_InitStatus_Failed)\n{\n  while (1);   /* 初始化失败，通常是没开 CAN1 时钟 */\n}",
+      "notesZh": [
+        "漏开 RCC_APB1Periph_CAN1 时 CAN_Init 会直接返回 CAN_InitStatus_Failed，这是最常见的失败原因",
+        "波特率算式：36MHz/(Prescaler×(1+BS1+BS2))。采样点建议落在 75%~87.5% 处，即 (1+BS1)/(1+BS1+BS2) 在 0.75~0.875，500k 常用 BS1=14、BS2=5",
+        "CAN_Mode_LoopBack 是自发自收，可以在没有收发器、没有第二个节点的情况下验证代码，调试期非常有用",
+        "CAN_NART 设为 ENABLE 会关闭自动重传，总线上有干扰时丢帧不再重发；除非做时间敏感协议，否则保持 DISABLE",
+        "CAN_Init 只是配置，不需要再调 CAN_Cmd；CAN 没有单独的使能函数，退出初始化模式后就在总线上活动了",
+        "确认 CAN_Init 返回值后再继续，直接忽略返回值接着调 CAN_FilterInit 会得到「程序正常跑但收不到数据」的假象"
+      ]
+    },
+
+    "CAN_FilterInit": {
+      "briefZh": "配置一个 CAN 过滤器组（模式、位宽、ID/掩码、关联 FIFO、使能）。",
+      "usageZh": "这是 CAN **最容易配错**的函数，也是「发得出去但收不回来」的头号原因。要注意五点：\n\n**① 位宽 FilterScale**：CAN_FilterScale_32bit 时 IdHigh/IdLow 合成一个 32 位，编码为 `[IDE|RTR|EXID[28:0]]`；CAN_FilterScale_16bit 时 IdHigh 与 IdLow 分别是两个独立的 16 位过滤器，编码为 `[IDE|RTR|STID[10:0]|EXID[17:13]]`。\n\n**② 模式 FilterMode**：CAN_FilterMode_IdMask 表示 MaskId 是掩码（1=该位必须匹配，0=不关心，掩码全 0 即全通）；CAN_FilterMode_IdList 表示 MaskId 也当作 ID 用，一个组能通过两个（32 位模式）或四个（16 位模式）指定 ID。\n\n**③ 移位写法**（32 位掩码模式收标准帧的固定套路）：\n`IdHigh = (StdId<<5); IdLow = 0; MaskHigh = (Mask<<5)|0x10; MaskLow = 0;`\n其中 0x10 是 IDE 位，置 1 表示「必须是标准帧」。\n\n**④ 16 位模式的移位**：`IdHigh = StdId<<5;`（低 5 位留给 RTR 与 EXID 高位），掩码里 0x10 同样是 IDE 位。\n\n**⑤ 不调用本函数的话，过滤器全是复位默认值（32 位掩码、ID 全 0、掩码全 0）** —— 硬件上这等于全部接收并塞进 FIFO0，所以你会「偶然」收到一堆别的节点的报文。想彻底不接收，要把 CAN_FilterActivation 设为 DISABLE，或让掩码只匹配一个不存在的 ID。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CAN_FilterInitStruct": "指向 CAN_FilterInitTypeDef 的指针，9 个字段：CAN_FilterNumber（过滤器组号，C8T6 的 CAN1 有 0~13 共 14 组）、CAN_FilterMode（CAN_FilterMode_IdMask 掩码模式 / CAN_FilterMode_IdList 列表模式）、CAN_FilterScale（CAN_FilterScale_16bit 或 CAN_FilterScale_32bit）、CAN_FilterIdHigh（32 位模式的 MSB 或 16 位模式的第一个 ID）、CAN_FilterIdLow（32 位模式的 LSB 或 16 位模式的第二个 ID）、CAN_FilterMaskIdHigh（掩码 MSB，或列表模式下的第二个 ID）、CAN_FilterMaskIdLow（掩码 LSB，或列表模式下的第四个 ID）、CAN_FilterFIFOAssignment（CAN_Filter_FIFO0 或 CAN_Filter_FIFO1，决定命中后存进哪个接收 FIFO）、CAN_FilterActivation（ENABLE 才生效）。"
+      },
+      "prerequisites": [
+        "已成功调用 CAN_Init 把 CAN 切到正常模式",
+        "已在 CAN_Init 里配置好 CAN_RFLM（FIFO 溢出时是覆盖还是锁定）",
+        "想用中断接收的话，还要在 CAN_ITConfig 里开 CAN_IT_FMP0/CAN_IT_FMP1，并配好 NVIC"
+      ],
+      "registers": ["CAN_FMR", "CAN_FM1R", "CAN_FS1R", "CAN_FFA1R", "CAN_FA1R", "CAN_F0R1", "CAN_F0R2"],
+      "relatedFunctions": ["CAN_Init", "CAN_Receive", "CAN_ITConfig", "CAN_FIFORelease", "CAN_SlaveStartBank"],
+      "exampleCode": "CAN_FilterInitTypeDef CAN_FilterInitStructure;\n\n/* 场景：只接收标准帧 ID = 0x123，全部存到 FIFO0 */\nCAN_FilterInitStructure.CAN_FilterNumber = 0;            /* 用第 0 组过滤器 */\nCAN_FilterInitStructure.CAN_FilterMode = CAN_FilterMode_IdMask;\nCAN_FilterInitStructure.CAN_FilterScale = CAN_FilterScale_32bit;\n\n/* 32 位编码 = [IDE(1) | RTR(1) | EXID[28:0]]，标准帧 ID 左移 5 位 */\nCAN_FilterInitStructure.CAN_FilterIdHigh = (0x123 << 5) & 0xFFFF;\nCAN_FilterInitStructure.CAN_FilterIdLow  = 0x0000;\n\n/* 掩码同样左移 5 位；|0x10 置上 IDE 位，要求 IDE=0（标准帧） */\nCAN_FilterInitStructure.CAN_FilterMaskIdHigh = ((0x7FF << 5) | 0x10) & 0xFFFF;\nCAN_FilterInitStructure.CAN_FilterMaskIdLow  = 0x0000;\n\nCAN_FilterInitStructure.CAN_FilterFIFOAssignment = CAN_Filter_FIFO0;\nCAN_FilterInitStructure.CAN_FilterActivation = ENABLE;\nCAN_FilterInit(&CAN_FilterInitStructure);\n\n/* 中断接收 */\nCAN_ITConfig(CAN1, CAN_IT_FMP0, ENABLE);\n/* 之后在 USB_LP_CAN1_RX0_IRQHandler 里判断 CAN_IT_FMP0 再 CAN_Receive */",
+      "notesZh": [
+        "忘了移位：CAN_FilterIdHigh 写 0x123 而不是 0x123<<5，过滤器匹配的是另一个 ID，现象是「偶尔收到不该收的、该收的收不到」",
+        "32 位掩码模式掩码里不带 0x10（IDE 位）时，标准帧和扩展帧都会被放进来，标准 ID 和扩展 ID 还可能撞车",
+        "掩码全 0（MaskIdHigh/Low 都是 0）表示接收所有报文，是调试时最省事的配法，但正式代码里会拖垮 CPU",
+        "16 位模式下一个过滤器组顶两个（CAN_FilterIdHigh 和 CAN_FilterIdLow），32 位模式下一个组只顶一个，配置数量别算错",
+        "C8T6 的 CAN1 只有 14 组过滤器（CAN_FilterNumber 0~13），写 14 及以上会写到保留区，函数不报错但过滤器不生效",
+        "只改了过滤器结构体却忘了把 CAN_FilterActivation 设为 ENABLE，过滤器等于没配，这是很隐蔽的一处漏写",
+        "同一个 FIFO 里收到的报文可以用 RxMessage.FMI 字段反查是哪一组过滤器命中的，调试多过滤器时很有用",
+        "过滤器组被占用后重复 CAN_FilterInit 会直接覆盖前一组的配置，多 ID 过滤要分配不同的 CAN_FilterNumber"
+      ]
+    },
+
+    "CAN_StructInit": {
+      "briefZh": "把 CAN_InitTypeDef 各字段填成默认值。",
+      "usageZh": "在 CAN_Init 之前调用，避免结构体里残留的栈上垃圾值造成难以复现的随机行为。默认值为：Prescaler=1、Mode=Normal、SJW=1tq、BS1=1tq、BS2=1tq、TTCM/ABOM/AWUM/NART/RFLM/TXFP 全部 DISABLE。注意默认的 Prescaler=1 会让波特率非常高（36MHz/(1+1+1)=12Mbps），**必须自己填波特率相关字段**。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CAN_InitStruct": "指向待初始化的 CAN_InitTypeDef 结构体。调用后所有字段被写成默认值，需要逐个覆盖关心的字段。"
+      },
+      "prerequisites": [
+        "结构体已声明（通常作为局部变量）"
+      ],
+      "registers": [],
+      "relatedFunctions": ["CAN_Init"],
+      "exampleCode": "CAN_InitTypeDef CAN_InitStructure;\n\nCAN_StructInit(&CAN_InitStructure);   /* 先清成默认值 */\n\n/* 只改必要的字段，其余保持默认 */\nCAN_InitStructure.CAN_Prescaler = 4;\nCAN_InitStructure.CAN_BS1 = CAN_BS1_14tq;\nCAN_InitStructure.CAN_BS2 = CAN_BS2_5tq;\n\nCAN_Init(CAN1, &CAN_InitStructure);",
+      "notesZh": [
+        "默认 Prescaler=1、BS1=BS2=1tq，如果不覆盖就直接 CAN_Init，波特率会是 12Mbps，总线上完全通信不了",
+        "它只处理 CAN_InitTypeDef，过滤器结构体 CAN_FilterInitTypeDef 没有对应的 StructInit，必须手动逐个字段赋值",
+        "局部结构体不初始化就用，Debug 版和 Release 版的栈内容不同，会出现「加个打印就好了」的诡异 bug"
+      ]
+    },
+
+    "CAN_SlaveStartBank": {
+      "briefZh": "设置从 CAN 的过滤器起始组号（划分 CAN1/CAN2 各占多少组过滤器）。",
+      "usageZh": "**只对互联型（STM32F105/107）有意义**，那里的 CAN1 与 CAN2 共享 28 组过滤器，需要用它划分归属。C8T6 是只有 CAN1 的中容量芯片，不存在从 CAN，调用本函数没有实际作用。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CAN_BankNumber": "从 CAN 的起始过滤器组号，取值 1~27。只有在互联型芯片上才有意义；C8T6 上不起作用。"
+      },
+      "prerequisites": [
+        "仅互联型（STM32F105/107）需要调用，且应在配置过滤器之前调用"
+      ],
+      "registers": ["CAN_FMR"],
+      "relatedFunctions": ["CAN_FilterInit"],
+      "exampleCode": "/* 仅互联型芯片需要，C8T6 请忽略本函数 */\n/* 例：CAN1 用 0~13 组，CAN2 从第 14 组开始 */\n/* CAN_SlaveStartBank(14); */",
+      "notesZh": [
+        "STM32F103C8T6 没有 CAN2，调用本函数不会报错但也没有任何效果",
+        "互联型上必须在 CAN_FilterInit 之前调用，之后再调会打乱已经配好的过滤器归属"
+      ]
+    },
+
+    "CAN_DBGFreeze": {
+      "briefZh": "调试模式下冻结 CAN（内核停止时 CAN 也停止收发）。",
+      "usageZh": "只在调试器连接且内核停机（断点/单步）时生效：开启后 CAN 控制器在调试暂停期间不再接收和发送，避免调试时总线上的报文被悄悄接收后 FIFO 溢出丢失。平时调试 CAN 通信建议打开。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "NewState": "ENABLE 冻结，DISABLE 不冻结。默认是 DISABLE。"
+      },
+      "prerequisites": [
+        "已开 CAN1 时钟"
+      ],
+      "registers": ["CAN_MCR"],
+      "relatedFunctions": ["DBGMCU_Config"],
+      "exampleCode": "/* 调试 CAN 时打开，避免断点期间 FIFO 被塞满 */\nCAN_DBGFreeze(CAN1, ENABLE);",
+      "notesZh": [
+        "它写的是 CAN_MCR 的 DBF 位，与 DBGMCU_Config(DBGMCU_CAN1_STOP) 是两个不同层级的机制，前者管 CAN 自身行为",
+        "只在调试模式生效，脱机运行（拔掉调试器）时完全无影响，所以可以安全地留在代码里",
+        "冻结期间总线上的报文不会被缓存，恢复运行后会从当前时刻重新接收，调试时序相关的协议时要注意这一点"
+      ]
+    },
+
+    "CAN_TTComModeCmd": {
+      "briefZh": "使能/关闭 CAN 的时间触发通信模式（TTCM）。",
+      "usageZh": "时间触发 CAN（TTCAN 的简化实现）用于对时序确定性有要求的场合。开启后发送的报文末尾两个数据字节会被硬件替换为 16 位时间戳：Data[6]=TIME[7:0]、Data[7]=TIME[15:8]。**要求 DLC 必须配成 8**，否则时间戳不会发出。普通 CAN 应用请保持关闭。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "NewState": "ENABLE 开启时间触发模式，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已调用 CAN_Init；也可以在 CAN_InitStruct.CAN_TTCM 里一次性设置"
+      ],
+      "registers": ["CAN_MCR", "CAN_TSR"],
+      "relatedFunctions": ["CAN_Init", "CAN_Transmit"],
+      "exampleCode": "/* 开启时间触发模式：发送帧的最后 2 字节会被替换成时间戳 */\nCAN_TTComModeCmd(CAN1, ENABLE);\n\nCanTxMsg TxMessage;\nTxMessage.DLC = 8;   /* 必须是 8，否则时间戳发不出去 */\n/* Data[6]/Data[7] 不用填，硬件会写入 TIME[7:0] / TIME[15:8] */",
+      "notesZh": [
+        "DLC 小于 8 时时间戳不会随帧发出，接收端拿到的就是普通数据",
+        "开启后数据场的最后两字节被硬件占用，业务数据只能放前 6 字节",
+        "总线上其它节点必须也理解这个约定，否则收到的时间戳会被当成普通数据",
+        "也可以在 CAN_InitTypeDef.CAN_TTCM 里直接设 ENABLE，效果相同"
+      ]
+    },
+
+    "CAN_Transmit": {
+      "briefZh": "把一帧报文放入一个空发送邮箱并启动发送。",
+      "usageZh": "发送的第一步。CAN 有 3 个发送邮箱，函数会挑一个空闲邮箱写入 TIR/TDTR/TDLR/TDHR 并置发送请求位。**调用前必须先确认有空邮箱**（返回值为 CAN_TxStatus_NoMailBox 就说明三个都满），否则报文直接丢失且不报错。标准做法是先 CAN_GetFlagStatus 查 CAN_FLAG_TME0/1/2，或直接判断返回值重试。\n\n注意：本函数返回只代表**报文已排入邮箱**，不代表已经成功发到总线上；要确认真正发出，必须用返回的邮箱号再调 CAN_TransmitStatus，或等 CAN_FLAG_RQCP0/1/2 置位。",
+      "returnDescZh": "返回占用的发送邮箱编号（CAN_TxMailBox_0、CAN_TxMailBox_1、CAN_TxMailBox_2），应保存下来传给 CAN_TransmitStatus/CAN_CancelTransmit；三个邮箱都满时返回 CAN_TxStatus_NoMailBox。",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "TxMessage": "指向 CanTxMsg 的指针，字段：StdId（标准 ID，0~0x7FF）、ExtId（扩展 ID，0~0x1FFFFFFF）、IDE（CAN_Id_Standard 或 CAN_Id_Extended，决定用哪个 ID）、RTR（CAN_RTR_Data 数据帧 / CAN_RTR_Remote 远程帧）、DLC（数据长度 0~8）、Data[8]（数据字节）。注意 StdId 和 ExtId 都要填或者至少都清零，用不上的那个置 0。"
+      },
+      "prerequisites": [
+        "已成功 CAN_Init 且 CAN 处于正常模式（不是睡眠或初始化模式）",
+        "已配置过滤器（发送本身不需要过滤器，但多数应用同时要收，漏配会导致只能看到自己发出去）",
+        "总线上至少还有一个能应答的节点，否则会因无 ACK 反复重传直至进入错误被动"
+      ],
+      "registers": ["CAN_TSR", "CAN_TI0R", "CAN_TDT0R", "CAN_TDL0R", "CAN_TDH0R", "CAN_TI1R", "CAN_TDT1R", "CAN_TDL1R", "CAN_TDH1R", "CAN_TI2R", "CAN_TDT2R", "CAN_TDL2R", "CAN_TDH2R"],
+      "relatedFunctions": ["CAN_TransmitStatus", "CAN_CancelTransmit", "CAN_GetFlagStatus", "CAN_Init"],
+      "exampleCode": "CanTxMsg TxMessage;\nuint8_t mailbox;\n\n/* 1. 等一个空邮箱：TME0/TME1/TME2 至少一个为 1 */\nwhile (CAN_GetFlagStatus(CAN1, CAN_FLAG_TME0) == RESET)\n{\n  /* 三个邮箱都忙，这里可以考虑超时退出 */\n}\n\n/* 2. 填报文 */\nTxMessage.StdId = 0x123;\nTxMessage.ExtId = 0x00;\nTxMessage.IDE   = CAN_Id_Standard;    /* 标准帧 */\nTxMessage.RTR   = CAN_RTR_Data;       /* 数据帧 */\nTxMessage.DLC   = 8;\nTxMessage.Data[0] = 0x11;\nTxMessage.Data[1] = 0x22;\n/* ... 其余字节 */\n\n/* 3. 发送：返回邮箱号，NoMailBox 说明没排进去 */\nmailbox = CAN_Transmit(CAN1, &TxMessage);\nif (mailbox != CAN_TxStatus_NoMailBox)\n{\n  /* 4. 等发送成功。CAN_TxStatus_Pending 表示还在发，可以加超时 */\n  while (CAN_TransmitStatus(CAN1, mailbox) == CAN_TxStatus_Pending)\n  {\n  }\n}",
+      "notesZh": [
+        "只调 CAN_Transmit 不等 CAN_TransmitStatus，连续快发会耗尽 3 个邮箱，返回 CAN_TxStatus_NoMailBox 的报文被静默丢弃",
+        "IDE 填 CAN_Id_Standard 时硬件用的是 StdId，填 CAN_Id_Extended 时用 ExtId；两者写反会出现收到「不认识的 ID」",
+        "DLC 可以小于 8，但接收端的 Data 数组只在 DLC 范围内有效，别把 8 字节全当有效数据",
+        "发远程帧时把 RTR 设为 CAN_RTR_Remote 且 DLC 表示期望的应答数据长度，Data 无意义",
+        "总线只有自己一个节点（没接从机）时，发送会因收不到 ACK 而反复重传，最终 TEC 超过 255 进入离线状态；自测请用 CAN_Mode_LoopBack",
+        "把 CAN_NART 设成 ENABLE 后发送失败不再重传，此时 CAN_TransmitStatus 会返回 CAN_TxStatus_Failed，必须自己处理",
+        "标准 ID 不要超过 0x7FF、扩展 ID 不要超过 0x1FFFFFFF，超了会被硬件截断，ID 变了但函数不报错"
+      ]
+    },
+
+    "CAN_TransmitStatus": {
+      "briefZh": "查询指定发送邮箱的发送结果（成功 / 失败 / 仍在发送）。",
+      "usageZh": "与 CAN_Transmit 配对使用，是在**发送完成后确认结果**的唯一可靠途径。它读 TSR 的 TXOKn 与 TERRn 位：邮箱还在发返回 CAN_TxStatus_Pending，发送成功返回 CAN_TxStatus_Ok，仲裁丢失或出错（TERR 置位）返回 CAN_TxStatus_Failed。查询成功后硬件会清掉对应的 RQCPn 标志，所以同一个邮箱不需要再手动清标志。",
+      "returnDescZh": "CAN_TxStatus_Ok 发送成功；CAN_TxStatus_Failed 发送失败（仲裁丢失或出错）；CAN_TxStatus_Pending 仍在发送中；邮箱号非法时也返回 CAN_TxStatus_Failed。",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "TransmitMailbox": "CAN_Transmit 返回的邮箱编号（CAN_TxMailBox_0/1/2）。必须用同一次发送返回的值，用错邮箱会读到别的报文的发送状态。"
+      },
+      "prerequisites": [
+        "已调用 CAN_Transmit 并保存了返回的邮箱编号"
+      ],
+      "registers": ["CAN_TSR"],
+      "relatedFunctions": ["CAN_Transmit", "CAN_CancelTransmit", "CAN_GetFlagStatus"],
+      "exampleCode": "uint8_t mail;\nmail = CAN_Transmit(CAN1, &TxMessage);\n\nif (mail != CAN_TxStatus_NoMailBox)\n{\n  uint32_t timeout = 100000;\n  while (CAN_TransmitStatus(CAN1, mail) == CAN_TxStatus_Pending && timeout--)\n  {\n  }\n\n  if (timeout == 0)\n  {\n    /* 超时：可能总线没接好或没有应答节点，取消这次发送 */\n    CAN_CancelTransmit(CAN1, mail);\n  }\n  else if (CAN_TransmitStatus(CAN1, mail) == CAN_TxStatus_Failed)\n  {\n    /* 仲裁丢失或出错，按协议决定是否重发 */\n  }\n}",
+      "notesZh": [
+        "轮询等待时必须加超时，总线断线或没有其它节点时可能永远等不到结果",
+        "返回 CAN_TxStatus_Failed 常见原因是仲裁丢失（总线竞争失败）而不是硬件坏了，别急着怀疑接线",
+        "第一次调用返回了 Ok/Failed 之后标志位就被清了，再查一次会读到 Pending，别用两次连续查询来判断",
+        "用错邮箱号不会报错，但读到的是别的报文的状态，会造成「明明发出去了却显示失败」的误判"
+      ]
+    },
+
+    "CAN_CancelTransmit": {
+      "briefZh": "取消指定发送邮箱里尚未发出的报文。",
+      "usageZh": "用于发送超时后主动放弃：置 TSR 的 ABRQn 位，硬件会中止发送并清掉邮箱占用。**如果报文已经发送成功，取消是无效的**（ABRQ 不起作用，报文已经上总线了）。典型场景是发送函数加了超时，超时后先取消再重发，避免邮箱被永久占用。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "Mailbox": "要取消的邮箱编号 CAN_TxMailBox_0/1/2，必须是 CAN_Transmit 返回的那个。"
+      },
+      "prerequisites": [
+        "已调用 CAN_Transmit 并拿到邮箱编号"
+      ],
+      "registers": ["CAN_TSR"],
+      "relatedFunctions": ["CAN_Transmit", "CAN_TransmitStatus"],
+      "exampleCode": "mail = CAN_Transmit(CAN1, &TxMessage);\nif (mail != CAN_TxStatus_NoMailBox)\n{\n  /* 等一小会儿还没发出去就放弃 */\n  if (wait_timeout(CAN1, mail) == 0)\n  {\n    CAN_CancelTransmit(CAN1, mail);   /* 释放邮箱，让后续报文能排进来 */\n  }\n}",
+      "notesZh": [
+        "已经发送成功的报文无法取消，函数会静默无操作",
+        "取消后必须再调一次 CAN_Transmit 重新排队，取消不会自动重发",
+        "不取消就会一直占着邮箱，三个邮箱都被卡住的报文占满后所有后续发送都会返回 CAN_TxStatus_NoMailBox",
+        "取消操作会清 TSR 中对应的请求位，之前保存的邮箱号随之失效，不要拿旧邮箱号再查状态"
+      ]
+    },
+
+    "CAN_Receive": {
+      "briefZh": "从指定接收 FIFO 取出一帧报文到 CanRxMsg 结构体。",
+      "usageZh": "接收的标准动作，**每调用一次只取出 FIFO 里的一帧**。调用后硬件会自动把该 FIFO 的输出邮箱释放（相当于内部做了 CAN_FIFORelease），所以正常流程是：判断 CAN_MessagePending 或收到接收中断 → 调 CAN_Receive → 再调一次 CAN_FIFORelease 确认释放。取出的 RxMessage.FMI 表示这帧是命中了哪一组过滤器，多过滤器场景下可用来区分报文来源。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "FIFONumber": "接收 FIFO 号，CAN_FIFO0 或 CAN_FIFO1。必须与 CAN_FilterInit 里 CAN_FilterFIFOAssignment 设置的 FIFO 一致，否则永远读不到数据。",
+        "RxMessage": "指向 CanRxMsg 的指针，函数会把解出的数据写入：StdId、ExtId、IDE、RTR、DLC、Data[8]、FMI（命中的过滤器组号）。调用前不需要初始化，但调用后要按 DLC 判断有效字节数。"
+      },
+      "prerequisites": [
+        "已 CAN_FilterInit 且把该组过滤器分配到要读取的 FIFO",
+        "FIFO 里有报文（CAN_MessagePending 返回非 0，或收到了 FMP0/FMP1 中断）"
+      ],
+      "registers": ["CAN_RF0R", "CAN_RF1R", "CAN_RI0R", "CAN_RDT0R", "CAN_RDL0R", "CAN_RDH0R", "CAN_RI1R", "CAN_RDT1R", "CAN_RDL1R", "CAN_RDH1R"],
+      "relatedFunctions": ["CAN_MessagePending", "CAN_FIFORelease", "CAN_FilterInit", "CAN_ITConfig"],
+      "exampleCode": "CanRxMsg RxMessage;\n\nvoid USB_LP_CAN1_RX0_IRQHandler(void)\n{\n  if (CAN_GetITStatus(CAN1, CAN_IT_FMP0) != RESET)\n  {\n    /* FIFO0 里有报文，取一帧（FIFO 号必须与过滤器分配的一致） */\n    CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);\n\n    if (RxMessage.IDE == CAN_Id_Standard && RxMessage.DLC >= 1)\n    {\n      /* 用 RxMessage.StdId 区分报文，RxMessage.Data[0..DLC-1] 是数据 */\n      process_frame(RxMessage.StdId, RxMessage.Data, RxMessage.DLC);\n    }\n\n    CAN_FIFORelease(CAN1, CAN_FIFO0);   /* 释放输出邮箱 */\n  }\n}\n\n/* 轮询版：一次把所有待处理报文取完 */\nwhile (CAN_MessagePending(CAN1, CAN_FIFO0) > 0)\n{\n  CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);\n  CAN_FIFORelease(CAN1, CAN_FIFO0);\n}",
+      "notesZh": [
+        "FIFONumber 与过滤器分配的 FIFO 不一致时读到的永远是空数据，是「过滤器配对但收不到」的常见原因",
+        "FIFO 只有 3 级深度，中断里处理太慢会溢出；CAN_RFLM=DISABLE 时新报文覆盖最旧的，会静默丢帧",
+        "取数据前先看 CAN_MessagePending，FIFO 为空时调用会读到无意义的内容且不会报错",
+        "标准帧和扩展帧共用同一个 RxMessage，必须用 IDE 判断该读 StdId 还是 ExtId",
+        "RxMessage.DLC 才是有效数据长度，别无条件读 8 个字节",
+        "中断服务函数名在 C8T6 上是 USB_LP_CAN1_RX0_IRQHandler（FIFO0）与 CAN1_RX1_IRQHandler（FIFO1），写成 CAN1_RX0_IRQHandler 编译能过但中断永远不进"
+      ]
+    },
+
+    "CAN_FIFORelease": {
+      "briefZh": "释放指定接收 FIFO 的输出邮箱（让硬件可以继续往 FIFO 里放报文）。",
+      "usageZh": "在 CAN_Receive 之后调用，或直接用作「丢弃最旧一帧」的手段（不读数据只释放，就等于丢掉该帧）。读取 FIFO 时若一直不释放，FIFO 会很快塞满并触发溢出。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "FIFONumber": "要释放的接收 FIFO，CAN_FIFO0 或 CAN_FIFO1。"
+      },
+      "prerequisites": [
+        "对应的 FIFO 里确实有报文（CAN_MessagePending 返回值大于 0），否则释放操作无意义"
+      ],
+      "registers": ["CAN_RF0R", "CAN_RF1R"],
+      "relatedFunctions": ["CAN_Receive", "CAN_MessagePending"],
+      "exampleCode": "/* 丢弃一帧不关心的报文：只释放不读取 */\nwhile (CAN_MessagePending(CAN1, CAN_FIFO0) > 3)\n{\n  CAN_FIFORelease(CAN1, CAN_FIFO0);   /* 让 FIFO 不至于溢出 */\n}",
+      "notesZh": [
+        "CAN_Receive 内部已经释放了一次输出邮箱，正常流程里再调一次是保险做法，不会出错",
+        "该释放而没释放，FIFO 满后新报文会按 CAN_RFLM 设置被丢弃或被锁定，表现为「越跑丢的包越多」",
+        "只释放不读取等于主动丢帧，别把它当成「清空 FIFO」用，一次只能释放一帧"
+      ]
+    },
+
+    "CAN_MessagePending": {
+      "briefZh": "返回指定接收 FIFO 中待处理（未读出）的报文数量。",
+      "usageZh": "轮询接收的主循环判断条件，也可用于监控 FIFO 水位判断是否快溢出。返回值范围 0~3，因为每个 FIFO 只有 3 级。返回 0 表示没数据，此时不要调 CAN_Receive。",
+      "returnDescZh": "待处理报文个数，取值 0~3（每个接收 FIFO 只有 3 级深度）。",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "FIFONumber": "接收 FIFO 号，CAN_FIFO0 或 CAN_FIFO1。"
+      },
+      "prerequisites": [
+        "已 CAN_Init 且 CAN 不在初始化/睡眠模式"
+      ],
+      "registers": ["CAN_RF0R", "CAN_RF1R"],
+      "relatedFunctions": ["CAN_Receive", "CAN_FIFORelease", "CAN_GetFlagStatus"],
+      "exampleCode": "/* 主循环轮询接收 */\nwhile (1)\n{\n  if (CAN_MessagePending(CAN1, CAN_FIFO0) > 0)\n  {\n    CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);\n    handle(&RxMessage);\n    CAN_FIFORelease(CAN1, CAN_FIFO0);\n  }\n}",
+      "notesZh": [
+        "FIFO 只有 3 级，返回值总是 3 说明处理速度跟不上总线速率，需要改用中断或 DMA 思路优化",
+        "在中断里用它可以一次把积压的报文全部取完（while 循环），避免频繁进出中断",
+        "没配过滤器或过滤器没使能时它恒为 0，不要用它来验证 CAN 是否初始化成功"
+      ]
+    },
+
+    "CAN_OperatingModeRequest": {
+      "briefZh": "请求把 CAN 切换到指定工作模式（初始化 / 正常 / 睡眠）。",
+      "usageZh": "用于运行期动态切换模式：进初始化模式才能改波特率（改 BTR 必须在初始化模式下），进睡眠模式降低功耗，唤醒后要回到正常模式才能收发。函数会请求目标模式并等待硬件确认，因此**调用时 CAN 不能处于故障或离线状态**，否则会返回失败。",
+      "returnDescZh": "CAN_ModeStatus_Success 成功进入目标模式；CAN_ModeStatus_Failed 超时未进入（常见于总线异常或时钟未开）。",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "CAN_OperatingMode": "目标模式：CAN_OperatingMode_Initialization（初始化，可改 BTR）、CAN_OperatingMode_Normal（正常工作）、CAN_OperatingMode_Sleep（睡眠）。"
+      },
+      "prerequisites": [
+        "已调用 CAN_Init 完成基本配置",
+        "CAN1 时钟已使能"
+      ],
+      "registers": ["CAN_MCR", "CAN_MSR"],
+      "relatedFunctions": ["CAN_Init", "CAN_Sleep", "CAN_WakeUp"],
+      "exampleCode": "/* 运行期改波特率：必须先进入初始化模式 */\nif (CAN_OperatingModeRequest(CAN1, CAN_OperatingMode_Initialization) == CAN_ModeStatus_Success)\n{\n  /* 此时可以改 CAN_BTR 或直接重调 CAN_Init */\n  CAN_Init(CAN1, &CAN_InitStructure);\n}\n\n/* 回到正常工作模式，才能收发 */\nCAN_OperatingModeRequest(CAN1, CAN_OperatingMode_Normal);",
+      "notesZh": [
+        "从初始化模式回到正常模式前，硬件要求至少有一个发送邮箱为空，否则无法退出（返回 Failed）",
+        "要改波特率必须先进 CAN_OperatingMode_Initialization，正常模式下写 BTR 会被硬件忽略",
+        "进睡眠模式后 CAN 不再收发，此时必须靠 CAN_WakeUp 或总线活动唤醒"
+      ]
+    },
+
+    "CAN_Sleep": {
+      "briefZh": "让 CAN 进入睡眠（低功耗）模式。",
+      "usageZh": "总线空闲且需要省电时调用，硬件会置 MCR 的 SLEEP 位并等待进入睡眠，此时 CAN 停止收发以降低功耗。只要总线上出现显性电平就会自动唤醒（若 CAN_AWUM 使能）。注意进睡眠前**最好先确认没有等待发送的报文**，否则睡眠请求会被拒绝。",
+      "returnDescZh": "CAN_Sleep_Ok 成功进入睡眠；CAN_Sleep_Failed 未能进入（通常是有报文正在发送，或请求了唤醒）。",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。"
+      },
+      "prerequisites": [
+        "已 CAN_Init 且 CAN 处于正常模式",
+        "建议先确认三个发送邮箱都空（CAN_FLAG_TME0/1/2 都置位）"
+      ],
+      "registers": ["CAN_MCR", "CAN_MSR"],
+      "relatedFunctions": ["CAN_WakeUp", "CAN_OperatingModeRequest", "CAN_Init"],
+      "exampleCode": "/* 总线空闲时进入睡眠省电 */\nif (CAN_Sleep(CAN1) == CAN_Sleep_Ok)\n{\n  /* 睡眠中；总线上出现活动或软件调用 CAN_WakeUp 都会唤醒 */\n}\n\n/* 唤醒后回到正常模式 */\nCAN_WakeUp(CAN1);",
+      "notesZh": [
+        "有报文正在发送时进睡眠会失败，务必判断返回值",
+        "睡眠期间 CAN 收不到报文，用它省电会丢帧，不适合要求实时性的场合",
+        "CAN_AWUM=DISABLE 时总线活动不会自动唤醒，必须软件调 CAN_WakeUp"
+      ]
+    },
+
+    "CAN_WakeUp": {
+      "briefZh": "把 CAN 从睡眠模式唤醒。",
+      "usageZh": "睡眠后需要恢复正常收发时调用，硬件会清 MCR 的 SLEEP 位并等待 CANDIS 状态位变化，成功后才真正回到正常模式。唤醒后**必须重新同步总线**：STM32 的 bxCAN 在唤醒后会等待 11 个连续隐性位才恢复接收，所以唤醒后立刻发报文可能失败。",
+      "returnDescZh": "CAN_WakeUp_Ok 成功退出睡眠；CAN_WakeUp_Failed 未能退出（总线持续有活动或状态异常）。",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。"
+      },
+      "prerequisites": [
+        "CAN 当前处于睡眠模式（之前调用过 CAN_Sleep 或硬件自动进入睡眠）"
+      ],
+      "registers": ["CAN_MCR", "CAN_MSR"],
+      "relatedFunctions": ["CAN_Sleep", "CAN_OperatingModeRequest", "CAN_ITConfig"],
+      "exampleCode": "if (CAN_WakeUp(CAN1) == CAN_WakeUp_Ok)\n{\n  /* 已回到正常模式，可以继续收发 */\n}\nelse\n{\n  /* 唤醒失败：总线被持续拉低或状态异常，检查接线与其它节点 */\n}",
+      "notesZh": [
+        "唤醒后硬件需要等到检测到 11 个连续隐性位才恢复接收，立刻发送可能丢帧，建议稍等或先读一次总线状态",
+        "CAN_AWUM=ENABLE 时总线活动会自动唤醒，此时软件不必再调本函数（但判断一下状态更稳妥）",
+        "未在睡眠状态调用会返回 Failed，不代表出错",
+        "开中断唤醒用 CAN_IT_WKU / CAN_IT_SLK 配合 NVIC，中断里同样要清标志"
+      ]
+    },
+
+    "CAN_GetLastErrorCode": {
+      "briefZh": "读取 CAN 最后一次错误类型码（LEC）。",
+      "usageZh": "总线不通信时排查问题的第一手工具。LEC 记录最近一次错误的原因：位填充错、格式错、ACK 错、位隐性错、位显性错、CRC 错等。最常见的是 **CAN_ERRORCODE_ACKErr**，几乎总是意味着「总线上没有第二个节点应答」或「没有接 CAN 收发器/收发器没供电」。读之前建议先确认 CAN_FLAG_LEC 相关的处理逻辑，调试时也可以周期性打印。",
+      "returnDescZh": "错误码：CAN_ERRORCODE_NoErr 无错、CAN_ERRORCODE_StuffErr 位填充错、CAN_ERRORCODE_FormErr 格式错、CAN_ERRORCODE_ACKErr 应答错、CAN_ERRORCODE_BitRecessiveErr 位隐性错、CAN_ERRORCODE_BitDominantErr 位显性错、CAN_ERRORCODE_CRCErr CRC 错、CAN_ERRORCODE_SoftwareSetErr 软件置位错。",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。"
+      },
+      "prerequisites": [
+        "已 CAN_Init 并让 CAN 在总线上活动过（否则 LEC 无意义）"
+      ],
+      "registers": ["CAN_ESR"],
+      "relatedFunctions": ["CAN_GetReceiveErrorCounter", "CAN_GetLSBTransmitErrorCounter", "CAN_GetFlagStatus"],
+      "exampleCode": "/* 通信不上时打印错误类型定位问题 */\nuint8_t lec = CAN_GetLastErrorCode(CAN1);\n\nswitch (lec)\n{\n  case CAN_ERRORCODE_NoErr:    /* 没有错误 */ break;\n  case CAN_ERRORCODE_ACKErr:   /* 没有应答：检查收发器、终端电阻、对端节点 */ break;\n  case CAN_ERRORCODE_StuffErr: /* 位填充错：波特率不一致或干扰严重 */ break;\n  case CAN_ERRORCODE_BitRecessiveErr: /* 回读到的隐性与发出不符：总线短路或驱动能力不足 */ break;\n  default: break;\n}",
+      "notesZh": [
+        "LEC 是「最近一次」的错误，平时的通信成功会把它刷成 NoErr，别指望它记录历史",
+        "拿到 ACKErr 时先查硬件：收发器供电、CANH/CANL 是否接反、总线两端 120Ω 终端电阻、对端节点是否上电",
+        "LEC 为 NoErr 但收不到数据，问题通常在过滤器配置，而不是总线",
+        "读 LEC 会刷新 ESR 中的错误码字段，需要连续观察时记得每次重新读"
+      ]
+    },
+
+    "CAN_GetReceiveErrorCounter": {
+      "briefZh": "读取接收错误计数器（REC）的当前值。",
+      "usageZh": "评估总线健康度用。按 CAN 标准，接收出错时 REC 加 1 或加 8，成功接收后减 1 或复位到 120。**REC 超过 127，节点进入错误被动状态**，此时不再发送主动错误帧，总线上一个节点的故障会拖慢整个网络。周期性打印 REC 能及早发现接触不良、终端电阻缺失等问题。",
+      "returnDescZh": "接收错误计数器当前值（0~255）。超过 127 说明已进入错误被动状态。",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。"
+      },
+      "prerequisites": [
+        "已 CAN_Init 且节点在总线上活动过"
+      ],
+      "registers": ["CAN_ESR"],
+      "relatedFunctions": ["CAN_GetLSBTransmitErrorCounter", "CAN_GetLastErrorCode"],
+      "exampleCode": "/* 周期性监控总线健康度 */\nif (CAN_GetReceiveErrorCounter(CAN1) > 127)\n{\n  /* 已进入错误被动状态：检查接线、终端电阻与对端节点 */\n}",
+      "notesZh": [
+        "超过 127 就是错误被动，超过 255 是离线（bus-off）；开启 CAN_ABOM 后离线能自动恢复，否则要重新初始化 CAN",
+        "它只统计接收方向，发送方向的问题要用 CAN_GetLSBTransmitErrorCounter",
+        "计数器为 0 也可能是因为刚刚成功接收被减掉了，要连续多次采样才有判断价值"
+      ]
+    },
+
+    "CAN_GetLSBTransmitErrorCounter": {
+      "briefZh": "读取发送错误计数器（TEC）的低 8 位。",
+      "usageZh": "与 REC 配套用于判断总线健康度。**函数名里的 LSB 很关键**：TEC 实际是 9 位（0~511），本函数只返回低 8 位。所以判断是否进入错误被动（TEC>127）用低 8 位足够；但判断是否离线（TEC>255，即 bus-off）必须结合 CAN_FLAG_BOF 标志，不能只看返回值。",
+      "returnDescZh": "9 位发送错误计数器的低 8 位（0~255），高 1 位需结合 CAN_FLAG_BOF 标志与 ESR 判断。",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。"
+      },
+      "prerequisites": [
+        "已 CAN_Init 且节点在总线上活动过"
+      ],
+      "registers": ["CAN_ESR"],
+      "relatedFunctions": ["CAN_GetReceiveErrorCounter", "CAN_GetFlagStatus", "CAN_GetLastErrorCode"],
+      "exampleCode": "/* 发送错误计数偏高，说明总线上没人应答或线路有问题 */\nif (CAN_GetLSBTransmitErrorCounter(CAN1) > 127)\n{\n  /* 错误被动：多半是没接对端或终端电阻缺失 */\n}\n\nif (CAN_GetFlagStatus(CAN1, CAN_FLAG_BOF) != RESET)\n{\n  /* 已离线（bus-off），需要 CAN_ABOM 自动恢复或重新 CAN_Init */\n}",
+      "notesZh": [
+        "只有低 8 位，无法直接区分 TEC=128 与 TEC=384；判断离线请用 CAN_FLAG_BOF",
+        "离线后只有 CAN_ABOM=ENABLE 才会自动恢复，否则必须手动重新初始化 CAN（CAN_Init 内部会退出初始化模式）",
+        "总线只有自己一个节点时 TEC 会迅速涨到 255 并离线，这是正常现象不是芯片坏了"
+      ]
+    },
+
+    "CAN_ITConfig": {
+      "briefZh": "使能或关闭指定的 CAN 中断源。",
+      "usageZh": "CAN 接收最常用的方式是中断：先 CAN_ITConfig(CAN1, CAN_IT_FMP0, ENABLE) 开 FIFO0 报文挂起中断，再 NVIC_Init 使能 USB_LP_CAN1_RX0_IRQn。**只开 CAN_ITConfig 不配 NVIC，中断永远不会进**，反之亦然。多个中断源可以用 `|` 组合一次使能，例如 CAN_IT_FMP0 | CAN_IT_ERR。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "CAN_IT": "中断源，可取 CAN_IT_TME（发送邮箱空）、CAN_IT_FMP0/CAN_IT_FMP1（FIFO0/1 收到报文）、CAN_IT_FF0/CAN_IT_FF1（FIFO 满）、CAN_IT_FOV0/CAN_IT_FOV1（FIFO 溢出）、CAN_IT_EWG（错误警告）、CAN_IT_EPV（错误被动）、CAN_IT_BOF（离线）、CAN_IT_LEC（上次错误码改变）、CAN_IT_ERR（错误总开关）、CAN_IT_WKU（唤醒）、CAN_IT_SLK（进入睡眠）。可用 | 组合。",
+        "NewState": "ENABLE 使能，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已 CAN_Init 与 CAN_FilterInit",
+        "已用 NVIC_Init 使能对应的 CAN1 中断通道，否则中断不会触发",
+        "中断服务函数名与启动文件一致（C8T6：USB_LP_CAN1_RX0_IRQHandler / CAN1_RX1_IRQHandler / USB_HP_CAN1_TX_IRQHandler / CAN1_SCE_IRQHandler）"
+      ],
+      "registers": ["CAN_IER"],
+      "relatedFunctions": ["CAN_GetITStatus", "CAN_ClearITPendingBit", "NVIC_Init", "CAN_Receive"],
+      "exampleCode": "NVIC_InitTypeDef NVIC_InitStructure;\n\n/* 1. 开 FIFO0 报文挂起中断 */\nCAN_ITConfig(CAN1, CAN_IT_FMP0, ENABLE);\n\n/* 2. 使能 NVIC 通道（C8T6 上 CAN1 接收 FIFO0 共用 USB 低优先级中断） */\nNVIC_InitStructure.NVIC_IRQChannel = USB_LP_CAN1_RX0_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\nvoid USB_LP_CAN1_RX0_IRQHandler(void)\n{\n  if (CAN_GetITStatus(CAN1, CAN_IT_FMP0) != RESET)\n  {\n    CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);\n    CAN_FIFORelease(CAN1, CAN_FIFO0);\n  }\n}",
+      "notesZh": [
+        "只 CAN_ITConfig 不 NVIC_Init 是最常见的「中断不进也不报错」原因",
+        "C8T6 的中断服务函数名容易写错：FIFO0 是 USB_LP_CAN1_RX0_IRQHandler，FIFO1 是 CAN1_RX1_IRQHandler，写成 CAN1_RX0_IRQHandler 能编译但永不触发",
+        "使能 CAN_IT_ERR 之前先单独开具体错误源（EWG/EPV/BOF/LEC），只开 ERR 不会产生任何错误中断",
+        "中断里不清标志（CAN_ClearITPendingBit）会反复进中断，接收中断尤其容易漏",
+        "FIFO 溢出中断 CAN_IT_FOV0 很有用：一旦触发说明处理速度不够，应优化接收逻辑"
+      ]
+    },
+
+    "CAN_GetFlagStatus": {
+      "briefZh": "查询指定的 CAN 标志位是否置位。",
+      "usageZh": "轮询式收发的主要工具。发送前查 CAN_FLAG_TME0/1/2 判断有没有空邮箱，发送后查 CAN_FLAG_RQCP0/1/2 判断是否发完，出错时查 CAN_FLAG_EWG/EPV/BOF 判断总线状态。注意 **RQCP0/1/2、FF0/FF1、FOV0/FOV1、WKU、SLAK、LEC 这些标志读一次就会被清零**（读后清），不能像普通 GPIO 那样反复查询。",
+      "returnDescZh": "SET 表示标志已置位，RESET 表示未置位。注意部分标志读一次即被清除。",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "CAN_FLAG": "要查询的标志：CAN_FLAG_TME0/TME1/TME2（发送邮箱空）不在可选之列的话请用 RQCP 系列；可用值包括 CAN_FLAG_EWG（错误警告）、CAN_FLAG_EPV（错误被动）、CAN_FLAG_BOF（离线）、CAN_FLAG_RQCP0/1/2（发送请求完成）、CAN_FLAG_FMP0/FMP1（FIFO 有待处理报文）、CAN_FLAG_FF0/FF1（FIFO 满）、CAN_FLAG_FOV0/FOV1（FIFO 溢出）、CAN_FLAG_WKU（唤醒）、CAN_FLAG_SLAK（睡眠应答）、CAN_FLAG_LEC（上次错误码）。"
+      },
+      "prerequisites": [
+        "已 CAN_Init；查询发送类标志前应先执行过一次发送"
+      ],
+      "registers": ["CAN_TSR", "CAN_RF0R", "CAN_RF1R", "CAN_MSR", "CAN_ESR"],
+      "relatedFunctions": ["CAN_ClearFlag", "CAN_Transmit", "CAN_MessagePending", "CAN_ITConfig"],
+      "exampleCode": "/* 发送前等一个空邮箱 */\nwhile (CAN_GetFlagStatus(CAN1, CAN_FLAG_TME0) == RESET)\n{\n}\nmail = CAN_Transmit(CAN1, &TxMessage);\n\n/* 发送完成后 RQCP 会被硬件置位 */\n/* 注意：读一次就被清零，别在 if 里读两遍 */\nif (CAN_GetFlagStatus(CAN1, CAN_FLAG_RQCP0) != RESET)\n{\n  /* 邮箱 0 的发送已完成 */\n}",
+      "notesZh": [
+        "FMP0/FMP1 是只读状态不是待清标志，用 CAN_ClearFlag 清它无效；这类标志请用 CAN_MessagePending 读取",
+        "CAN_FLAG_RQCP0/1/2 读取即清零，写在 if 条件里只查一次是对的，连续查两次第二次必然是 RESET",
+        "FIFO 溢出用 CAN_FLAG_FOV0（注意不是 FOVR0 之类），触发后必须 CAN_ClearFlag 清掉才能继续判断下一次",
+        "轮询 TME 时没有超时保护会死循环，量产代码务必加超时"
+      ]
+    },
+
+    "CAN_ClearFlag": {
+      "briefZh": "清除指定的 CAN 挂起标志。",
+      "usageZh": "清除那些不能靠读取自动清掉的标志，典型是 CAN_FLAG_FOV0/FOV1（FIFO 溢出）和 CAN_FLAG_WKU。发送完成标志 RQCP0/1/2 读一次就自动清了，一般不需要手动清。多个标志可以用 | 一次清多个。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "CAN_FLAG": "要清除的标志：CAN_FLAG_RQCP0/RQCP1/RQCP2、CAN_FLAG_FF0/FF1（FIFO 满）、CAN_FLAG_FOV0/FOV1（FIFO 溢出）、CAN_FLAG_WKU、CAN_FLAG_SLAK、CAN_FLAG_LEC。可用 | 组合。"
+      },
+      "prerequisites": [
+        "该标志确实已置位（否则清除操作无意义）"
+      ],
+      "registers": ["CAN_TSR", "CAN_RF0R", "CAN_RF1R", "CAN_MSR", "CAN_ESR"],
+      "relatedFunctions": ["CAN_GetFlagStatus", "CAN_ClearITPendingBit"],
+      "exampleCode": "/* FIFO 溢出后必须清标志，否则会一直读到溢出状态 */\nif (CAN_GetFlagStatus(CAN1, CAN_FLAG_FOV0) != RESET)\n{\n  CAN_ClearFlag(CAN1, CAN_FLAG_FOV0);\n  /* 这里说明接收处理太慢，需要优化（比如改成中断或提高优先级） */\n}",
+      "notesZh": [
+        "对只读标志（如 FMP0/FMP1）调用本函数无效，它们由硬件状态决定",
+        "溢出标志不清，会让后续判断永远认为 FIFO 处于溢出状态",
+        "RQCP 类标志读取时会自动清除，先 GetFlagStatus 再用本函数清是多余但无害的写法",
+        "清标志与清中断挂起位是两件事，中断里应优先用 CAN_ClearITPendingBit"
+      ]
+    },
+
+    "CAN_GetITStatus": {
+      "briefZh": "查询指定的 CAN 中断是否已发生（同时检查中断使能位与状态位）。",
+      "usageZh": "中断服务函数里的标准入口判断。它同时读 CAN_IER 与状态寄存器，**既要求该中断已使能、又要求对应事件已发生**才返回 SET。比直接读标志更符合中断语义。注意它对 FMP0/FMP1 这类「有报文」的标志也有效。",
+      "returnDescZh": "SET 表示该中断已发生且已使能，RESET 表示未发生或未使能。",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "CAN_IT": "要查询的中断源：CAN_IT_TME、CAN_IT_FMP0、CAN_IT_FF0、CAN_IT_FOV0、CAN_IT_FMP1、CAN_IT_FF1、CAN_IT_FOV1、CAN_IT_WKU、CAN_IT_SLK、CAN_IT_EWG、CAN_IT_EPV、CAN_IT_BOF、CAN_IT_LEC、CAN_IT_ERR。"
+      },
+      "prerequisites": [
+        "已 CAN_ITConfig 使能该中断，并已 NVIC_Init 使能对应中断通道"
+      ],
+      "registers": ["CAN_IER", "CAN_TSR", "CAN_RF0R", "CAN_RF1R", "CAN_MSR", "CAN_ESR"],
+      "relatedFunctions": ["CAN_ITConfig", "CAN_ClearITPendingBit", "CAN_Receive"],
+      "exampleCode": "void CAN1_SCE_IRQHandler(void)   /* 状态改变/错误中断 */\n{\n  if (CAN_GetITStatus(CAN1, CAN_IT_EPV) != RESET)\n  {\n    /* 进入错误被动：检查总线 */\n    CAN_ClearITPendingBit(CAN1, CAN_IT_EPV);\n  }\n\n  if (CAN_GetITStatus(CAN1, CAN_IT_BOF) != RESET)\n  {\n    /* 离线，需要恢复 */\n    CAN_ClearITPendingBit(CAN1, CAN_IT_BOF);\n  }\n}",
+      "notesZh": [
+        "必须先 CAN_ITConfig 使能，否则即使事件发生了这里也返回 RESET，容易误判成「中断没进」",
+        "它不返回值是哪个邮箱/FIFO，多个来源共用一个中断向量时要逐个 if 判断",
+        "错误中断写在 CAN1_SCE_IRQHandler 里，收发中断则在 USB_LP_CAN1_RX0_IRQHandler / CAN1_RX1_IRQHandler / USB_HP_CAN1_TX_IRQHandler",
+        "查询 TME/RQCP 类中断会顺带清掉相关标志，所以判断完要记得处理"
+      ]
+    },
+
+    "CAN_ClearITPendingBit": {
+      "briefZh": "清除 CAN 中断的挂起位。",
+      "usageZh": "中断服务函数处理完事件后必须调用，否则同一中断会反复触发。收发中断（FMP0/FMP1）通常在 CAN_Receive + CAN_FIFORelease 之后清；错误中断（EWG/EPV/BOF/LEC）在记录完错误后清。可用 | 一次清多个。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CANx": "CAN 外设，C8T6 填 CAN1。",
+        "CAN_IT": "要清除的中断挂起位：CAN_IT_TME、CAN_IT_FF0、CAN_IT_FOV0、CAN_IT_FF1、CAN_IT_FOV1、CAN_IT_WKU、CAN_IT_SLK、CAN_IT_EWG、CAN_IT_EPV、CAN_IT_BOF、CAN_IT_LEC、CAN_IT_ERR。注意 CAN_IT_FMP0/FMP1 不在其中——它们由读取 FIFO 释放时自动清除。"
+      },
+      "prerequisites": [
+        "已用 CAN_GetITStatus 确认是该中断触发"
+      ],
+      "registers": ["CAN_TSR", "CAN_RF0R", "CAN_RF1R", "CAN_MSR", "CAN_ESR"],
+      "relatedFunctions": ["CAN_GetITStatus", "CAN_ITConfig", "CAN_Receive", "CAN_FIFORelease"],
+      "exampleCode": "void USB_LP_CAN1_RX0_IRQHandler(void)\n{\n  if (CAN_GetITStatus(CAN1, CAN_IT_FMP0) != RESET)\n  {\n    CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);\n    CAN_FIFORelease(CAN1, CAN_FIFO0);   /* 释放即清掉 FMP0 */\n    handle(&RxMessage);\n  }\n\n  /* FMP0 不需要也不能用 CAN_ClearITPendingBit 清 */\n}",
+      "notesZh": [
+        "CAN_IT_FMP0/FMP1 不在此函数支持列表里，想清它必须 CAN_Receive + CAN_FIFORelease",
+        "中断里忘记清标志会导致程序一直停在中断里，主循环完全得不到执行",
+        "清 FIFO 溢出中断前最好先记录一次溢出计数，否则问题会被悄悄掩盖",
+        "对未使能的中断位清挂起位没有副作用，但仍建议先用 CAN_GetITStatus 判断"
+      ]
+    }
+  }
+}

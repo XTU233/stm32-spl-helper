@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://local/stm32_spl_helper/manifest.schema.json",
+  "title": "DataManifest",
+  "description": "assets/data/manifest.json —— 数据版本与文件清单，APP 启动时最先读取。",
+  "type": "object",
+  "required": ["schemaVersion", "dataVersion", "splVersion", "defaultChipId", "stats", "files"],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "type": "integer", "minimum": 1, "description": "数据结构版本，与 Dart 侧 DataManifest.currentSchemaVersion 比对" },
+    "dataVersion": { "type": "string", "description": "数据内容版本，如 1.0.0，每次重新生成递增" },
+    "splVersion": { "type": "string", "description": "数据来源，如 STM32F10x_StdPeriph_Lib_V3.5.0" },
+    "defaultChipId": { "type": "string", "description": "默认芯片 id，对应 chips/<id>.json" },
+    "generatedAt": { "type": "string", "description": "生成时间，ISO8601 带时区" },
+    "generator": { "type": "string" },
+    "stats": {
+      "type": "object",
+      "required": ["peripheralCount", "functionCount", "symbolCount"],
+      "additionalProperties": true,
+      "properties": {
+        "peripheralCount": { "type": "integer", "minimum": 0 },
+        "functionCount": { "type": "integer", "minimum": 0 },
+        "symbolCount": { "type": "integer", "minimum": 0 },
+        "pinCount": { "type": "integer", "minimum": 0 },
+        "compileErrorCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "files": {
+      "type": "object",
+      "description": "各数据文件相对 assets/data/ 的路径",
+      "required": ["peripherals", "functions", "symbols"],
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

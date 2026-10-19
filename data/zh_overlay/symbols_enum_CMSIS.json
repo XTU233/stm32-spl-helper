@@ -1,0 +1,33 @@
+{
+  "_comment": "CMSIS 枚举成员中文（面向 STM32F103C8T6）。",
+  "symbols": {
+    "FlagStatus": {
+      "briefZh": "通用标志位状态枚举，用于 xxx_GetFlagStatus() 系列函数的返回值，回答“这个标志有没有置起”。",
+      "membersZh": {
+        "RESET": "标志未置位（0）。GetFlagStatus 返回 RESET 表示对应事件尚未发生或标志已被清除，可以继续等待。",
+        "SET": "标志已置位（非 0，实际为 0xFFFFFFFF 补码）。GetFlagStatus 返回 SET 表示事件已发生；多数外设的标志需要手动清除（如 USART_ClearFlag、SPI_I2S_ClearFlag），否则会重复进入判断分支。易混点：SET 与 ENABLE、Bit_SET 数值语义不同，不能互相替换传参。"
+      }
+    },
+    "ITStatus": {
+      "briefZh": "中断状态枚举，用于 xxx_GetITStatus() 的判断，表示某个中断源当前是否处于挂起状态。",
+      "membersZh": {
+        "RESET": "中断未挂起（0）。GetITStatus 返回 RESET 表示该中断源当前没有请求，或已被 xxx_ClearITPendingBit 清除。",
+        "SET": "中断已挂起（非 0）。GetITStatus 返回 SET 表示中断源已触发、ISR 需要处理；处理完务必调用 xxx_ClearITPendingBit，否则退出中断后会立刻再次进入（反复中断）。易混点：ITStatus 与 FlagStatus 都有 SET/RESET，但类型不同，按函数签名传参，别交叉赋值。"
+      }
+    },
+    "FunctionalState": {
+      "briefZh": "功能使能状态枚举，几乎全部 xxx_Cmd() 类函数的 NewState 参数都用它：ENABLE 打开、DISABLE 关闭。",
+      "membersZh": {
+        "DISABLE": "失能（0）。传给 xxx_Cmd() 关闭对应外设功能，例如 TIM_Cmd(TIM2, DISABLE) 停止计数、RCC_APB2PeriphClockCmd(..., DISABLE) 关闭外设时钟以省电。",
+        "ENABLE": "使能（1）。传给 xxx_Cmd() 打开对应外设功能，例如 USART_Cmd(USART1, ENABLE)、ADC_Cmd(ADC1, ENABLE)。常见坑：只配好参数却忘记 ENABLE，外设完全不动；ENABLE 与 SET/Bit_SET 数值不同，混用会编译告警或行为异常。"
+      }
+    },
+    "ErrorStatus": {
+      "briefZh": "通用成功/失败状态枚举，用于返回类型为 ErrorStatus 的函数（如 RCC_WaitForHSEStartUp）。",
+      "membersZh": {
+        "ERROR": "失败（0）。表示操作未达成：例如 RCC_WaitForHSEStartUp 返回 ERROR 说明外部晶振未起振；HSE 起振失败时应回落使用 HSI（F103C8T6 板上 HSE 为 8MHz，不起振会导致 SYSCLK 异常）。",
+        "SUCCESS": "成功（非 0，实际为 0xFFFFFFFF 补码）。表示操作完成，如 RCC_WaitForHSEStartUp 返回 SUCCESS 表示 HSE 已稳定。判断时用 if (xxx() != SUCCESS) 处理失败分支，不要拿它和 1 直接比较。"
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "_comment": "RCC 时钟频率结构体成员中文。所有字段单位都是 Hz，不是 MHz。",
+  "symbols": {
+    "RCC_ClocksTypeDef": {
+      "briefZh": "时钟树各节点频率输出结构体，RCC_GetClocksFreq 用它一次取回 SYSCLK、HCLK、PCLK1、PCLK2、ADCCLK 的实际频率。",
+      "usageZh": "声明结构体后调用 RCC_GetClocksFreq(&clocks) 即可，它会把当前的 PLL 倍频和 AHB/APB 分频都算进去，得到真实运行频率。典型用途：① 调试时确认时钟树是否符合预期（HSE 起振失败退回 HSI 时读数会明显偏小）；② 自定义延时函数按 HCLK_Frequency 计算循环次数；③ 算定时器/波特率分频时取对应的 PCLK。注意这几个字段是“当前值”，改了 RCC 配置后要重新调用才会更新。",
+      "notesZh": [
+        "SYS 时钟树里 SYSCLK 可达 72MHz：HSE 8MHz 经 PLL×9 得到，AHB 不分频，APB1 二分频 36MHz，APB2 不分频 72MHz；如果 HSE 起振失败退回 HSI，SYSCLK 只有 8MHz，所有基于 RCC_GetClocksFreq 计算出来的延时、波特率都会偏差 9 倍。",
+        "RCC_GetClocksFreq 只读寄存器、不改配置，可以在任意时刻调用，但开销有几百个周期，不要放进高频中断里。",
+        "它算的是“寄存器声明的频率”，如果 HSE 实际没起振但程序仍然切换了过去，读到的值会是对的而实际是 HSI，这种情况要用 MCO 或实测来确认。",
+        "C8T6 的 USB 需要精确 48MHz，只能由 PLL 输出除以 1.5 得到，因此要求 SYSCLK 必须是 48 的整数倍（72MHz 可以），这条限制会影响整个时钟树的设计。"
+      ],
+      "membersZh": {
+        "SYSCLK_Frequency": "系统时钟频率（SYSCLK），单位 Hz，即 CPU 内核与 AHB 总线的时钟源。C8T6 标准配置是 HSE 8MHz × PLL9 = 72MHz；若退回 HSI，则是 8MHz。它就是 SysTick 延时和相关计算的基准。",
+        "HCLK_Frequency": "AHB 总线时钟频率，单位 Hz，= SYSCLK / AHB 预分频（HCLK 分频通常为 1，即 HCLK=72MHz）。DMA、FSMC、SRAM/Flash 接口、SDIO 都接在 AHB 上，所以 DMA 搬运速率、FSMC 时序的 HCLK 周期都按这个值算。",
+        "PCLK1_Frequency": "APB1 总线时钟频率，单位 Hz，最大 36MHz（C8T6 标准配置为 72/2=36MHz）。挂在 APB1 上的外设：USART2/3、SPI2、I2C1/2、TIM2~TIM7、DAC、CEC、PWR、BKP、CAN、USB、UART4/5、看门狗。APB1 分频不为 1 时，定时器时钟是它的 2 倍（TIMxCLK = PCLK1 × 2）。",
+        "PCLK2_Frequency": "APB2 总线时钟频率，单位 Hz，最大 72MHz（C8T6 标准配置为 72MHz）。挂在 APB2 上的外设：GPIOA~E、USART1、SPI1、ADC1/2、TIM1/TIM8、EXTI/AFIO。APB2 分频不为 1 时，TIM1/TIM8 的时钟同样是 PCLK2 × 2；APB2 分频为 1 时 TIM1 时钟就等于 PCLK2。",
+        "ADCCLK_Frequency": "ADC 时钟频率，单位 Hz，= PCLK2 / ADC 预分频（RCC_ADCCLKConfig 设置），规范上限 14MHz。C8T6 满速 72MHz 时通常设 6 分频得到 12MHz，则单个常规转换约 1µs（14 个周期）。超过 14MHz 转换结果会明显不准，这是“ADC 读数偏小/乱跳”的常见根因。"
+      }
+    }
+  }
+}

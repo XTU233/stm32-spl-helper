@@ -1,0 +1,22 @@
+{
+  "_comment": "EXTI 结构体成员中文。C8T6 的 EXTI 线号同时对应 PA/PB/PC/PORTx 的同号引脚，具体接哪个端口由 GPIO_EXTILineConfig 决定。",
+  "symbols": {
+    "EXTI_InitTypeDef": {
+      "briefZh": "外部中断/事件线配置结构体，EXTI_Init 据它决定哪根线、中断还是事件、上升/下降沿触发以及是否使能。",
+      "usageZh": "完整链路四步缺一不可：① RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE) → ② GPIO_Init 把引脚配成输入（按键到 GND 用 GPIO_Mode_IPU，到 VCC 用 GPIO_Mode_IPD 或外部下拉）→ ③ GPIO_EXTILineConfig(GPIO_PortSourceGPIOC, GPIO_PinSource13) 把引脚映射到中断线 → ④ 填本结构体并 EXTI_Init，最后再用 NVIC_Init 打开对应的 EXTIx_IRQn。C8T6 的向量分组是固定的：Line0~Line4 各有一个独立向量（EXTI0_IRQn … EXTI4_IRQn，优先级最高），Line5~Line9 共用 EXTI9_5_IRQn（48~55 号优先级），Line10~Line15 共用 EXTI15_10_IRQn（56~63 号优先级），共用向量的服务函数里必须用 EXTI_GetITStatus 逐条判断再 EXTI_ClearITPendingBit。",
+      "notesZh": [
+        "EXTI_Init 会读改写 IMR/RTSR/FTSR/SWIER 的对应位，同一根线重复调用以最后一次为准；要单独改某根线前先清掉旧配置更稳。",
+        "只配 EXTI_Init 不调 NVIC_Init，标志位会置位但永远不进中断，这时候 EXTI_GetFlagStatus 读得到 SET，很容易误以为中断进了。",
+        "C8T6 的 PC13 是 RTC/Tamper 引脚（LSE 引脚），做按键中断时 PA0~PA12、PB0~PB1、PB3~PB15、PA15 这些普通 IO 更稳妥。",
+        "EXTI_Init 只配置 EXTI 本身的触发方式，引脚的方向、上下拉还得靠 GPIO_Init，漏配会出现边沿乱触发或根本触发不了。",
+        "进入中断服务函数后必须先 EXTI_ClearITPendingBit 再处理业务，否则中断会反复进入——尤其是中断里做消抖或长操作时。"
+      ],
+      "membersZh": {
+        "EXTI_Line": "要配置的中断线，取 EXTI_Line0 ~ EXTI_Line15（可通过按位或一次配置多条，库会逐条处理）。线号不等于引脚号：EXTI_Line0 对应的是“某个端口的 0 号脚”，究竟是 PA0、PB0 还是 PC0 由 GPIO_EXTILineConfig 决定，同一时刻一根线只能挂一个端口。EXTI_Line16 是 PVD、Line17 是 RTC 闹钟、Line18 是 USB 唤醒、Line19 是以太网唤醒，这些不用 GPIO 映射。",
+        "EXTI_Mode": "中断或事件模式：EXTI_Mode_Interrupt 置位 IMR，边沿到来时向 NVIC 发出中断请求并进入中断服务函数；EXTI_Mode_Event 置位 EMR，只把挂起位送给片上其他外设（如启动 ADC 转换、唤醒停机模式），不产生 CPU 中断。做按键、编码器时用 Interrupt，做低功耗唤醒或硬件联动时用 Event。",
+        "EXTI_Trigger": "触发边沿：EXTI_Trigger_Rising（上升沿，按键一端接 GND、按下拉高时用）、EXTI_Trigger_Falling（下降沿，按键一端接 VCC、按下拉低时用）、EXTI_Trigger_Rising_Falling（双边沿，适合旋转编码器，但要在中断里读引脚电平判断方向，抖动快时容易误判）。注意结构体成员不是位掩码，写死一个值即可。",
+        "EXTI_LineCmd": "该中断线的总开关：ENABLE 才会真正响应触发，DISABLE 相当于配置了触发方式但不打开。EXTI_StructInit 的默认值是 DISABLE，所以只改 Line 和 Trigger 却漏了这一句，现象和完全没配置一模一样——这是 EXTI 最常见的坑。"
+      }
+    }
+  }
+}

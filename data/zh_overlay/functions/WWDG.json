@@ -1,0 +1,182 @@
+{
+  "_comment": "WWDG（窗口看门狗）的中文补充：PCLK1 时钟、上窗口限制、喂狗过早同样复位、EWI 提前唤醒中断保存数据。重点讲窗口机制与窗口值的计算。",
+  "peripheral": "WWDG",
+  "functions": {
+    "WWDG_DeInit": {
+      "briefZh": "把 WWDG 外设寄存器恢复为复位默认值。",
+      "usageZh": "复位 WWDG_CR、WWDG_CFR、WWDG_SR。实际工程里几乎不用：WWDG 属于\"要么一直开着、要么靠复位关掉\"的外设，**调用本函数并不会停掉已经启动的看门狗计数**（计数器一旦使能就不能通过软件关闭），只会把分频、窗口值、使能位等配置清掉，结果反而更糟——计数器还在跑，但窗口值和分频都变成默认值，超时行为完全失控。仅在启动 WWDG 之前、要把残留配置清干净时才用。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {},
+      "prerequisites": [
+        "已打开 WWDG 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG, ENABLE)",
+        "应在 WWDG_Enable 之前调用，启动之后不要调用"
+      ],
+      "registers": ["WWDG_CR", "WWDG_CFR", "WWDG_SR"],
+      "relatedFunctions": ["WWDG_Enable", "WWDG_SetPrescaler", "WWDG_SetWindowValue", "RCC_APB1PeriphClockCmd"],
+      "exampleCode": "/* 在启动看门狗之前清理残留配置 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG, ENABLE);\nWWDG_DeInit();\n\n/* 然后重新配置 */\nWWDG_SetPrescaler(WWDG_Prescaler_8);\nWWDG_SetWindowValue(0x5F);\nWWDG_Enable(0x7F);",
+      "notesZh": [
+        "WWDG 启动后无法用软件关闭，WWDG_DeInit 也不会停掉计数器，启动后再调用只会让配置与计数状态不匹配",
+        "调用后窗口值回到 0x3F、分频回到 1，此时喂狗时机要求完全变了，很容易立刻触发复位",
+        "如果程序已经开始喂狗，本函数会造成\"喂得太早\"从而复位，症状是莫名其妙的反复重启",
+        "WWDG 时钟在 APB1 上，必须先开 RCC_APB1Periph_WWDG 再操作，否则写入无效"
+      ]
+    },
+
+    "WWDG_SetPrescaler": {
+      "briefZh": "设置 WWDG 的预分频系数，决定计数器的递减速度。",
+      "usageZh": "WWDG 计数器由 **PCLK1（APB1 时钟）** 驱动，先除以 4096，再按本函数设置的分频系数（1、2、4、8）继续分频。**超时时间 = 4096 × 分频系数 × (计数值 - 0x3F) / PCLK1频率**。PCLK1 在 72MHz 系统里通常是 36MHz，4096 分频后约 8.8kHz，再分频 8 后计数器每约 0.91ms 减 1。设置分频必须在启动之前完成。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "WWDG_Prescaler": "分频系数：WWDG_Prescaler_1、WWDG_Prescaler_2、WWDG_Prescaler_4、WWDG_Prescaler_8。常用 WWDG_Prescaler_8。"
+      },
+      "prerequisites": [
+        "已打开 WWDG 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG, ENABLE)",
+        "应在 WWDG_Enable 之前调用（启动后再改分频会导致计时行为突变）"
+      ],
+      "registers": ["WWDG_CFR", "WWDG_CR"],
+      "relatedFunctions": ["WWDG_Enable", "WWDG_SetWindowValue", "WWDG_SetCounter", "RCC_GetClocksFreq"],
+      "exampleCode": "/* 典型配置：PCLK1 = 36MHz，分频 8\n   计数步长 = 4096 * 8 / 36MHz = 0.91ms\n   计数值 0x7F -> 0x3F 共 64 步 -> 约 58ms */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG, ENABLE);\nWWDG_SetPrescaler(WWDG_Prescaler_8);\nWWDG_SetWindowValue(0x50);\nWWDG_Enable(0x7F);",
+      "notesZh": [
+        "时钟源是 **PCLK1（APB1）**，不是 LSI。所以系统时钟一变（比如从 STOP 唤醒后没重配时钟，PCLK1 掉到 8MHz），WWDG 的超时时间会立刻跟着变化，可能出现超时变长或变短",
+        "WWDG 挂载在 APB1，PCLK1 最高 36MHz；改系统时钟（RCC_PCLK1Config 等）后要重新核算喂狗周期",
+        "分频系数与 PCLK1 共同决定超时，算错会导致窗口完全对不上，喂狗永远在窗口之外",
+        "启动后改分频不会停止计数，但会让窗口计算失效，务必在 Enable 之前一次性配好"
+      ]
+    },
+
+    "WWDG_SetWindowValue": {
+      "briefZh": "设置 WWDG 的上窗口值，限定最早允许喂狗的时机。",
+      "usageZh": "这是 WWDG 与 IWDG 的本质区别：**只有当递减计数器降到小于等于窗口值（且大于 0x3F）时才允许喂狗**。喂得太早（计数值还大于窗口值）会被判定为程序跑飞（比如某个循环跑得过快、时序异常），直接复位。窗口值必须小于 0x80，且**必须大于 0x3F 才有意义**——若窗口值 ≤ 0x3F，窗口条件恒成立，WWDG 就退化成普通看门狗。典型用法：窗口值取 0x50 左右，让喂狗必须落在计数器从 0x50 降到 0x3F 的这一段。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "WindowValue": "窗口值，必须小于 0x80（0~0x7F），且应大于 0x3F。常用 0x50、0x5F。"
+      },
+      "prerequisites": [
+        "已打开 WWDG 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG, ENABLE)",
+        "已调用 WWDG_SetPrescaler 确定计数速度",
+        "应在 WWDG_Enable 之前调用"
+      ],
+      "registers": ["WWDG_CFR"],
+      "relatedFunctions": ["WWDG_SetCounter", "WWDG_SetPrescaler", "WWDG_Enable", "WWDG_EnableIT"],
+      "exampleCode": "/* 窗口配置：计数值必须落到 (0x3F, 0x50] 区间内喂狗才合法\n   计数值 0x7F 时喂 -> 太早，复位\n   计数值 0x45 时喂 -> 合法\n   计数值降到 0x3F 以下 -> 太晚，复位 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG, ENABLE);\nWWDG_SetPrescaler(WWDG_Prescaler_8);\nWWDG_SetWindowValue(0x50);\nWWDG_Enable(0x7F);",
+      "notesZh": [
+        "**喂得太早也会复位**，这是 WWDG 最容易踩的坑：程序运行比预期快时反而被复位，看起来像是\"跑得快被惩罚\"",
+        "窗口值必须大于 0x3F，配成 0x3F 或更小窗口限制就失效了，与 IWDG 无异",
+        "窗口值必须小于 0x80；0x80 及以上会被硬件截断，实际窗口与预期不符",
+        "窗口值离 0x7F 太近（如 0x7E）时留给软件的合法喂狗区间极窄，稍微抖动就复位，实际项目很少这么配",
+        "喂狗时机必须根据主循环的**最长执行时间**设计：合法区间是 [窗口值, 0x3F] 对应的那段时间，业务耗时波动大时要用 EWI 中断辅助"
+      ]
+    },
+
+    "WWDG_SetCounter": {
+      "briefZh": "设置（喂狗）WWDG 计数器的值。",
+      "usageZh": "写入 0x40~0x7F 之间的值刷新计数器，同时也起喂狗作用。窗口机制下，**只有当前计数值已经降到窗口值以下、且还没降到 0x3F 时写入才有效**，否则立即复位。日常喂狗通常写 0x7F（最大值），让窗口最宽；写太小（如 0x41）会立刻接近超时下限，下一次喂狗必须马上到来。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "Counter": "计数器新值，必须在 0x40 ~ 0x7F 之间。常用 0x7F。"
+      },
+      "prerequisites": [
+        "已调用 WWDG_Enable 启动（未启动时写入无效）",
+        "调用时机必须落在合法窗口内：当前计数值 ≤ 窗口值，且 > 0x3F"
+      ],
+      "registers": ["WWDG_CR"],
+      "relatedFunctions": ["WWDG_Enable", "WWDG_SetWindowValue", "WWDG_EnableIT", "WWDG_GetFlagStatus"],
+      "exampleCode": "while (1)\n{\n  Task_Run();              /* 业务必须耗时落在合法窗口内 */\n  WWDG_SetCounter(0x7F);   /* 喂狗：写回 0x7F */\n}",
+      "notesZh": [
+        "写入值低于 0x40 会立刻触发复位——写 0x3F 相当于自己把计数器推到超时边界",
+        "写入值超过 0x7F（bit7 之外的位）会被截断，实际值可能不是想要的",
+        "喂狗太早（计数器还大于窗口值）同样立即复位，这就是\"窗口\"的含义",
+        "在 EWI 中断里喂狗是很常见的做法：计数器降到 0x40 时先产生 EWI 中断，在中断里写回 0x7F，此时既在上窗口之下，又还没到 0x3F，时机天然合法"
+      ]
+    },
+
+    "WWDG_EnableIT": {
+      "briefZh": "使能 WWDG 提前唤醒中断（EWI）。",
+      "usageZh": "当递减计数器降到 0x40 时产生 EWI 中断（在真正复位之前）。**这是 WWDG 最有价值的特性**：可以在复位发生前抢救数据——把关键状态写进 BKP_DRx 或 Flash，记录故障现场，或者在中断里喂狗让程序继续跑（相当于把 WWDG 当普通看门狗用）。使能 EWI 之后必须在 NVIC 里打开 WWDG_IRQn 通道，中断服务函数名固定为 WWDG_IRQHandler，并且**在中断里必须 WWDG_ClearFlag()，然后要么喂狗、要么准备复位**。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {},
+      "prerequisites": [
+        "已打开 WWDG 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG, ENABLE)",
+        "已配置分频与窗口值，并调用 WWDG_Enable 启动",
+        "已 NVIC_Init 使能 WWDG_IRQn 通道"
+      ],
+      "registers": ["WWDG_CFR", "WWDG_SR"],
+      "relatedFunctions": ["WWDG_Enable", "WWDG_ClearFlag", "WWDG_GetFlagStatus", "NVIC_Init", "BKP_WriteBackupRegister", "PWR_BackupAccessCmd"],
+      "exampleCode": "/* 通过 EWI 在复位前保存现场 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG, ENABLE);\nWWDG_SetPrescaler(WWDG_Prescaler_8);\nWWDG_SetWindowValue(0x50);\nWWDG_EnableIT();                /* 使能提前唤醒中断 */\nWWDG_Enable(0x7F);\n\n/* NVIC 必须使能 WWDG_IRQn */\nNVIC_InitTypeDef NVIC_InitStructure;\nNVIC_InitStructure.NVIC_IRQChannel = WWDG_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x00;  /* 优先级要高 */\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x00;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\nvoid WWDG_IRQHandler(void)\n{\n  WWDG_ClearFlag();   /* 必须先清 EWI 标志 */\n\n  /* 抢救数据：写进备份寄存器（先开备份域访问） */\n  PWR_BackupAccessCmd(ENABLE);\n  BKP_WriteBackupRegister(BKP_DR1, 0x0BAD);\n\n  /* 选择一：喂狗继续跑 */\n  WWDG_SetCounter(0x7F);\n  /* 选择二：不再喂狗，等待 WWDG 复位 */\n}",
+      "notesZh": [
+        "只调 WWDG_EnableIT 而没在 NVIC 里使能 WWDG_IRQn，中断不会进，程序会被直接复位——这是最典型的漏配",
+        "中断服务函数里必须 WWDG_ClearFlag()，否则中断反复进入，而计数器仍在递减，最终还是复位",
+        "EWI 到实际复位之间只有约 (0x40 - 0x3F) × 计数步长 的时间，**只有几十微秒到一毫秒量级**，别在里面做 Flash 擦写这种耗时操作（Flash 页擦除要 20~40ms，根本来不及）；要保存数据请写 BKP_DRx",
+        "如果 EWI 里喂狗，就相当于放弃了窗口看门狗的保护作用，只在\"记录一次异常\"的场景下这么用",
+        "EWI 中断优先级要设高，避免被其它长中断阻塞而错过窗口",
+        "STM32F1 的 DBGMCU_CR 有 DBG_WWDG_STOP 位，可以在调试暂停时冻结 WWDG 计数；用 DBGMCU_Config 配置后调试断点就不会被狗咬了"
+      ]
+    },
+
+    "WWDG_Enable": {
+      "briefZh": "启动 WWDG 并装载计数器初值。",
+      "usageZh": "置位 WWDG_CR 的 WDGA 使能位并把计数值写入，看门狗开始工作。**一旦使能就无法通过软件关闭**，只能靠复位。因此调用之前必须把分频、窗口值、EWI 都配好。计数值建议写 0x7F（最大），这样从 0x7F 递减到窗口值有一段可以干活的时间。与 IWDG 的区别是，WWDG 用 PCLK1 驱动、有上窗口限制，适合检测\"程序跑得太快/时序异常\"，IWDG 用 LSI、无窗口，适合检测\"完全跑飞\"；两者可以同时开启。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "Counter": "计数器初值，必须在 0x40 ~ 0x7F 之间。常用 0x7F。低于 0x40 会立即复位。"
+      },
+      "prerequisites": [
+        "已打开 WWDG 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG, ENABLE)",
+        "已调用 WWDG_SetPrescaler 与 WWDG_SetWindowValue",
+        "若要使用提前唤醒中断，已在 WWDG_Enable 之前调用 WWDG_EnableIT 并配置好 NVIC",
+        "主循环中已准备好合法的喂狗代码（时机必须落在窗口内）"
+      ],
+      "registers": ["WWDG_CR", "WWDG_CFR"],
+      "relatedFunctions": ["WWDG_SetCounter", "WWDG_SetPrescaler", "WWDG_SetWindowValue", "WWDG_EnableIT", "IWDG_Enable", "DBGMCU_Config"],
+      "exampleCode": "/* WWDG 完整初始化：PCLK1 = 36MHz，分频 8，窗口 0x50 */\nvoid WWDG_Config(void)\n{\n  RCC_APB1PeriphClockCmd(RCC_APB1Periph_WWDG, ENABLE);\n\n  WWDG_SetPrescaler(WWDG_Prescaler_8);   /* 计数步长约 0.91ms */\n  WWDG_SetWindowValue(0x50);             /* 上窗口：不能早于这个值喂 */\n  WWDG_EnableIT();                       /* 提前唤醒中断，用于保存现场 */\n  WWDG_Enable(0x7F);                     /* 启动，不可逆 */\n\n  /* 调试时冻结 WWDG，避免断点被复位 */\n  RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);\n  DBGMCU_Config(DBGMCU_WWDG_STOP, ENABLE);\n}\n\nwhile (1)\n{\n  Task_Run();\n  WWDG_SetCounter(0x7F);   /* 喂狗，注意时机要在窗口内 */\n}",
+      "notesZh": [
+        "**启动后无法软件关闭**，只能靠复位或掉电；调试阶段建议先不调用，或用 DBGMCU_Config(DBGMCU_WWDG_STOP, ENABLE) 在暂停时冻结计数",
+        "计数值必须在 0x40~0x7F；写 0x40 以下会立刻复位（0x3F 是超时判定点）",
+        "喂狗时机必须落在 \"计数值 ≤ 窗口值 且 > 0x3F\" 的区间内，太早太晚都复位——这是与 IWDG 最大的不同",
+        "WWDG 时钟源是 PCLK1，系统时钟或 APB1 分频一变，超时时间就跟着变；从 STOP 模式唤醒后如果没有重新配置时钟，PCLK1 会变成 HSI 分频，喂狗周期全部失准",
+        "窗口设计要基于主循环最长执行时间：窗口值取\"最长任务耗时的对应计数值\"附近，太紧会误复位，太松就失去窗口保护意义",
+        "调试时被狗咬的典型表现是单步执行到一半程序重启——用 DBGMCU 冻结或调试版本里先不启动",
+        "WWDG 与 IWDG 可以同时使用：IWDG 防完全跑飞，WWDG 防时序异常"
+      ]
+    },
+
+    "WWDG_GetFlagStatus": {
+      "briefZh": "查询 WWDG 的提前唤醒中断标志（EWIF）是否置位。",
+      "usageZh": "读 WWDG_SR 的 EWIF 位，判断是否已经产生了提前唤醒中断。一般在 WWDG_IRQHandler 里用来确认中断来源。注意**这个函数没有参数**（SPL 只提供这一个标志，不像 IWDG 那样要传参数）。返回 SET 表示 EWI 已发生，此时计数器已经降到 0x40，再不处理就会复位。",
+      "returnDescZh": "返回 FlagStatus：SET 表示提前唤醒中断标志已置位，RESET 表示未置位。",
+      "paramsZh": {},
+      "prerequisites": [
+        "已调用 WWDG_EnableIT 使能提前唤醒中断",
+        "已 NVIC_Init 使能 WWDG_IRQn 通道"
+      ],
+      "registers": ["WWDG_SR"],
+      "relatedFunctions": ["WWDG_ClearFlag", "WWDG_EnableIT", "WWDG_SetCounter"],
+      "exampleCode": "void WWDG_IRQHandler(void)\n{\n  if (WWDG_GetFlagStatus() != RESET)\n  {\n    WWDG_ClearFlag();       /* 必须先清标志，否则中断反复进入 */\n    /* 此时计数器已到 0x40，马上要复位：抢救数据或喂狗 */\n    WWDG_SetCounter(0x7F);  /* 若想继续运行就喂狗 */\n  }\n}",
+      "notesZh": [
+        "本函数无参数，不接受标志枚举，别按 IWDG_GetFlagStatus 的写法传参",
+        "查到置位后必须 WWDG_ClearFlag()，否则中断会一直重复进入",
+        "EWI 标志置位时计数器已是 0x40，距离复位只剩 1 个计数周期，处理必须尽快",
+        "不要用它做常规轮询喂狗——EWI 是\"最后机会\"信号，正常喂狗应该在它之前完成"
+      ]
+    },
+
+    "WWDG_ClearFlag": {
+      "briefZh": "清除 WWDG 的提前唤醒中断标志（EWIF）。",
+      "usageZh": "在 WWDG_IRQHandler 里第一时间调用，清掉 WWDG_SR 的 EWIF 位。**漏掉这一句的后果是中断反复触发**：中断服务函数还没返回，标志又因为计数器仍在递减而再次置位，程序看起来像卡死在中断里，最终被 WWDG 复位。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {},
+      "prerequisites": [
+        "已进入 WWDG_IRQHandler，且已调用 WWDG_EnableIT 使能了中断"
+      ],
+      "registers": ["WWDG_SR"],
+      "relatedFunctions": ["WWDG_GetFlagStatus", "WWDG_EnableIT", "WWDG_SetCounter"],
+      "exampleCode": "void WWDG_IRQHandler(void)\n{\n  WWDG_ClearFlag();   /* 第一件事就是清标志 */\n\n  /* 然后在极短时间内做出决定：喂狗继续，或保存现场等待复位 */\n  WWDG_SetCounter(0x7F);\n}",
+      "notesZh": [
+        "必须在中断处理的一开始就调用，拖到最后再清会缩短本就不多的时间余量",
+        "清除标志不会重置计数器，计数器仍在向 0x3F 递减，不喂狗依旧会复位",
+        "与 IWDG 不同，WWDG 没有中断挂起位和事件标志之分，只有 EWIF 这一个标志",
+        "如果中断里要写 BKP_DRx 保存数据，记得先 PWR_BackupAccessCmd(ENABLE)，而这一步的前提是 PWR 时钟已开——这些都要在正常初始化阶段就准备好，中断里只做最少的操作"
+      ]
+    }
+  }
+}

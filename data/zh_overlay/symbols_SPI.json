@@ -1,0 +1,30 @@
+{
+  "_comment": "SPI/I2S 结构体成员中文。STM32F103C8T6 只有 SPI1（APB2，72MHz；PA5=SCK、PA6=MISO、PA7=MOSI、PA4=NSS）与 SPI2（APB1，36MHz；PB13/PB14/PB15/PB12）。SPI3 与 I2S 在本型号上不存在，下面 I2S_InitTypeDef 的说明仅供参考。",
+  "symbols": {
+    "SPI_InitTypeDef": {
+      "briefZh": "SPI 初始化参数结构体，SPI_Init 用它配置数据方向、主从模式、帧长、时钟极性与相位、片选管理、波特率分频与前导位。",
+      "membersZh": {
+        "SPI_Direction": "数据线组织方式，取 SPI_Direction_2Lines_FullDuplex（双线全双工，最常用）、SPI_Direction_2Lines_RxOnly（双线只收）、SPI_Direction_1Line_Rx（单线只收）、SPI_Direction_1Line_Tx（单线只发）。它对应 BIDIMODE 与 RXONLY 位，会改变 MOSI/MISO 引脚的用途：单线模式下收发都走 MOSI，MISO 可空出来当普通 GPIO。用 SPI1（PA5/PA6/PA7）或 SPI2（PB13/PB14/PB15）时要一并把这三个引脚配成 AF_PP 复用推挽，否则即使结构体正确也没有波形输出。",
+        "SPI_Mode": "主从模式，取 SPI_Mode_Master 或 SPI_Mode_Slave。SPI_StructInit 的默认值是 SPI_Mode_Slave（不是 Master！），所以调用 SPI_StructInit 后必须显式改成 Master——读写外部 Flash、SPI 屏、RF 模块等绝大多数场景都是主机。主机模式下 MSTR 位置 1、SCK 由本机输出；从机模式 SCK 必须由外部提供，配错时会一直等不到时钟，程序卡在等 TXE/RXNE 的 while 循环里。",
+        "SPI_DataSize": "每帧数据位数，取 SPI_DataSize_8b（默认，绝大多数外设都用 8 位）或 SPI_DataSize_16b（一次收发 16 位，用于某些 LCD、ADC）。写 16 位模式时 SPI_I2S_SendData 的实参仍是 uint16_t，接收也读 16 位；若外设其实按 8 位处理，会把两个字节合成一个帧导致数据错乱。此字段与 SPI_CRCPolynomial 的 CRC 计算长度联动。",
+        "SPI_CPOL": "空闲时钟电平（极性），取 SPI_CPOL_Low（空闲低电平，默认）或 SPI_CPOL_High（空闲高电平）。CPOL 与 CPHA 合起来就是 SPI 模式 0~3：CPOL=Low/CPHA=1Edge 是模式 0，最常用；CPOL=High/CPHA=2Edge 是模式 3。必须与外设手册给的 SPI mode 完全一致，配错的现象是能读到数据但全为 0xFF 或 0x00、读 ID 失败。",
+        "SPI_CPHA": "数据在哪个时钟沿被采样（相位），取 SPI_CPHA_1Edge（第一个边沿采样，默认）或 SPI_CPHA_2Edge（第二个边沿采样）。W25Q 系列 Flash 与多数 SPI 屏用 1Edge（模式 0）；2Edge 需要配 CPOL=Low 才是模式 1，与 CPOL=High 组合是模式 3。必须与 SPI_CPOL 成对确定，不能只看其中一个。",
+        "SPI_NSS": "片选由谁产生，取 SPI_NSS_Soft（软件 NSS，SSM=1，由 SSI 位内部拉出高电平，用 GPIO 引脚自己输出片选）或 SPI_NSS_Hard（硬件 NSS）。做主机的常规做法是 SPI_NSS_Soft，再选一个普通 GPIO 推挽输出、低电平选中器件，这样片选脚可以任意选；用 SPI_NSS_Hard 做主机会把 NSS 引脚当输入，一旦被拉低就自动退出主模式、MSTR 位清零，表现为通信突然停摆。SPI_StructInit 默认给的是 SPI_NSS_Hard，忘记改是很常见的坑。",
+        "SPI_BaudRatePrescaler": "SCK 分频系数，取 SPI_BaudRatePrescaler_2 / 4 / 8 / 16 / 32 / 64 / 128 / 256。SCK 频率 = 所属 SPI 的外设时钟 / 分频：SPI1 在 APB2（72MHz，分频 2 即 36MHz，已是 SPI1 的上限），SPI2 在 APB1（36MHz，分频 2 即 18MHz）。从机模式下这一项无需设置（SCK 由主机给），但字段仍必须赋值。驱动 W25Q 这类 Flash 时，读 ID 阶段常用 8 或 16 降速，确认连通后再改小分频；杜邦线飞线时建议分频 ≥8，否则 SCK 太快容易读错。",
+        "SPI_FirstBit": "先发高位还是低位，取 SPI_FirstBit_MSB（默认，绝大多数芯片包括 W25Q、SPI 屏都是 MSB 在前）或 SPI_FirstBit_LSB（如某些 74HC595 移位链）。它对应 LSBFIRST 位，只影响比特顺序，不影响帧长。配错时地址与命令字会被镜像位翻转，读 ID 随机失败。",
+        "SPI_CRCPolynomial": "硬件 CRC 的生成多项式，写入 CRCPR 寄存器，断言要求 ≥ 0x1，ST 示例与常用值都是 7（CRC-8，x^8+x^2+x+1）。只在调用 SPI_CalculateCRC / SPI_TransmitCRC 等 CRC 相关函数时才参与运算，普通 SPI 收发用不到；但 SPI_Init 会无条件把它写进寄存器，所以必须赋一个合法值（未初始化的栈变量可能触发断言或写入错误值）。"
+      }
+    },
+    "I2S_InitTypeDef": {
+      "briefZh": "I2S 初始化参数结构体，I2S_Init 用它配置 I2S 主从/收发方向、标准、数据格式、MCLK 输出、采样率与时钟极性；STM32F103C8T6 上不存在 I2S（I2S2/I2S3 复用自 SPI2/SPI3），本结构仅作查阅参考。",
+      "membersZh": {
+        "I2S_Mode": "收发方向与主从，取 I2S_Mode_SlaveTx、I2S_Mode_SlaveRx、I2S_Mode_MasterTx、I2S_Mode_MasterRx。MasterTx 用于向 DAC 或功放（如 PCM5102、MAX98357A）发音频，SlaveRx 用于从音频 ADC 或 I2S 麦克风（如 INMP441）收数据。Master 模式下 SCK/WS 由本机输出，Slave 模式必须由外部提供，方向配反时总线无时钟、DMA 永久等不到请求。注意 I2S_Init 只接受 SPI2/SPI3（断言 IS_SPI_23_PERIPH），I2S 与 SPI 共用同一组外设，同一时刻只能用其一。",
+        "I2S_Standard": "帧格式（通信标准），取 I2S_Standard_Phillips（标准 I2S，默认，绝大多数音频芯片）、I2S_Standard_MSB（左对齐）、I2S_Standard_LSB（右对齐）、I2S_Standard_PCMShort、I2S_Standard_PCMLong（PCM 短/长帧，某些语音 codec 与电话芯片用）。与数据源或 codec 不一致时听到的是一段连续噪音或节奏错乱。",
+        "I2S_DataFormat": "数据字长，取 I2S_DataFormat_16b、I2S_DataFormat_16bextended、I2S_DataFormat_24b、I2S_DataFormat_32b。它决定每帧的位长：选 16b 时帧长按 16 位（32 个 SCK）算，其余三种都按 32 位帧长算——I2S_Init 正是靠它给 packetlength 赋值，所以填错不仅数据位对不上，I2S_AudioFreq 算出的实际采样率也会偏。24 位与 32 位两种选值的帧长相同，分频结果一样。",
+        "I2S_MCLKOutput": "是否输出 MCLK（主时钟，采样率的 256 倍），取 I2S_MCLKOutput_Enable 或 I2S_MCLKOutput_Disable（默认）。很多 DAC/ADC 需要 MCLK 才能工作，这时选 Enable 并把对应引脚复用出去；但注意 I2S_Init 的分频公式随这一项变化（Enable 时按 256×fs 算，Disable 时按 32×每帧位长×fs 算），所以它必须与硬件上 MCLK 是否真的连到 codec 一致，否则采样率会错一倍。",
+        "I2S_AudioFreq": "目标采样率，单位 Hz，取 I2S_AudioFreq_8k / 11k / 16k / 22k / 32k / 44k / 48k / 96k / 192k，或直接写 8000~192000 之间的任意值（断言只管这个区间），另外 I2S_AudioFreq_Default（=2）表示用默认分频。I2S_Init 依据 SYSCLK、I2S_MCLKOutput 与 I2S_DataFormat 算出 I2SDIV，算出的分频若 <2 或 >255，会静默回退成默认值 0x02，此时实际采样率与预期完全不同——库里没有回读实际频率的函数，只能自己按公式核对 I2SPR 或实测输出。72MHz SYSCLK 下 44.1kHz 无法整除，误差会让音乐音调轻微偏高。",
+        "I2S_CPOL": "I2S 时钟的空闲电平，取 I2S_CPOL_Low（默认，空闲低，标准 I2S 的做法）或 I2S_CPOL_High（空闲高）。它对应 I2SCFGR 的 CKPOL 位，决定数据在哪个边沿被锁存，要与 I2S_Standard 搭配着看。注意它不是 SPI 的 SPI_CPOL_Low，两者宏值不同，不能混用。"
+      }
+    }
+  }
+}

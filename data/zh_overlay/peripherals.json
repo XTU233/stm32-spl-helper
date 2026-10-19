@@ -1,0 +1,195 @@
+{
+  "_comment": "外设总体中文说明。字段为空表示不覆盖基础数据。",
+  "peripherals": {
+    "GPIO": {
+      "nameZh": "通用输入输出",
+      "introZh": "GPIO 是 STM32 最基础也最常用的外设。STM32F103C8T6 的 LQFP48 封装引出了 PA0~PA15、PB0~PB15、PC13~PC15 共 35 个可用 IO。每个引脚都可以独立配置为输入、输出或复用功能，输出模式下还能选推挽/开漏和翻转速度。",
+      "usageOverviewZh": "标准调用顺序：① RCC_APB2PeriphClockCmd 使能 GPIOx 与 AFIO 时钟（用重映射时必须开 AFIO）；② 填写 GPIO_InitTypeDef 三个字段；③ GPIO_Init 写入配置；④ 用 GPIO_SetBits / GPIO_ResetBits / GPIO_WriteBit 操作电平，或 GPIO_ReadInputDataBit 读取。注意：忘了第 ① 步是新手最常踩的坑，配置会静默失效且不报错。",
+      "tags": ["常用", "基础"]
+    },
+    "RCC": {
+      "nameZh": "复位与时钟控制",
+      "introZh": "RCC 负责整个芯片的时钟树：选择时钟源（HSI/HSE/PLL）、配置各总线分频、使能/复位每个外设的时钟。任何外设在使用前都必须先通过 RCC 打开它的时钟，否则寄存器写入无效。",
+      "usageOverviewZh": "两类用法：① 系统时钟初始化——通常在 SystemInit 里用 RCC_HSEConfig / RCC_PLLConfig / RCC_SYSCLKConfig 配到 72MHz；② 外设时钟使能——RCC_APB2PeriphClockCmd（GPIO/USART1/SPI1/ADC1/TIM1 等）或 RCC_APB1PeriphClockCmd（USART2/3、TIM2~7、I2C、SPI2、PWR、BKP 等）。搞不清挂在哪条总线是常见困惑点，看函数名里的 APB1/APB2 即可。",
+      "tags": ["常用", "基础", "必学"]
+    },
+    "USART": {
+      "nameZh": "通用同步异步收发器",
+      "introZh": "USART 用于串口通信，是最常用的调试与设备互联手段。C8T6 有 USART1（APB2）、USART2 和 USART3（APB1）三个。支持异步串口、同步模式、IrDA、LIN 与智能卡模式。",
+      "usageOverviewZh": "标准调用顺序：① 开 USARTx 时钟与对应 GPIO 时钟；② GPIO 配成复用推挽（TX 用 GPIO_Mode_AF_PP，RX 用 GPIO_Mode_IN_FLOATING）；③ 填 USART_InitTypeDef 并 USART_Init；④ USART_Cmd(USARTx, ENABLE) 使能；⑤ USART_ITConfig 开中断或直接轮询 USART_GetFlagStatus；⑥ 发送用 USART_SendData，接收用 USART_ReceiveData。波特率算错会收到乱码，注意 USART1 挂 APB2（72MHz），USART2/3 挂 APB1（36MHz）。",
+      "tags": ["常用", "通信"]
+    },
+    "TIM": {
+      "nameZh": "定时器",
+      "introZh": "TIM 是功能最丰富的外设。C8T6 有 4 个定时器：TIM1 是高级定时器（APB2，带互补输出与死区），TIM2/TIM3/TIM4 是通用定时器（APB1）。可用于定时中断、PWM 输出、输入捕获、编码器接口等。",
+      "usageOverviewZh": "定时中断的典型顺序：① 开 TIMx 时钟；② 填 TIM_TimeBaseInitTypeDef（Prescaler 分频、Period 重装值）并 TIM_TimeBaseInit；③ TIM_ITConfig 开更新中断；④ NVIC 配置优先级并使能；⑤ TIM_Cmd 启动；⑥ 在 TIMx_IRQHandler 里判断 TIM_GetITStatus 并 TIM_ClearITPendingBit。PWM 输出还要额外配置 TIM_OCInitTypeDef 与 TIM_OCxInit。注意中断里必须清标志，否则会反复进中断。",
+      "tags": ["常用", "进阶"]
+    },
+    "MISC": {
+      "nameZh": "内核外设与中断",
+      "introZh": "misc.c 是 CMSIS 的补充，封装了 NVIC 中断优先级分组、NVIC 初始化、SysTick 配置等内核级功能。虽然只有 5 个函数，但每个工程都会用到。",
+      "usageOverviewZh": "标准用法：① 程序启动时 NVIC_PriorityGroupConfig 选定优先级分组（通常 NVIC_PriorityGroup_2）；② 对每个中断源填 NVIC_InitTypeDef（NVIC_IRQChannel / PreemptionPriority / SubPriority / Cmd）并 NVIC_Init。注意：优先级分组全工程只能设一次，重复设置会打乱已有中断的优先级。",
+      "tags": ["常用", "基础"]
+    },
+    "EXTI": {
+      "nameZh": "外部中断",
+      "introZh": "EXTI 管理外部中断/事件线。GPIO 要产生中断必须先把引脚映射到 EXTI 线（GPIO_EXTILineConfig），再配置 EXTI 触发方式并开 NVIC。",
+      "usageOverviewZh": "标准顺序：① 开 GPIO 与 AFIO 时钟，GPIO 配成输入；② GPIO_EXTILineConfig 把引脚连到 EXTI 线；③ 填 EXTI_InitTypeDef（EXTI_Line / EXTI_Mode / EXTI_Trigger / EXTI_LineCmd）并 EXTI_Init；④ NVIC 使能 EXTIx_IRQHandler；⑤ 中断里先 EXTI_GetITStatus 判断，处理完必须 EXTI_ClearITPendingBit。注意：PA0 与 PB0 共用 EXTI0 线，不能同时用作中断。",
+      "tags": ["常用", "中断"]
+    },
+    "SPI": {
+      "nameZh": "串行外设接口",
+      "introZh": "SPI 是高速同步串行总线，常用于 Flash、屏幕、传感器。C8T6 有 SPI1（APB2）与 SPI2（APB1）。支持全双工主从模式，最高 18MHz（SPI1）。",
+      "usageOverviewZh": "主机模式顺序：① 开 SPIx 与 GPIO 时钟；② SCK/MOSI 配成复用推挽，MISO 配成浮空输入，NSS 用软件管理时配成普通输出；③ 填 SPI_InitTypeDef（方向、模式、数据宽度、极性相位、分频、位序）并 SPI_Init；④ SPI_Cmd 使能；⑤ 发送用 SPI_I2S_SendData，接收前要等 SPI_I2S_GetFlagStatus(SPIx, SPI_I2S_FLAG_TXE) 等标志。注意 CPOL/CPHA 要与从机一致，否则收到全 0 或全 FF。",
+      "tags": ["常用", "通信"]
+    },
+    "I2C": {
+      "nameZh": "I2C 总线",
+      "introZh": "I2C 是两线制同步串行总线（SCL/SDA），常用于 EEPROM、传感器、RTC。C8T6 有 I2C1 与 I2C2（都在 APB1）。",
+      "usageOverviewZh": "主机发送顺序：① 开 I2Cx 与 GPIO 时钟；② SCL/SDA 配成复用开漏（GPIO_Mode_AF_OD）；③ 填 I2C_InitTypeDef（时钟频率、模式、占空比、自身地址、应答、地址宽度）并 I2C_Init；④ I2C_Cmd 使能；⑤ I2C_GenerateSTART 起始 → 等 SB 标志 → 发地址 → 等 ADDR → 传数据 → I2C_GenerateSTOP。注意：必须用开漏模式并外接上拉电阻，用推挽会导致总线锁死。",
+      "tags": ["常用", "通信", "易踩坑"]
+    },
+    "ADC": {
+      "nameZh": "模数转换",
+      "introZh": "ADC 是 12 位逐次逼近型模数转换器。C8T6 有 ADC1 与 ADC2，支持 10 个外部通道（PA0~PA7、PB0、PB1）加内部温度传感器与参考电压通道。",
+      "usageOverviewZh": "单通道规则转换顺序：① 开 ADC1 与 GPIO 时钟，GPIO 配成模拟输入（GPIO_Mode_AIN）；② RCC_ADCCLKConfig 设置 ADC 时钟（不得超过 14MHz）；③ 填 ADC_InitTypeDef 并 ADC_Init；④ ADC_RegularChannelConfig 指定通道与采样时间；⑤ ADC_Cmd 使能；⑥ ADC_ResetCalibration + ADC_StartCalibration 做校准（首次必须做）；⑦ ADC_SoftwareStartConvCmd 启动转换，轮询 ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) 后 ADC_GetConversionValue 取值。注意采样时间设太短会导致读数跳动。",
+      "tags": ["常用", "模拟"]
+    },
+    "DMA": {
+      "nameZh": "直接存储器访问",
+      "introZh": "DMA 让数据在外设与内存之间自动搬运，不占用 CPU。C8T6 只有 DMA1，共 7 个通道，每个通道固定绑定若干外设请求（如 USART1_TX 是通道4，ADC1 是通道1）。",
+      "usageOverviewZh": "标准顺序：① 开 DMA1 时钟；② 填 DMA_InitTypeDef（外设基址、内存基址、方向、缓冲区大小、外设/内存增量、数据宽度、模式、优先级、M2M）并 DMA_Init；③ DMA_Cmd 使能通道；④ 若用中断则 DMA_ITConfig + NVIC 配置；⑤ 外设侧还要开对应的 DMA 请求（如 USART_DMACmd）。注意通道与外设的对应关系是硬件固定的，选错通道不会报错但不工作。",
+      "tags": ["进阶", "性能"]
+    },
+    "FLASH": {
+      "nameZh": "闪存",
+      "introZh": "FLASH 模块负责片内 Flash 的编程与擦除，以及读写保护、选项字节配置。C8T6 有 64KB Flash，擦写寿命约 1 万次。",
+      "usageOverviewZh": "写入数据的顺序：① FLASH_Unlock 解锁；② FLASH_ErasePage 擦除目标页（Flash 只能按页擦、按半字写，且写前必须是 0xFFFF）；③ FLASH_ProgramHalfWord 逐半字写入；④ FLASH_Lock 上锁。注意：擦写期间 CPU 会停顿，且不能在 Flash 上执行代码的同时擦写同一块区域。",
+      "tags": ["存储"]
+    },
+    "PWR": {
+      "nameZh": "电源控制",
+      "introZh": "PWR 管理低功耗模式（睡眠/停止/待机）与电源电压监测（PVD），并控制备份域访问。",
+      "usageOverviewZh": "进入停止模式：① 开 PWR 时钟（RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE)）；② 配置唤醒源（EXTI）；③ PWR_EnterSTOPMode(PWR_Regulator_ON, PWR_STOPEntry_WFI)。注意：退出停止模式后系统时钟会切回 HSI，需要重新配置时钟。",
+      "tags": ["低功耗"]
+    },
+    "BKP": {
+      "nameZh": "备份寄存器",
+      "introZh": "BKP 提供 10 个 16 位备份寄存器与 RTC 相关控制。备份域由 VBAT 供电，主电源掉电后数据仍能保持。",
+      "usageOverviewZh": "使用备份寄存器：① 开 PWR 与 BKP 时钟；② PWR_BackupAccessCmd(ENABLE) 解除备份域写保护；③ BKP_WriteBackupRegister / BKP_ReadBackupRegister 读写；④ 若用侵入检测则 BKP_TamperPinCmd 等。注意：不解除写保护就写会静默失败。",
+      "tags": ["存储", "低功耗"]
+    },
+    "IWDG": {
+      "nameZh": "独立看门狗",
+      "introZh": "IWDG 由内部 40kHz LSI 驱动，独立于主时钟，主程序跑飞时能可靠复位。适合做最后一道保险。",
+      "usageOverviewZh": "顺序：① IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable) 允许写；② IWDG_SetPrescaler 与 IWDG_SetReload 设定超时（超时 = 分频 × 重装值 / 40kHz）；③ IWDG_ReloadCounter 喂狗；④ IWDG_Enable 启动。注意：一旦启动无法关闭，调试时容易反复复位，需要先关掉再下载。",
+      "tags": ["可靠性"]
+    },
+    "WWDG": {
+      "nameZh": "窗口看门狗",
+      "introZh": "WWDG 由 APB1 时钟驱动，除了下限还有上限窗口——喂狗太早也会复位，适合检测程序跑得过快或过慢。",
+      "usageOverviewZh": "顺序：① 开 WWDG 时钟；② WWDG_SetPrescaler 与 WWDG_SetWindowValue 设定窗口；③ WWDG_Enable 并给初值；④ WWDG_SetCounter 喂狗；⑤ 可选 WWDG_EnableIT 开提前唤醒中断，在中断里做紧急处理。注意：喂狗必须在窗口内，太早太晚都复位。",
+      "tags": ["可靠性"]
+    },
+    "RTC": {
+      "nameZh": "实时时钟",
+      "introZh": "RTC 是 32 位秒计数器，配合 32.768kHz 晶振可做日历时钟，掉电由 VBAT 维持。",
+      "usageOverviewZh": "顺序：① 开 PWR 与 BKP 时钟，解除备份域写保护；② RCC_LSEConfig 开外部 32.768kHz 晶振并等待就绪；③ RCC_RTCCLKConfig 选 RTC 时钟源；④ RCC_RTCCLKCmd 使能；⑤ RTC_SetPrescaler 设分频（32767 得 1Hz）；⑥ RTC_SetCounter 设初值。注意：LSE 起振较慢，必须 RCC_WaitForHSEStartUp 式的等待就绪判断。",
+      "tags": ["时钟"]
+    },
+    "CRC": {
+      "nameZh": "循环冗余校验",
+      "introZh": "CRC 模块用硬件计算 CRC-32 校验值，比软件实现快得多，常用于固件完整性校验与通信校验。",
+      "usageOverviewZh": "用法：① 开 CRC 时钟；② CRC_ResetDR 复位数据寄存器；③ 逐字调用 CRC_CalculateCRC 累加，或直接写 CRC->DR；④ CRC_GetCRC 取结果。注意：C8T6 的 CRC 多项式固定为 0x4C11DB7，不可更改。",
+      "tags": ["工具"]
+    },
+    "DBGMCU": {
+      "nameZh": "调试支持",
+      "introZh": "DBGMCU 控制调试器连接时外设的行为，比如单步调试时是否冻结看门狗与定时器，避免调试期间被看门狗复位。",
+      "usageOverviewZh": "常用：DBGMCU_Config(DBGMCU_IWDG_STOP, ENABLE) 让内核停止时冻结 IWDG；DBGMCU_Config(DBGMCU_TIM2_STOP, ENABLE) 冻结定时器计数。调试阶段很有用。",
+      "tags": ["调试"]
+    },
+    "CAN": {
+      "nameZh": "控制器局域网",
+      "introZh": "CAN 是差分总线，抗干扰强，广泛用于汽车与工业。C8T6 有 1 个 CAN（CAN1，APB1），需要外接 CAN 收发器（如 TJA1050）。",
+      "usageOverviewZh": "顺序：① 开 CAN1 与 GPIO 时钟，CAN_RX 配成上拉输入、CAN_TX 配成复用推挽；② CAN_Init 设置模式、波特率（要与总线上其它节点一致）、自动重传等；③ CAN_FilterInit 配置过滤器（不配过滤器收不到任何报文）；④ CAN_ITConfig + NVIC 开接收中断；⑤ 发送用 CAN_Transmit，接收中断里用 CAN_Receive 取数据。注意：过滤器不配置是新手最常见的「发得出去收不回来」原因。",
+      "tags": ["通信", "进阶"]
+    },
+    "CMSIS": {
+      "nameZh": "内核与外设寄存器定义",
+      "introZh": "CMSIS 不是外设，而是 stm32f10x.h 里的一整套硬件寄存器定义：每个外设的寄存器组（如 GPIO_TypeDef）、外设基址指针（如 GPIOA、TIM2）、中断号（如 TIM2_IRQn）、以及大量位定义宏。库函数内部最终都落到这些寄存器上，所以它们是「库函数到底改了什么」的最底层答案。",
+      "usageOverviewZh": "典型用途：① 查某个库函数到底操作哪个寄存器（函数详情页的「涉及的寄存器」一节就是这么来的）；② 库函数没覆盖的场合直接写寄存器，如 `GPIOA->BSRR = GPIO_Pin_5`；③ 查外设基址与中断号。注意：这些结构体是**寄存器映射**，成员名就是寄存器名，直接读写会与库函数互相干扰——除非你清楚后果，否则优先用库函数。",
+      "tags": ["底层", "查阅"]
+    },
+    "CORTEX": {
+      "nameZh": "Cortex-M3 内核寄存器",
+      "introZh": "CORTEX 是 core_cm3.h 里定义的内核外设：NVIC（中断控制器）、SCB（系统控制块，含向量表、系统异常、优先级分组）、SysTick（系统节拍定时器）、MPU（内存保护）、CoreDebug（调试控制）。它们属于 ARM Cortex-M3 内核而不属于 ST 的外设，所以不在 RCC 的时钟使能范围内——不需要开时钟就能访问。",
+      "usageOverviewZh": "常用：① 中断使能与优先级走 NVIC->ISER / NVIC->IP，但通常用库函数 NVIC_Init 封装；② 系统复位、向量表偏移走 SCB->AIRCR / SCB->VTOR；③ 优先级分组见 SCB->AIRCR 的 PRIGROUP 位。注意：直接写这些寄存器很容易与 SPL 的 NVIC_Init / NVIC_PriorityGroupConfig 冲突，除非要做的操作库函数没提供，否则别绕过它们。",
+      "tags": ["底层", "内核"]
+    },
+    "CEC": {
+      "nameZh": "消费电子控制",
+      "introZh": "CEC 是 HDMI 的消费电子控制总线，用于机顶盒与电视之间传递开关机、遥控等信号，只需一根线（PB8）。",
+      "usageOverviewZh": "STM32F103 的中容量型号（含 C8T6）**硅片上带 CEC 外设**，但 LQFP48 封装**没有引出 CEC 引脚（PB8 未引出）**，因此本型号上无法实际使用，函数说明仅供查阅。若要用 CEC，需换 100 脚以上型号（如 ZET6/VET6）。",
+      "tags": ["引脚未引出"]
+    },
+    "DAC": {
+      "nameZh": "数模转换",
+      "introZh": "DAC 是 12 位数字转模拟输出，可直接输出 0~VREF+ 的电压，输出引脚是 PA4（通道1）与 PA5（通道2）。",
+      "usageOverviewZh": "本型号（STM32F103C8T6，LQFP48）**没有引出 DAC 外设**：DAC 只在 100 脚以上的大容量型号（如 RCT6、ZET6）上提供，C8T6 的 PA4/PA5 是普通 GPIO。需要模拟输出时可用 PWM + RC 滤波近似。函数说明仅供查阅。",
+      "tags": ["引脚未引出"]
+    },
+    "FSMC": {
+      "nameZh": "灵活静态存储控制器",
+      "introZh": "FSMC 用于驱动外部 SRAM、NOR/NAND Flash、LCD 并口屏等，通过地址/数据/控制线把外部存储器映射到 CPU 的寻址空间。",
+      "usageOverviewZh": "FSMC 需要大量引脚（16 位数据线 + 地址线 + 片选/读写控制），**STM32F103C8T6（LQFP48）没有引出 FSMC 引脚**，无法使用；该外设只在 100 脚以上的大容量型号（如 ZET6、VET6）上提供。函数说明仅供查阅。",
+      "tags": ["引脚未引出"]
+    },
+    "SDIO": {
+      "nameZh": "SD 卡接口",
+      "introZh": "SDIO 用于读写 SD/TF 卡与 SDIO 设备，支持 1 位与 4 位总线模式，时钟最高 48MHz。",
+      "usageOverviewZh": "STM32F103C8T6 的 **LQFP48 封装没有引出 SDIO 引脚**（SDIO 用 PC8~PC12 + PD2，这些脚在本封装上不存在），因此无法使用；SDIO 只在 100 脚以上的型号上提供。若需读卡，只能用 SPI 模式驱动 SD 卡。函数说明仅供查阅。",
+      "tags": ["引脚未引出"]
+    }
+  },
+
+  "sectionTitles": {
+    "Initialization and Configuration functions": "初始化与配置函数",
+    "Configuration functions": "配置函数",
+    "Command functions": "使能/失能函数",
+    "Data reading functions": "数据读取函数",
+    "Data writing functions": "数据写入函数",
+    "Data transmitting functions": "数据发送函数",
+    "Data receiving functions": "数据接收函数",
+    "Interrupts management functions": "中断管理函数",
+    "Flags management functions": "标志管理函数",
+    "Status checking functions": "状态查询函数",
+    "其它函数": "其它函数"
+  },
+
+  "orderIndex": {
+    "GPIO": 1,
+    "RCC": 2,
+    "USART": 3,
+    "TIM": 4,
+    "MISC": 5,
+    "EXTI": 6,
+    "SPI": 7,
+    "I2C": 8,
+    "ADC": 9,
+    "DMA": 10,
+    "FLASH": 11,
+    "PWR": 12,
+    "BKP": 13,
+    "IWDG": 14,
+    "WWDG": 15,
+    "RTC": 16,
+    "CRC": 17,
+    "DBGMCU": 18,
+    "CAN": 19,
+    "CEC": 90,
+    "DAC": 91,
+    "FSMC": 92,
+    "SDIO": 93
+  }
+}

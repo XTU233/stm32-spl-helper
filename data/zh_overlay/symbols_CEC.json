@@ -1,0 +1,18 @@
+{
+  "_comment": "CEC 结构体成员中文。CEC 需要先配好时钟源（CEC 在 APB1，引脚 PB10，实际使用前还要确认本型号可用的时钟），本结构体只控制位时序与位周期两种模式。",
+  "symbols": {
+    "CEC_InitTypeDef": {
+      "briefZh": "CEC（消费电子控制）位时序配置结构体，CEC_Init 用它决定位时序与位周期采用标准模式还是容错/灵活模式。",
+      "usageZh": "CEC 用于 HDMI 设备间的单线控制总线（典型 1kHz 位率、3.3V 开漏、需外部上拉）。顺序：开 CEC 计时器时钟源（CEC 从 RCC 取 32.768kHz RTC/LSE 或 HSE/1.5 作为 1ms 基准，需 RCC 侧显式配置）→ RCC_APB1PeriphClockCmd(RCC_APB1Periph_CEC) → 填本结构体 → CEC_Init → CEC_Cmd(ENABLE)。两个字段相互独立，标准模式下两个都填 *_StdMode 即可，是最稳的起点。",
+      "notesZh": [
+        "CEC 的计时基准来自 RCC 侧的 CEC 时钟源，RCC 没配好时 CEC_Init 不会报错，但收发全部失败。",
+        "CEC_BitTimingErrFreeMode 允许 ±200µs 的位时序误差而仍认为有效，只在信号质量差（长线、多从机）时启用；调试阶段先用 StdMode。",
+        "CEC_BitPeriodFlexibleMode 放宽相邻位之间的周期判决窗口，启用后可能出现“本应被判为错误的数据被当成有效数据”，影响错误计数。"
+      ],
+      "membersZh": {
+        "CEC_BitTimingMode": "位时序判决模式：CEC_BitTimingStdMode（0x0000）按 CEC 规范严格判定位内逻辑 1/0 的时间窗，CEC_BitTimingErrFreeMode（CEC_CFGR 的 BTEM）允许位时序偏差而免于报错。二者是二选一，填反了不报错但错误计数行为完全不同——信号质量差而误判成 StdMode 时会不断出现 BTE 错误。",
+        "CEC_BitPeriodMode": "位周期判决模式：CEC_BitPeriodStdMode（0x0000）按规范严格检查相邻位的周期，CEC_BitPeriodFlexibleMode（CEC_CFGR 的 BPEM）使用更宽松的窗口。宽松模式能容忍对端时钟偏差，但也会放过真正的帧错误，排查通信问题时建议先用 StdMode 定位。"
+      }
+    }
+  }
+}

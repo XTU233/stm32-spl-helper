@@ -1,0 +1,922 @@
+{
+  "schemaVersion": 1,
+  "peripheral": "RTC",
+  "functions": [
+    {
+      "id": "RTC_ITConfig",
+      "name": "RTC_ITConfig",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec1",
+      "prototype": "void RTC_ITConfig(uint16_t RTC_IT, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RTC_IT",
+          "type": "uint16_t",
+          "descEn": "specifies the RTC interrupts sources to be enabled or disabled. This parameter can be any combination of the following values:",
+          "descZh": "中断源，可以是 RTC_IT_SEC、RTC_IT_ALR、RTC_IT_OW 的按位或组合。常用 RTC_IT_ALR。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the specified RTC interrupts. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified RTC interrupts.",
+      "briefZh": "使能或关闭 RTC 的中断源（秒中断、闹钟中断、溢出中断）。",
+      "usageZh": "打开 RTC 的三种中断：RTC_IT_SEC（每秒一次）、RTC_IT_ALR（计数器等于闹钟值时一次）、RTC_IT_OW（计数器溢出，32 位计数约 136 年一次，基本用不到）。闹钟中断是最常用的定时唤醒源，也是 STANDBY 模式下仅有的三种唤醒源之一。使能中断之后别忘了 NVIC_Init 打开 RTC_IRQn（或 RTCAlarm_IRQn）通道，否则中断永远不会进。",
+      "prerequisites": [
+        "已打开 PWR/BKP 时钟，先 PWR_BackupAccessCmd(ENABLE) 再 RCC_RTCCLKConfig + RCC_RTCCLKCmd(ENABLE)",
+        "已调用 RTC_WaitForSynchro 保证 RTC 寄存器同步",
+        "修改中断使能位前后需要 RTC_WaitForLastTask（RTC_CRH 也属于 RTC 寄存器）",
+        "若要真正进入中断，还要 NVIC_Init 配好 RTC_IRQn / RTCAlarm_IRQn"
+      ],
+      "registers": [
+        "RTC_CRH",
+        "RTC_CRL"
+      ],
+      "relatedFunctions": [
+        "RTC_SetAlarm",
+        "RTC_GetITStatus",
+        "RTC_ClearITPendingBit",
+        "NVIC_Init",
+        "RTC_EnterConfigMode"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "只调 RTC_ITConfig 不 NVIC_Init，中断不触发且无任何提示",
+        "RTC 闹钟中断实际走 RTCAlarm_IRQn + EXTI_Line17；如果同时开了 EXTI_Line17 中断，两处标志都要清，否则会反复进中断",
+        "溢出中断 RTC_IT_OW 只在 32 位秒计数器溢出（约 136 年）时触发，日常项目不必开",
+        "RTC_IT_SEC 每秒一次，中断里做太多事会影响其它实时任务；短周期定时建议用 TIM",
+        "使能/关闭中断位属于写 RTC 寄存器，前后成对调用 RTC_WaitForLastTask 才可靠"
+      ],
+      "exampleCode": "/* 使能闹钟中断 */\nRTC_WaitForLastTask();\nRTC_ITConfig(RTC_IT_ALR, ENABLE);\nRTC_WaitForLastTask();\n\n/* 别忘了 NVIC：RTC 闹钟用的是 RTCAlarm_IRQn */\nNVIC_InitTypeDef NVIC_InitStructure;\nNVIC_InitStructure.NVIC_IRQChannel = RTCAlarm_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x01;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x01;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\nvoid RTCAlarm_IRQHandler(void)\n{\n  if (RTC_GetITStatus(RTC_IT_ALR) != RESET)\n  {\n    RTC_ClearITPendingBit(RTC_IT_ALR);\n    RTC_WaitForLastTask();\n    /* 定时任务 */\n  }\n  EXTI_ClearITPendingBit(EXTI_Line17);  /* 闹钟同时接到 EXTI17，若开了 EXTI 中断要一起清 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "BKP",
+        "DISABLE",
+        "ENABLE",
+        "EXTI",
+        "EXTI_ClearITPendingBit",
+        "EXTI_Line17",
+        "FunctionalState",
+        "NVIC",
+        "NVIC_Init",
+        "NVIC_InitTypeDef",
+        "PWR",
+        "PWR_BackupAccessCmd",
+        "RCC_RTCCLKCmd",
+        "RCC_RTCCLKConfig",
+        "RESET",
+        "RTC",
+        "RTC_ClearITPendingBit",
+        "RTC_GetITStatus",
+        "RTC_IT_ALR",
+        "RTC_IT_OW",
+        "RTC_IT_SEC",
+        "RTC_WaitForLastTask",
+        "RTC_WaitForSynchro"
+      ],
+      "headerLine": 102,
+      "sourceLine": 90,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RTC_EnterConfigMode",
+      "name": "RTC_EnterConfigMode",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec2",
+      "prototype": "void RTC_EnterConfigMode(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enters the RTC configuration mode.",
+      "briefZh": "进入 RTC 配置模式，允许修改 RTC 的计数、分频、闹钟等寄存器。",
+      "usageZh": "RTC 的寄存器默认是写保护的，**任何对 RTC_CNT、RTC_ALR、RTC_PRL 的修改，以及 BKP_SetRTCCalibrationValue，都必须在配置模式下进行**。标准写法是：RTC_WaitForLastTask → RTC_EnterConfigMode → 写寄存器 → RTC_ExitConfigMode → RTC_WaitForLastTask。进入配置模式会暂时停止计数器（RTC_CNT 冻结），配置期间时间不走，所以配置动作要尽量短。",
+      "prerequisites": [
+        "RTC 时钟已使能并在运行：RCC_RTCCLKConfig + RCC_RTCCLKCmd(ENABLE)",
+        "已调用 RTC_WaitForSynchro 完成首次同步",
+        "调用前先 RTC_WaitForLastTask 确保上一次写操作已完成"
+      ],
+      "registers": [
+        "RTC_CRL"
+      ],
+      "relatedFunctions": [
+        "RTC_ExitConfigMode",
+        "RTC_WaitForLastTask",
+        "RTC_SetCounter",
+        "RTC_SetAlarm",
+        "RTC_SetPrescaler"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "在配置模式下 RTC 计数器停止走时，长时间停留在配置模式会丢时间",
+        "忘记 RTC_ExitConfigMode 是最常见的错误：程序继续跑但 RTC 永远停在原地，读 RTC_GetCounter 值一直不变",
+        "进入配置模式前不 RTC_WaitForLastTask，可能上一次写还没落到 RTC 寄存器就被打断",
+        "进入配置模式会清掉秒中断标志（RSF 行为），如果同时用秒中断要重新处理标志"
+      ],
+      "exampleCode": "/* 标准写法：等待 -> 进配置 -> 写 -> 出配置 -> 等待 */\nRTC_WaitForLastTask();\nRTC_EnterConfigMode();\n\n/* 配置模式下写寄存器 */\nRTC_SetCounter(0);          /* 计数器清零 */\nRTC_SetAlarm(3600);         /* 1 小时后闹钟 */\n\nRTC_ExitConfigMode();\nRTC_WaitForLastTask();",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "BKP_SetRTCCalibrationValue",
+        "ENABLE",
+        "RCC_RTCCLKCmd",
+        "RCC_RTCCLKConfig",
+        "RTC",
+        "RTC_ExitConfigMode",
+        "RTC_GetCounter",
+        "RTC_SetAlarm",
+        "RTC_SetCounter",
+        "RTC_WaitForLastTask",
+        "RTC_WaitForSynchro"
+      ],
+      "headerLine": 104,
+      "sourceLine": 111,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RTC_ExitConfigMode",
+      "name": "RTC_ExitConfigMode",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec2",
+      "prototype": "void RTC_ExitConfigMode(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Exits from the RTC configuration mode.",
+      "briefZh": "退出 RTC 配置模式，恢复寄存器写保护并让计数器继续走时。",
+      "usageZh": "与 RTC_EnterConfigMode 成对使用。写完全部 RTC 寄存器后必须调用，否则 RTC 停走、时间不再更新。退出后要 RTC_WaitForLastTask 等待写操作完成，再进行后续操作（尤其是读计数器）。",
+      "prerequisites": [
+        "已调用 RTC_EnterConfigMode 进入配置模式"
+      ],
+      "registers": [
+        "RTC_CRL"
+      ],
+      "relatedFunctions": [
+        "RTC_EnterConfigMode",
+        "RTC_WaitForLastTask",
+        "RTC_GetCounter"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "只进不出会让 RTC 完全停摆，读回来的秒数永远不变——这类 bug 很隐蔽，因为程序看起来一切正常",
+        "退出后不 RTC_WaitForLastTask 就读 RTC_GetCounter，可能读到旧值",
+        "退出配置模式后 RTC_CRL 的 CNF 位被清零，寄存器重新变为写保护，此时再写 RTC_CNT 不会生效"
+      ],
+      "exampleCode": "RTC_WaitForLastTask();\nRTC_EnterConfigMode();\nRTC_SetPrescaler(32767);      /* LSE 32768Hz 分频成 1Hz */\nRTC_SetCounter(0);\nRTC_ExitConfigMode();\nRTC_WaitForLastTask();        /* 退出后必须等，才能安全地读计数器 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RTC",
+        "RTC_EnterConfigMode",
+        "RTC_GetCounter",
+        "RTC_SetCounter",
+        "RTC_SetPrescaler",
+        "RTC_WaitForLastTask"
+      ],
+      "headerLine": 105,
+      "sourceLine": 122,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RTC_GetCounter",
+      "name": "RTC_GetCounter",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec3",
+      "prototype": "uint32_t RTC_GetCounter(void);",
+      "returnType": "uint32_t",
+      "params": [],
+      "returnDescEn": "RTC counter value.",
+      "returnDescZh": "返回当前 RTC 计数器值（uint32_t），单位秒。32 位约 136 年才会溢出。",
+      "briefEn": "Gets the RTC counter value.",
+      "briefZh": "读取 RTC 秒计数器的当前值。",
+      "usageZh": "RTC 的计数器按 1Hz 递增（分频配好之后），值就是从设定的起始时间起经过的秒数。要换算成日期时间，需要自己在软件里做年月日时分秒的转换（SPL 不带日历算法，也不带 BCD 转换，这跟 HAL 库不一样）。读之前要保证 RTC 已经 RTC_WaitForSynchro 并且上一次写已完成。",
+      "prerequisites": [
+        "RTC 已初始化并运行，且已完成 RTC_WaitForSynchro",
+        "上一次对 RTC 寄存器的写操作已完成（RTC_WaitForLastTask）"
+      ],
+      "registers": [
+        "RTC_CNT"
+      ],
+      "relatedFunctions": [
+        "RTC_SetCounter",
+        "RTC_GetDivider",
+        "RTC_WaitForSynchro",
+        "RTC_WaitForLastTask"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "SPL 的 RTC 只有 32 位秒计数器，没有日历/BCD 寄存器（那是 HAL 库的 RTC），年月日要自己算或自己定基准时间",
+        "在 RTC_EnterConfigMode 期间计数器停止，此时读到的值不变化，容易误判为\"读函数坏了\"",
+        "连续读两次可能差 1 秒，这是正常的跨秒边界效应；要精确读取可以先读 MSB 再读 LSB 或用秒中断同步",
+        "上电后马上读可能返回 0，因为还没 RTC_WaitForSynchro"
+      ],
+      "exampleCode": "/* 读取当前时间（秒） */\nuint32_t ts = RTC_GetCounter();\n\n/* SPL 没有日历换算，需要自己算 */\nuint16_t hour = (ts % 86400) / 3600;\nuint16_t min  = (ts % 3600) / 60;\nuint16_t sec  = ts % 60;",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RTC",
+        "RTC_EnterConfigMode",
+        "RTC_WaitForLastTask",
+        "RTC_WaitForSynchro"
+      ],
+      "headerLine": 106,
+      "sourceLine": 133,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RTC_SetCounter",
+      "name": "RTC_SetCounter",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec4",
+      "prototype": "void RTC_SetCounter(uint32_t CounterValue);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "CounterValue",
+          "type": "uint32_t",
+          "descEn": "RTC counter new value.",
+          "descZh": "新的计数器值（uint32_t），单位秒。常用做法是写入 Unix 时间戳，或写入 0 从零开始计时。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Sets the RTC counter value.",
+      "briefZh": "设置 RTC 秒计数器的值。",
+      "usageZh": "用来设定时间基准（比如把 Unix 时间戳写进去，或校时后重新对齐）。**必须在配置模式下调用**，即 RTC_EnterConfigMode → RTC_SetCounter → RTC_ExitConfigMode → RTC_WaitForLastTask。注意写入这一瞬间计数器会被冻结再恢复，如果要精确到秒，最好配合秒中断或在校时后清掉秒中断标志。",
+      "prerequisites": [
+        "RTC 已使能运行，且已 RTC_WaitForSynchro",
+        "已调用 RTC_EnterConfigMode 进入配置模式",
+        "调用前先 RTC_WaitForLastTask"
+      ],
+      "registers": [
+        "RTC_CNT",
+        "RTC_CRL"
+      ],
+      "relatedFunctions": [
+        "RTC_EnterConfigMode",
+        "RTC_ExitConfigMode",
+        "RTC_GetCounter",
+        "RTC_WaitForLastTask",
+        "RTC_SetAlarm"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "不在配置模式下调用，写入完全无效且没有任何报错——这是 RTC 最典型的坑",
+        "写入后必须 RTC_WaitForLastTask()，否则紧接着读 RTC_GetCounter 可能拿到旧值",
+        "改计数器不会自动重算闹钟；如果闹钟值小于新计数值，闹钟会立刻触发一次（或一直不触发），一般要同时重设 RTC_SetAlarm",
+        "掉电后 RTC 由 VBAT 供电继续走时，重新上电不要盲目清零，先判断备份域魔数再决定是否重设",
+        "RTC_SetCounter 只是 32 位秒数，没有日历字段，年月日自己在软件里换算"
+      ],
+      "exampleCode": "#define RTC_BASE_2024  1704067200u   /* 2024-01-01 00:00:00 UTC */\n\nRTC_WaitForLastTask();\nRTC_EnterConfigMode();\nRTC_SetCounter(RTC_BASE_2024);   /* 设定时间基准 */\nRTC_SetAlarm(RTC_BASE_2024 + 60);/* 基准后 60 秒闹钟 */\nRTC_ExitConfigMode();\nRTC_WaitForLastTask();\n\n/* 读回校验 */\nif (RTC_GetCounter() >= RTC_BASE_2024) { /* 设定成功 */ }",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RTC",
+        "RTC_EnterConfigMode",
+        "RTC_ExitConfigMode",
+        "RTC_GetCounter",
+        "RTC_SetAlarm",
+        "RTC_WaitForLastTask",
+        "RTC_WaitForSynchro"
+      ],
+      "headerLine": 107,
+      "sourceLine": 145,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RTC_SetPrescaler",
+      "name": "RTC_SetPrescaler",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec4",
+      "prototype": "void RTC_SetPrescaler(uint32_t PrescalerValue);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "PrescalerValue",
+          "type": "uint32_t",
+          "descEn": "RTC prescaler new value.",
+          "descZh": "预分频值（uint32_t），实际分频系数是 PrescalerValue + 1。LSE 32768Hz 填 32767；LSI 约 40kHz 填 39999。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Sets the RTC prescaler value.",
+      "briefZh": "设置 RTC 的预分频值，决定计数器递增的频率。",
+      "usageZh": "把 RTC 时钟源分频成 1Hz。计算公式是 **分频后的频率 = RTC 时钟 / (PrescalerValue + 1)**，所以想让计数器每秒加 1，写进去的值应该是 时钟频率 - 1。用 LSE（32768Hz）时填 32767；用 LSI（约 40000Hz）时填 39999（但 LSI 不准，走时误差较大）。**必须在配置模式下调用**，且**只能在备份域复位后的第一次 RTC 初始化时设置**——RTC_PRL 在正常走时状态下不接受修改，即使进了配置模式，后续想改分频通常也需要先做备份域复位重新初始化。",
+      "prerequisites": [
+        "RTC 时钟源已选好并使能：RCC_RTCCLKConfig + RCC_RTCCLKCmd(ENABLE)",
+        "已调用 RTC_WaitForSynchro 与 RTC_WaitForLastTask",
+        "已进入配置模式 RTC_EnterConfigMode"
+      ],
+      "registers": [
+        "RTC_PRL",
+        "RTC_CRL"
+      ],
+      "relatedFunctions": [
+        "RTC_EnterConfigMode",
+        "RTC_ExitConfigMode",
+        "RTC_WaitForLastTask",
+        "RCC_RTCCLKConfig",
+        "BKP_DeInit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "公式是 **时钟频率 /(值+1)**，少减 1 会让时钟快约 30ppm，一天差好几秒",
+        "没接 32.768kHz 晶振时，用内部 LSI（约 40kHz，实际 30~60kHz 且随温度漂移）分频，走时误差很大，做时钟会明显不准",
+        "分频值在正常走时状态下无法修改，想改必须先备份域复位（BKP_DeInit 或 RCC_BackupResetCmd）再重新初始化整个 RTC",
+        "不在配置模式下写，值不会生效",
+        "改分频不会自动重算计数器，改完最好同时重设 RTC_SetCounter"
+      ],
+      "exampleCode": "/* 首次初始化 RTC：LSE 32768Hz 分频为 1Hz */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);\nRCC_LSEConfig(RCC_LSE_ON);\nwhile (RCC_GetFlagStatus(RCC_FLAG_LSERDY) == RESET) { }\nRCC_RTCCLKConfig(RCC_RTCCLKSource_LSE);\nRCC_RTCCLKCmd(ENABLE);\n\nRTC_WaitForSynchro();\nRTC_WaitForLastTask();\nRTC_EnterConfigMode();\nRTC_SetPrescaler(32767);   /* 32768 / (32767+1) = 1Hz */\nRTC_ExitConfigMode();\nRTC_WaitForLastTask();",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "BKP_DeInit",
+        "ENABLE",
+        "PWR_BackupAccessCmd",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_BKP",
+        "RCC_APB1Periph_PWR",
+        "RCC_BackupResetCmd",
+        "RCC_FLAG_LSERDY",
+        "RCC_GetFlagStatus",
+        "RCC_LSEConfig",
+        "RCC_LSE_ON",
+        "RCC_RTCCLKCmd",
+        "RCC_RTCCLKConfig",
+        "RCC_RTCCLKSource_LSE",
+        "RESET",
+        "RTC",
+        "RTC_EnterConfigMode",
+        "RTC_ExitConfigMode",
+        "RTC_SetCounter",
+        "RTC_WaitForLastTask",
+        "RTC_WaitForSynchro"
+      ],
+      "headerLine": 108,
+      "sourceLine": 160,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RTC_SetAlarm",
+      "name": "RTC_SetAlarm",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec4",
+      "prototype": "void RTC_SetAlarm(uint32_t AlarmValue);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "AlarmValue",
+          "type": "uint32_t",
+          "descEn": "RTC alarm new value.",
+          "descZh": "闹钟值（uint32_t），即与 RTC_CNT 比较的秒数。应设为\"当前计数值 + 期望延时秒数\"。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Sets the RTC alarm value.",
+      "briefZh": "设置 RTC 闹钟值，计数器等于该值时触发闹钟。",
+      "usageZh": "闹钟是精确到秒的一次性／周期性事件：当 RTC_CNT == RTC_ALR 时置位闹钟标志，若已 RTC_ITConfig(RTC_IT_ALR, ENABLE) 则产生中断，并同时触发 EXTI_Line17。**STANDBY/STOP 模式下 RTC 闹钟是极少数可用的唤醒源之一**，常用于\"定时唤醒采集一次再睡\"的低功耗设计。设置时要在配置模式下，且**闹钟值应大于当前计数值**，否则要等 32 位计数器回绕才会触发（约 136 年）。要周期性闹钟，需要在中断里重新设置下一次的闹钟值。",
+      "prerequisites": [
+        "RTC 已初始化并在走时（分频已设为 1Hz）",
+        "已 RTC_ITConfig(RTC_IT_ALR, ENABLE) 和 NVIC_Init(RTCAlarm_IRQn) —— 若是靠中断唤醒",
+        "已进入配置模式 RTC_EnterConfigMode"
+      ],
+      "registers": [
+        "RTC_ALR",
+        "RTC_CRL"
+      ],
+      "relatedFunctions": [
+        "RTC_GetCounter",
+        "RTC_ITConfig",
+        "RTC_GetITStatus",
+        "RTC_ClearITPendingBit",
+        "RTC_EnterConfigMode",
+        "PWR_EnterSTANDBYMode"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "闹钟值必须大于当前 RTC_GetCounter()，否则要等 32 位计数器溢出（约 136 年）才会触发；直接写 0 常被误以为\"闹钟坏了\"",
+        "闹钟是一次性的，周期闹钟必须在中断里重新 RTC_SetAlarm，忘了就只响一次",
+        "闹钟中断走 RTCAlarm_IRQn 并同时置位 EXTI_Line17，中断服务函数里两个挂起位都要清",
+        "不在配置模式下调用，写入无效",
+        "STANDBY 模式下 RTC 闹钟可以唤醒芯片，但唤醒后是复位重启；STOP 模式下可以从中断返回继续执行——按需求选模式",
+        "用 LSI 作为 RTC 时钟时，闹钟间隔误差会很大，不适合做精确定时"
+      ],
+      "exampleCode": "/* 10 秒后闹钟唤醒一次（低功耗定时上报场景） */\nRTC_WaitForLastTask();\nRTC_EnterConfigMode();\nRTC_SetAlarm(RTC_GetCounter() + 10);   /* 必须大于当前计数值 */\nRTC_ExitConfigMode();\nRTC_WaitForLastTask();\n\n/* 周期闹钟：在中断里重新装下一次 */\nvoid RTCAlarm_IRQHandler(void)\n{\n  if (RTC_GetITStatus(RTC_IT_ALR) != RESET)\n  {\n    RTC_ClearITPendingBit(RTC_IT_ALR);\n    RTC_WaitForLastTask();\n\n    RTC_WaitForLastTask();\n    RTC_EnterConfigMode();\n    RTC_SetAlarm(RTC_GetCounter() + 10);  /* 装下一次，间隔 10s */\n    RTC_ExitConfigMode();\n    RTC_WaitForLastTask();\n  }\n  EXTI_ClearITPendingBit(EXTI_Line17);\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "EXTI_ClearITPendingBit",
+        "EXTI_Line17",
+        "NVIC_Init",
+        "RESET",
+        "RTC",
+        "RTC_ClearITPendingBit",
+        "RTC_EnterConfigMode",
+        "RTC_ExitConfigMode",
+        "RTC_GetCounter",
+        "RTC_GetITStatus",
+        "RTC_ITConfig",
+        "RTC_IT_ALR",
+        "RTC_WaitForLastTask"
+      ],
+      "headerLine": 109,
+      "sourceLine": 178,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RTC_GetDivider",
+      "name": "RTC_GetDivider",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec3",
+      "prototype": "uint32_t RTC_GetDivider(void);",
+      "returnType": "uint32_t",
+      "params": [],
+      "returnDescEn": "RTC Divider value.",
+      "returnDescZh": "返回 RTC 分频余数计数器的值（uint32_t），范围取决于 RTC_SetPrescaler 设置的分频值。",
+      "briefEn": "Gets the RTC divider value.",
+      "briefZh": "读取 RTC 的预分频余数计数器（DIV）当前值。",
+      "usageZh": "返回的是分频器里剩下的计数，取值范围 0 ~ (PRL+1)。用途主要是：**获得比 1 秒更高的时间分辨率**（例如用 LSE 32768 分频时，DIV 每减 1 约 30.5us，可以算出一个更精确的亚秒时间戳）；或者检查 RTC 是否真的在走时（连续读两次 DIV 应该不同）。",
+      "prerequisites": [
+        "RTC 已初始化并运行",
+        "已设置过分频值（RTC_SetPrescaler），否则 DIV 的含义不确定"
+      ],
+      "registers": [
+        "RTC_DIV"
+      ],
+      "relatedFunctions": [
+        "RTC_GetCounter",
+        "RTC_SetPrescaler"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "DIV 是递减的（从 PRL+1 递减到 0），不是递增，做小数秒换算时方向别搞反",
+        "DIV 的值域取决于 RTC_SetPrescaler 的设置，PRL 为 32767 时范围是 0~32767",
+        "在配置模式下 RTC 停走，DIV 不变化",
+        "读 DIV 不保证与 RTC_GetCounter 严格同时刻，要求高精度时应以 DIV 为主做插值"
+      ],
+      "exampleCode": "/* 用 DIV 算亚秒精度：LSE 32768Hz，分频 PRL=32767 时 1Hz */\nuint32_t sec = RTC_GetCounter();\nuint32_t div = RTC_GetDivider();\n\n/* 小数秒比例：div 从 PRL+1 递减到 0 */\nfloat frac = 1.0f - (float)div / 32768.0f;\n\n/* 判活：连续两次读 DIV 应不同，若相同说明 RTC 没在走 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RTC",
+        "RTC_GetCounter",
+        "RTC_SetPrescaler"
+      ],
+      "headerLine": 110,
+      "sourceLine": 193,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RTC_WaitForLastTask",
+      "name": "RTC_WaitForLastTask",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec2",
+      "prototype": "void RTC_WaitForLastTask(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Waits until last write operation on RTC registers has finished.",
+      "briefZh": "等待上一次对 RTC 寄存器的写操作完成（等待 RTOFF 位置位）。",
+      "usageZh": "RTC 寄存器运行在 32.768kHz 的慢时钟域，APB 写进去的命令要几个 RTC 时钟周期才能生效。**按库的注释：任何一次写 RTC 寄存器之前都要调用本函数**。实际工程里的固定套路是\"写前等一次、写后再等一次\"：RTC_WaitForLastTask() → 写操作 → RTC_WaitForLastTask()。省略它会出现\"写了但没生效\"或\"读回旧值\"的间歇性故障，而且很难复现。",
+      "prerequisites": [
+        "RTC 时钟已使能（APB 时钟必须开着，否则 RTOFF 永远等不到）"
+      ],
+      "registers": [
+        "RTC_CRL"
+      ],
+      "relatedFunctions": [
+        "RTC_WaitForSynchro",
+        "RTC_EnterConfigMode",
+        "RTC_SetCounter",
+        "RTC_SetAlarm",
+        "RTC_SetPrescaler"
+      ],
+      "remarks": [
+        "This function must be called before any write to RTC registers."
+      ],
+      "notesZh": [
+        "本函数是**死等循环**，如果 RTC 时钟没开（APB 时钟被关或 RTC 没使能），会永久卡在这里——程序表现为卡死在某一行",
+        "省掉\"写后再等\"这一步，紧接着的写/读可能被丢弃，故障是间歇性的、难以复现",
+        "不要在中断里长时间调用它，若 RTC 时钟异常会拖死整个中断",
+        "调试时如果发现程序卡在 RTC_WaitForLastTask，第一个要查的就是 RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE) 和 RCC_RTCCLKCmd(ENABLE) 是否都调了"
+      ],
+      "exampleCode": "/* 修改 RTC 寄存器的推荐模板 */\nRTC_WaitForLastTask();     /* 1. 等上一次写完成 */\nRTC_EnterConfigMode();     /* 2. 进入配置模式 */\nRTC_SetCounter(0);         /* 3. 写寄存器 */\nRTC_ExitConfigMode();      /* 4. 退出配置模式 */\nRTC_WaitForLastTask();     /* 5. 再等本次写完成（关键，别省） */\n\n/* 之后读计数器才是可靠值 */\nuint32_t sec = RTC_GetCounter();",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_BKP",
+        "RCC_APB1Periph_PWR",
+        "RCC_RTCCLKCmd",
+        "RTC",
+        "RTC_EnterConfigMode",
+        "RTC_ExitConfigMode",
+        "RTC_GetCounter",
+        "RTC_SetCounter"
+      ],
+      "headerLine": 111,
+      "sourceLine": 207,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RTC_WaitForSynchro",
+      "name": "RTC_WaitForSynchro",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec2",
+      "prototype": "void RTC_WaitForSynchro(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Waits until the RTC registers (RTC_CNT, RTC_ALR and RTC_PRL) are synchronized with RTC APB clock.",
+      "briefZh": "等待 RTC 的 CNT/ALR/PRL 寄存器与 APB 时钟同步（等待 RSF 位置位）。",
+      "usageZh": "RTC 寄存器在两个时钟域之间传递，**APB 复位后或 APB 时钟停止后又重新开启时，必须先调用本函数等 RSF 置位，才能读 RTC 寄存器**。首次上电配置 RTC 时必须调用，否则读 RTC_CNT 可能拿到全 0 或旧值。退出 STOP/STANDBY 唤醒之后，如果 APB 时钟被重新初始化过，也要再调一次。",
+      "prerequisites": [
+        "RTC 时钟已使能并在运行",
+        "APB1 时钟已开启"
+      ],
+      "registers": [
+        "RTC_CRL"
+      ],
+      "relatedFunctions": [
+        "RTC_WaitForLastTask",
+        "RTC_GetCounter",
+        "RCC_RTCCLKCmd"
+      ],
+      "remarks": [
+        "This function must be called before any read operation after an APB reset or an APB clock stop."
+      ],
+      "notesZh": [
+        "首次上电配置 RTC 时必须调用，否则 RTC_GetCounter 读回 0，看起来像\"RTC 不走时\"",
+        "如果不接 LSE 晶振（C8T6 最小系统板常缺 32.768kHz 晶振），RCC_GetFlagStatus(RCC_FLAG_LSERDY) 永远不置位会死循环；应改用 RCC_RTCCLKSource_LSI 作为时钟源",
+        "本函数同样是死等循环，RTC 时钟没跑起来就会卡死",
+        "从 STOP 模式唤醒后如果重新初始化了 APB 时钟，要再次调用它"
+      ],
+      "exampleCode": "/* 首次配置 RTC 时：等 LSE 起振 -> 选时钟源 -> 使能 -> 等同步 -> 配置 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);\n\nRCC_LSEConfig(RCC_LSE_ON);\nwhile (RCC_GetFlagStatus(RCC_FLAG_LSERDY) == RESET) { }  /* 等晶振起振 */\n\nRCC_RTCCLKConfig(RCC_RTCCLKSource_LSE);\nRCC_RTCCLKCmd(ENABLE);\n\nRTC_WaitForSynchro();     /* 关键：不等 RSF 就读寄存器会读到无效值 */\nRTC_WaitForLastTask();\n\nRTC_EnterConfigMode();\nRTC_SetPrescaler(32767);  /* 32768/(32767+1) = 1Hz */\nRTC_SetCounter(0);\nRTC_ExitConfigMode();\nRTC_WaitForLastTask();",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "PWR_BackupAccessCmd",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_BKP",
+        "RCC_APB1Periph_PWR",
+        "RCC_FLAG_LSERDY",
+        "RCC_GetFlagStatus",
+        "RCC_LSEConfig",
+        "RCC_LSE_ON",
+        "RCC_RTCCLKCmd",
+        "RCC_RTCCLKConfig",
+        "RCC_RTCCLKSource_LSE",
+        "RCC_RTCCLKSource_LSI",
+        "RESET",
+        "RTC",
+        "RTC_EnterConfigMode",
+        "RTC_ExitConfigMode",
+        "RTC_GetCounter",
+        "RTC_SetCounter",
+        "RTC_SetPrescaler",
+        "RTC_WaitForLastTask"
+      ],
+      "headerLine": 112,
+      "sourceLine": 223,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RTC_GetFlagStatus",
+      "name": "RTC_GetFlagStatus",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec5",
+      "prototype": "FlagStatus RTC_GetFlagStatus(uint16_t RTC_FLAG);",
+      "returnType": "FlagStatus",
+      "params": [
+        {
+          "name": "RTC_FLAG",
+          "type": "uint16_t",
+          "descEn": "specifies the flag to check. This parameter can be one the following values:",
+          "descZh": "要查询的标志：RTC_FLAG_RSF（寄存器同步完成）、RTC_FLAG_SEC（秒）、RTC_FLAG_ALR（闹钟）、RTC_FLAG_OW（溢出）、RTC_FLAG_RTOFF（写操作完成）。"
+        }
+      ],
+      "returnDescEn": "The new state of RTC_FLAG (SET or RESET).",
+      "returnDescZh": "返回 FlagStatus：SET 表示标志已置位，RESET 表示未置位。",
+      "briefEn": "Checks whether the specified RTC flag is set or not.",
+      "briefZh": "查询指定的 RTC 标志是否置位。",
+      "usageZh": "可查询的标志有：RTC_FLAG_RSF（寄存器已同步）、RTC_FLAG_SEC（秒标志）、RTC_FLAG_ALR（闹钟标志）、RTC_FLAG_OW（溢出）、RTC_FLAG_RTOFF（上一次写完成）。轮询式实现里常用 RTC_FLAG_SEC 做秒计时，或用 RTC_FLAG_RTOFF 自己实现等待逻辑。与 RTC_GetITStatus 的区别在于本函数是顶层的统一入口。",
+      "prerequisites": [
+        "RTC 时钟已使能并在运行"
+      ],
+      "registers": [
+        "RTC_CRL"
+      ],
+      "relatedFunctions": [
+        "RTC_ClearFlag",
+        "RTC_GetITStatus",
+        "RTC_WaitForSynchro",
+        "RTC_WaitForLastTask"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "RTC_FLAG_SEC 置位后要及时清（RTC_ClearFlag），否则轮询逻辑会一直判定为\"刚过一秒\"",
+        "RTC_FLAG_RSF 在 APB 复位或时钟重启后才会清零，正常运行时一直是 SET，不要用它做循环等待条件",
+        "查标志和 RTC_GetITStatus 查的是同一批位，混用容易出现\"清了没生效\"的错觉",
+        "清标志属于写 RTC 寄存器，清完要 RTC_WaitForLastTask"
+      ],
+      "exampleCode": "/* 轮询方式等待闹钟到达 */\nwhile (RTC_GetFlagStatus(RTC_FLAG_ALR) == RESET)\n{\n  /* 等待中，可以顺便做点别的事 */\n}\nRTC_ClearFlag(RTC_FLAG_ALR);\nRTC_WaitForLastTask();\n\n/* 检查 RTC 是否已完成同步 */\nif (RTC_GetFlagStatus(RTC_FLAG_RSF) == RESET)\n{\n  RTC_WaitForSynchro();\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FlagStatus",
+        "RESET",
+        "RTC",
+        "RTC_ClearFlag",
+        "RTC_FLAG_ALR",
+        "RTC_FLAG_OW",
+        "RTC_FLAG_RSF",
+        "RTC_FLAG_RTOFF",
+        "RTC_FLAG_SEC",
+        "RTC_GetITStatus",
+        "RTC_WaitForLastTask",
+        "RTC_WaitForSynchro",
+        "SET"
+      ],
+      "headerLine": 113,
+      "sourceLine": 244,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RTC_ClearFlag",
+      "name": "RTC_ClearFlag",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec5",
+      "prototype": "void RTC_ClearFlag(uint16_t RTC_FLAG);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RTC_FLAG",
+          "type": "uint16_t",
+          "descEn": "specifies the flag to clear. This parameter can be any combination of the following values:",
+          "descZh": "要清除的标志，可以是 RTC_FLAG_SEC、RTC_FLAG_ALR、RTC_FLAG_OW 的按位或组合。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Clears the RTC's pending flags.",
+      "briefZh": "清除 RTC 的挂起标志。",
+      "usageZh": "清除秒标志（RTC_FLAG_SEC）、闹钟标志（RTC_FLAG_ALR）、溢出标志（RTC_FLAG_OW）等。可以用按位或一次清多个。注意 RTC_FLAG_RSF 和 RTC_FLAG_RTOFF 是硬件状态位，不由软件清除。清完记得 RTC_WaitForLastTask。",
+      "prerequisites": [
+        "RTC 时钟已使能并在运行"
+      ],
+      "registers": [
+        "RTC_CRL"
+      ],
+      "relatedFunctions": [
+        "RTC_GetFlagStatus",
+        "RTC_ClearITPendingBit",
+        "RTC_WaitForLastTask"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "RTC_FLAG_RSF（同步完成）和 RTC_FLAG_RTOFF（写完成）是硬件控制的，传给本函数不会有效果",
+        "漏清 SEC 标志会让轮询逻辑每次都判为成立，任务被反复执行",
+        "清除后必须 RTC_WaitForLastTask()，否则紧接着的读可能看到旧标志",
+        "如果同一个事件既用了中断方式又用了轮询，标志会被两边互抢，最好只选一种"
+      ],
+      "exampleCode": "/* 清掉闹钟和秒标志 */\nRTC_ClearFlag(RTC_FLAG_ALR | RTC_FLAG_SEC);\nRTC_WaitForLastTask();\n\n/* 轮询秒标志的标准写法 */\nwhile (1)\n{\n  if (RTC_GetFlagStatus(RTC_FLAG_SEC) != RESET)\n  {\n    RTC_ClearFlag(RTC_FLAG_SEC);\n    RTC_WaitForLastTask();\n    /* 每秒执行一次的任务 */\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RESET",
+        "RTC",
+        "RTC_FLAG_ALR",
+        "RTC_FLAG_OW",
+        "RTC_FLAG_RSF",
+        "RTC_FLAG_RTOFF",
+        "RTC_FLAG_SEC",
+        "RTC_GetFlagStatus",
+        "RTC_WaitForLastTask"
+      ],
+      "headerLine": 114,
+      "sourceLine": 273,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RTC_GetITStatus",
+      "name": "RTC_GetITStatus",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec1",
+      "prototype": "ITStatus RTC_GetITStatus(uint16_t RTC_IT);",
+      "returnType": "ITStatus",
+      "params": [
+        {
+          "name": "RTC_IT",
+          "type": "uint16_t",
+          "descEn": "specifies the RTC interrupts sources to check. This parameter can be one of the following values:",
+          "descZh": "要查询的中断源：RTC_IT_SEC、RTC_IT_ALR、RTC_IT_OW 之一（本函数只判断单个源）。"
+        }
+      ],
+      "returnDescEn": "The new state of the RTC_IT (SET or RESET).",
+      "returnDescZh": "返回 ITStatus：SET 表示该中断已发生，RESET 表示未发生。",
+      "briefEn": "Checks whether the specified RTC interrupt has occurred or not.",
+      "briefZh": "查询指定的 RTC 中断标志是否置位。",
+      "usageZh": "在 RTC_IRQHandler / RTCAlarm_IRQHandler 里判断本次是哪种中断源（秒、闹钟、溢出）。闹钟中断服务函数名固定是 RTCAlarm_IRQHandler，秒中断是 RTC_IRQHandler。判断完必须清标志并 RTC_WaitForLastTask，否则会反复进中断。",
+      "prerequisites": [
+        "已使能对应的 RTC 中断：RTC_ITConfig(RTC_IT_ALR, ENABLE)",
+        "已 NVIC_Init 使能 RTCAlarm_IRQn / RTC_IRQn 通道"
+      ],
+      "registers": [
+        "RTC_CRL"
+      ],
+      "relatedFunctions": [
+        "RTC_ITConfig",
+        "RTC_ClearITPendingBit",
+        "RTC_WaitForLastTask",
+        "RTC_GetFlagStatus"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "只读标志不清标志，中断会一直重复触发，表现为主循环停滞",
+        "清标志之后要 RTC_WaitForLastTask()，否则紧接着的操作可能丢失",
+        "闹钟还连着 EXTI_Line17，如果 EXTI 的挂起位没清，EXTI 侧也会反复触发",
+        "RTC_GetITStatus 查的是中断标志，与 RTC_GetFlagStatus 查的标志位是同一批位的不同封装，别混用造成重复处理"
+      ],
+      "exampleCode": "void RTCAlarm_IRQHandler(void)\n{\n  if (RTC_GetITStatus(RTC_IT_ALR) != RESET)\n  {\n    RTC_ClearITPendingBit(RTC_IT_ALR);\n    RTC_WaitForLastTask();\n    /* 处理闹钟事件 */\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "EXTI",
+        "EXTI_Line17",
+        "ITStatus",
+        "NVIC_Init",
+        "RESET",
+        "RTC",
+        "RTC_ClearITPendingBit",
+        "RTC_GetFlagStatus",
+        "RTC_ITConfig",
+        "RTC_IT_ALR",
+        "RTC_IT_OW",
+        "RTC_IT_SEC",
+        "RTC_WaitForLastTask",
+        "SET"
+      ],
+      "headerLine": 115,
+      "sourceLine": 291,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "RTC_ClearITPendingBit",
+      "name": "RTC_ClearITPendingBit",
+      "peripheral": "RTC",
+      "sectionId": "RTC#sec1",
+      "prototype": "void RTC_ClearITPendingBit(uint16_t RTC_IT);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "RTC_IT",
+          "type": "uint16_t",
+          "descEn": "specifies the interrupt pending bit to clear. This parameter can be any combination of the following values:",
+          "descZh": "要清除的中断挂起位，可以是 RTC_IT_SEC、RTC_IT_ALR、RTC_IT_OW 的按位或组合。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Clears the RTC's interrupt pending bits.",
+      "briefZh": "清除 RTC 中断挂起标志。",
+      "usageZh": "在 RTC 中断服务函数中处理完业务后调用，清掉对应的挂起位。可以按位或一次清多个（如 RTC_IT_ALR | RTC_IT_SEC）。清完记得 RTC_WaitForLastTask。",
+      "prerequisites": [
+        "已使能对应的 RTC 中断并进入中断服务函数"
+      ],
+      "registers": [
+        "RTC_CRL"
+      ],
+      "relatedFunctions": [
+        "RTC_GetITStatus",
+        "RTC_ITConfig",
+        "RTC_WaitForLastTask",
+        "RTC_ClearFlag"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "这是一个写 RTC_CRL 的操作，清完必须 RTC_WaitForLastTask()，否则后续对 RTC 的操作可能丢失",
+        "漏清标志会让中断反复进入，程序看起来像卡死在中断里",
+        "若同时使能了秒中断和闹钟中断，两者都会进 RTC_IRQHandler，必须在函数里逐个判断并分别清除",
+        "闹钟还会置位 EXTI_Line17 的挂起位，若开了 EXTI 中断，要额外 EXTI_ClearITPendingBit(EXTI_Line17)"
+      ],
+      "exampleCode": "void RTC_IRQHandler(void)\n{\n  /* 秒中断与闹钟中断共用同一个处理函数 */\n  if (RTC_GetITStatus(RTC_IT_SEC) != RESET)\n  {\n    RTC_ClearITPendingBit(RTC_IT_SEC);\n    RTC_WaitForLastTask();\n  }\n  if (RTC_GetITStatus(RTC_IT_ALR) != RESET)\n  {\n    RTC_ClearITPendingBit(RTC_IT_ALR);\n    RTC_WaitForLastTask();\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "EXTI",
+        "EXTI_ClearITPendingBit",
+        "EXTI_Line17",
+        "RESET",
+        "RTC",
+        "RTC_GetITStatus",
+        "RTC_IT_ALR",
+        "RTC_IT_OW",
+        "RTC_IT_SEC",
+        "RTC_WaitForLastTask"
+      ],
+      "headerLine": 116,
+      "sourceLine": 318,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    }
+  ]
+}

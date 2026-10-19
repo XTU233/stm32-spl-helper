@@ -1,0 +1,251 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show rootBundle;
+
+import '../models/chip.dart';
+import '../models/compile_error.dart';
+import '../models/function_item.dart';
+import '../models/manifest.dart';
+import '../models/peripheral.dart';
+import '../models/pin.dart';
+import '../models/spl_data.dart';
+import '../models/symbol_item.dart';
+
+/// 数据加载失败时抛出的异常。
+///
+/// 页面捕获它并显示友好提示，避免白屏（需求：assets 加载失败要有友好提示）。
+class AssetLoadException implements Exception {
+  /// 出错的资源路径
+  final String assetPath;
+
+  /// 底层原因
+  final Object? cause;
+
+  const AssetLoadException(this.assetPath, [this.cause]);
+
+  @override
+  String toString() {
+    final base = '数据文件加载失败：$assetPath';
+    return cause == null ? base : '$base\n$cause';
+  }
+}
+
+/// 数据版本不匹配时抛出。数据是重新生成的，需要用户重装或重新生成数据。
+class DataVersionException implements Exception {
+  final int found;
+  final int expected;
+
+  const DataVersionException(this.found, this.expected);
+
+  @override
+  String toString() =>
+      '数据结构版本不匹配：数据为 v$found，APP 需要 v$expected。请重新生成 assets/data。';
+}
+
+// ---------------------------------------------------------------------------
+// 供 compute 使用的顶层解码函数
+//
+// JSON 解析放在独立 isolate 里做，避免 1.5 MB 的 symbols.json 阻塞 UI 线程。
+// compute 要求函数是顶层函数，所以不能写成闭包。
+// ---------------------------------------------------------------------------
+
+Map<String, dynamic> _decodeMap(String source) =>
+    jsonDecode(source) as Map<String, dynamic>;
+
+/// 静态数据仓库。
+///
+/// 分层加载策略（需求：JSON 一次性加载进内存，不要每次进页面都重新读文件）：
+///   - [loadCore]     启动时调用，读 manifest / peripherals / chip / symbols /
+///                    pinout / compile_errors，构建全部内存索引
+///   - [loadFunctions] 进外设详情页时按需读，读过的缓存在内存里
+///   - [loadRegisters] 查看寄存器位域时才读（2.7 MB，不拖慢首屏）
+///
+/// 所有读过的数据都缓存，重复调用不会重复读文件。
+class AssetRepository {
+  /// assets 下数据根目录
+  static const String dataRoot = 'assets/data';
+
+  /// 超过这个大小就用 compute 在独立 isolate 里解析，避免卡 UI。
+  /// 阈值取 200 KB：小文件直接解析更快（省掉 isolate 启动开销）。
+  static const int _computeThreshold = 200 * 1024;
+
+  /// 函数文件缓存：外设 id → 函数包
+  final Map<String, FunctionBundle> _functionCache = {};
+
+  /// 寄存器位定义符号缓存（整包读一次）
+  List<SymbolItem>? _registerSymbols;
+
+  /// 首屏核心数据缓存
+  SplData? _core;
+
+  /// 已加载的核心数据；未加载时为 null。
+  SplData? get cachedCore => _core;
+
+  /// 已缓存的函数包数量（调试用）
+  int get cachedFunctionBundleCount => _functionCache.length;
+
+  // ---- 路径拼接 ----
+
+  /// 拼接 assets 路径，容忍 manifest 里带或不带结尾斜杠。
+  String _asset(String relative) {
+    final rel = relative.startsWith('/') ? relative.substring(1) : relative;
+    return '$dataRoot/$rel';
+  }
+
+  /// 把 manifest 里的目录项与文件名拼起来，如 "chips/" + "xxx" + ".json"。
+  String _join(String dir, String name, String ext) {
+    var d = dir;
+    if (d.endsWith('/')) d = d.substring(0, d.length - 1);
+    return d.isEmpty ? '$name$ext' : '$d/$name$ext';
+  }
+
+  // ---- 底层读取 ----
+
+  /// 读取并解析一个 JSON 对象文件。
+  ///
+  /// 大文件走 compute 在独立 isolate 解析。失败时抛 [AssetLoadException]。
+  Future<Map<String, dynamic>> _loadJson(String relative) async {
+    final path = _asset(relative);
+    try {
+      final source = await rootBundle.loadString(path);
+      if (source.length >= _computeThreshold) {
+        return await compute(_decodeMap, source);
+      }
+      return _decodeMap(source);
+    } on FlutterError catch (e) {
+      // rootBundle 找不到资源时抛 FlutterError
+      throw AssetLoadException(path, e);
+    } on FormatException catch (e) {
+      // JSON 语法错误
+      throw AssetLoadException(path, e);
+    }
+  }
+
+  // ---- 核心数据 ----
+
+  /// 加载首屏所需的全部核心数据并构建内存索引。
+  ///
+  /// 结果会被缓存，重复调用直接返回同一实例。
+  Future<SplData> loadCore({bool forceReload = false}) async {
+    if (!forceReload && _core != null) return _core!;
+
+    final manifestJson = await _loadJson('manifest.json');
+    final manifest = DataManifest.fromJson(manifestJson);
+
+    // 版本校验：不匹配时明确报错，而不是让页面到处崩
+    if (!manifest.isSchemaCompatible) {
+      throw DataVersionException(
+        manifest.schemaVersion,
+        DataManifest.currentSchemaVersion,
+      );
+    }
+
+    // 外设与函数分组
+    final peripheralBundle =
+        PeripheralBundle.fromJson(await _loadJson('peripherals.json'));
+
+    // 芯片能力
+    final chipDir = manifest.fileOf('chips', fallback: 'chips/');
+    final chipPath = _join(chipDir, manifest.defaultChipId, '.json');
+    final chip = ChipSpec.fromJson(await _loadJson(chipPath));
+
+    // 符号（API 符号，首屏就要建搜索索引）
+    final symbolBundle =
+        SymbolBundle.fromJson(await _loadJson('symbols.json'));
+
+    // 引脚
+    final pinoutPath = manifest.fileOf('pinout', fallback: 'pinout_f103c8t6.json');
+    PinoutData pinout;
+    try {
+      pinout = PinoutData.fromJson(await _loadJson(pinoutPath));
+    } catch (e) {
+      // 引脚数据缺失不该让整个 APP 起不来，降级为空数据
+      debugPrint('[AssetRepository] 引脚数据加载失败，降级为空：$e');
+      pinout = PinoutData(
+        schemaVersion: 1,
+        chipId: manifest.defaultChipId,
+        package: chip.package,
+        source: '',
+        verified: false,
+        verifiedNote: '引脚数据缺失',
+        pins: const [],
+      );
+    }
+
+    // 编译错误
+    final errorPath =
+        manifest.fileOf('compileErrors', fallback: 'compile_errors.json');
+    CompileErrorBundle compileErrors;
+    try {
+      compileErrors = CompileErrorBundle.fromJson(await _loadJson(errorPath));
+    } catch (e) {
+      debugPrint('[AssetRepository] 编译错误数据加载失败，降级为空：$e');
+      compileErrors = const CompileErrorBundle(schemaVersion: 1);
+    }
+
+    // 外设按 orderIndex 排序（首页"按使用频率排序"的依据）
+    final peripherals = List<Peripheral>.from(peripheralBundle.peripherals)
+      ..sort((a, b) {
+        final byOrder = a.orderIndex.compareTo(b.orderIndex);
+        return byOrder != 0 ? byOrder : a.id.compareTo(b.id);
+      });
+
+    // 函数详情不在这里加载（按需读），所以核心数据的 functions 先为空，
+    // 索引里只放外设、符号、引脚、编译错误。
+    final data = SplData(
+      manifest: manifest,
+      chip: chip,
+      peripherals: peripherals,
+      functions: const [],
+      symbols: symbolBundle.symbols,
+      pinout: pinout,
+      compileErrors: compileErrors,
+    );
+    _core = data;
+    return data;
+  }
+
+  // ---- 按需数据 ----
+
+  /// 读取某个外设的函数详情，带缓存。
+  Future<FunctionBundle> loadFunctions(String peripheralId) async {
+    final cached = _functionCache[peripheralId];
+    if (cached != null) return cached;
+
+    final core = _core;
+    // 优先用 manifest 里登记的函数目录
+    final dir = core?.manifest.fileOf('functions', fallback: 'functions/') ??
+        'functions/';
+    final path = _join(dir, peripheralId, '.json');
+
+    final bundle = FunctionBundle.fromJson(await _loadJson(path));
+    _functionCache[peripheralId] = bundle;
+    return bundle;
+  }
+
+  /// 读取寄存器位定义符号（2.7 MB，只在需要时读一次）。
+  Future<List<SymbolItem>> loadRegisterSymbols() async {
+    final cached = _registerSymbols;
+    if (cached != null) return cached;
+
+    final dir = _core?.manifest.fileOf('registers', fallback: 'registers.json') ??
+        'registers.json';
+    try {
+      final bundle = SymbolBundle.fromJson(await _loadJson(dir));
+      _registerSymbols = bundle.symbols;
+    } catch (e) {
+      // 寄存器位定义是增强功能，缺失时降级为空而不是报错
+      debugPrint('[AssetRepository] 寄存器位定义加载失败，降级为空：$e');
+      _registerSymbols = const <SymbolItem>[];
+    }
+    return _registerSymbols!;
+  }
+
+  /// 清空缓存（设置页"重新加载数据"用）。
+  void clearCache() {
+    _functionCache.clear();
+    _registerSymbols = null;
+    _core = null;
+  }
+}

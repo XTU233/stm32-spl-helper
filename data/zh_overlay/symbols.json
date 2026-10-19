@@ -1,0 +1,359 @@
+{
+  "_comment": "关键宏与枚举值的中文说明。symbols 里的键必须存在于解析产物中；extraSymbols 用于补充 SPL 源码里没有、但查阅时需要的符号（工程预定义宏等）。membersZh 用于给枚举/结构体成员加中文说明。",
+  "_extraSymbols_comment": "这几个是编译期宏，由用户在工程选项里定义，不属于库文件，所以解析器抓不到，在这里手工补充。",
+  "extraSymbols": {
+    "USE_STDPERIPH_DRIVER": {
+      "kind": "macro",
+      "peripheral": "MISC",
+      "value": "（工程预定义宏，无固定值）",
+      "valueKind": "expression",
+      "definedIn": "工程预定义宏（不在库文件中）",
+      "briefZh": "编译期宏。定义它才会让 stm32f10x.h 去包含 stm32f10x_conf.h，从而启用标准外设库。",
+      "usageZh": "在工程的预定义宏里设置。Keil：Options for Target → C/C++ → Define 填 USE_STDPERIPH_DRIVER, STM32F10X_MD；GCC：CFLAGS 里加 -DUSE_STDPERIPH_DRIVER。",
+      "notesZh": [
+        "不定义它，stm32f10x_conf.h 不会被包含，所有库函数都不可用。",
+        "与 STM32F10X_MD 一起定义，两者缺一不可。"
+      ],
+      "relatedSymbols": ["STM32F10X_MD", "USE_FULL_ASSERT"]
+    },
+    "STM32F10X_MD": {
+      "kind": "macro",
+      "peripheral": "MISC",
+      "value": "（工程预定义宏，无固定值）",
+      "valueKind": "expression",
+      "definedIn": "工程预定义宏（不在库文件中）",
+      "briefZh": "编译期宏，声明目标芯片为中容量产品（64~128KB Flash）。",
+      "usageZh": "STM32F103C8T6 属于中容量，必须定义 STM32F10X_MD。不定义会报 #error「Please select first the target STM32F10x device」。",
+      "notesZh": [
+        "容量档次对照：LD 小容量（16-32KB）、MD 中容量（64-128KB）、HD 大容量（256-512KB）、CL 互联型、XL 超大容量。",
+        "选错档次会导致中断向量表与实际芯片不符，中断无法响应。"
+      ],
+      "relatedSymbols": ["USE_STDPERIPH_DRIVER"]
+    },
+    "USE_FULL_ASSERT": {
+      "kind": "macro",
+      "peripheral": "MISC",
+      "value": "（工程预定义宏，无固定值）",
+      "valueKind": "expression",
+      "definedIn": "工程预定义宏（不在库文件中）",
+      "briefZh": "编译期宏。定义后库函数的 assert_param 会真正检查参数合法性，非法时调用 assert_failed。",
+      "usageZh": "调试阶段建议打开，能立刻定位非法参数（assert_failed 的参数会给出源文件与行号）。发布版本注释掉以节省代码空间。",
+      "notesZh": [
+        "打开后必须自己实现 assert_failed 函数，否则编译报未定义。",
+        "运行中停在 assert_failed 说明传了非法参数，不是 bug 而是参数检查生效了。"
+      ],
+      "relatedSymbols": ["USE_STDPERIPH_DRIVER"]
+    }
+  },
+  "symbols": {
+    "ENABLE": {
+      "briefZh": "使能。传给所有 xxxCmd 类函数的 NewState 参数，表示打开该功能。",
+      "usageZh": "FunctionalState 枚举的两个取值之一（另一个是 DISABLE）。库函数里几乎随处可见。",
+      "notesZh": []
+    },
+    "DISABLE": {
+      "briefZh": "失能。传给 xxxCmd 类函数的 NewState 参数，表示关闭该功能。",
+      "usageZh": "FunctionalState 枚举的两个取值之一（另一个是 ENABLE）。"
+    },
+
+    "GPIO_Mode_AIN": {
+      "briefZh": "模拟输入。引脚直连 ADC，施密特触发器关闭。",
+      "usageZh": "用 ADC 采集电压时，对应引脚必须配成这个模式。此时引脚不带上拉/下拉，输入阻抗高。",
+      "notesZh": ["做 ADC 采集时若误配成浮空输入，读数会漂移不准。"]
+    },
+    "GPIO_Mode_IN_FLOATING": {
+      "briefZh": "浮空输入。引脚电平完全由外部决定，内部无上拉下拉。",
+      "usageZh": "用于接收外部已有明确驱动的信号，如 USART_RX、SPI_MISO、I2C 的 SDA/SCL（配合外部上拉）。",
+      "notesZh": ["引脚悬空时电平不定，读数会随机跳变，按键输入不要用这个模式。"]
+    },
+    "GPIO_Mode_IPD": {
+      "briefZh": "下拉输入。内部接下拉电阻，无外部信号时读到低电平。",
+      "usageZh": "用于按键接 VCC、按下给高电平的场景。",
+      "notesZh": ["内部下拉约 40kΩ，长走线或强干扰环境建议外接下拉。"]
+    },
+    "GPIO_Mode_IPU": {
+      "briefZh": "上拉输入。内部接上拉电阻，无外部信号时读到高电平。",
+      "usageZh": "最常用的按键输入模式——按键一端接 GND，按下读到低电平。也用于 USART_RX 等空闲应为高电平的信号。",
+      "notesZh": ["内部上拉约 40kΩ，反应较慢，高速信号要用外部上拉。"]
+    },
+    "GPIO_Mode_Out_OD": {
+      "briefZh": "开漏输出。只能主动拉低，高电平靠外部上拉电阻。",
+      "usageZh": "用于 I2C 的 SCL/SDA、多设备共享的总线、以及需要电平转换（如 5V 器件）的场合。",
+      "notesZh": ["必须外接上拉电阻，否则永远输出不了高电平。"]
+    },
+    "GPIO_Mode_Out_PP": {
+      "briefZh": "推挽输出。可主动输出高电平和低电平，驱动能力强。",
+      "usageZh": "驱动 LED、继电器、蜂鸣器等最常用。也是 SPI_SCK/MOSI 等复用输出的基础模式。",
+      "notesZh": ["不能把两个推挽输出直接对接，会短路烧引脚。"]
+    },
+    "GPIO_Mode_AF_OD": {
+      "briefZh": "复用开漏输出。引脚交给外设控制，且为开漏形式。",
+      "usageZh": "I2C 的 SCL/SDA 必须用这个模式（配合外部上拉），因为 I2C 总线需要线与功能。",
+      "notesZh": ["用推挽模式驱动 I2C 会导致总线无法仲裁甚至锁死。"]
+    },
+    "GPIO_Mode_AF_PP": {
+      "briefZh": "复用推挽输出。引脚交给外设控制，推挽形式。",
+      "usageZh": "绝大多数复用输出都用它：USART_TX、SPI_SCK/MOSI、TIM_PWM 输出、CAN_TX 等。",
+      "notesZh": [
+        "USART_TX 配成 Out_PP 是常见错误——引脚电平会动，但数据发不出去。",
+        "只有 TX 类（输出方向）的复用信号用 AF_PP；RX 类（输入方向）要配成浮空或上拉输入。"
+      ]
+    },
+
+    "GPIO_Speed_10MHz": {
+      "briefZh": "输出驱动速度 10MHz。",
+      "usageZh": "速度越高，引脚翻转越快但电磁干扰（EMI）越大、功耗越高。按实际需要选最低够用的档位。"
+    },
+    "GPIO_Speed_2MHz": {
+      "briefZh": "输出驱动速度 2MHz（最低档）。",
+      "usageZh": "驱动 LED、继电器等低速负载时用，EMI 最小。",
+      "notesZh": ["输入模式下此项无效，但仍必须赋值。"]
+    },
+    "GPIO_Speed_50MHz": {
+      "briefZh": "输出驱动速度 50MHz（最高档）。",
+      "usageZh": "SPI、高速并口等需要快速翻转的场合。",
+      "notesZh": ["低速负载用 50MHz 会明显增加 EMI 与功耗，没有必要就不要用最高档。"]
+    },
+
+    "GPIO_Pin_All": {
+      "briefZh": "选中端口的全部 16 个引脚（0xFFFF）。",
+      "usageZh": "GPIO_StructInit 的默认值就是它，所以调用 StructInit 后必须显式改 GPIO_Pin，否则会把整个端口都配置掉。",
+      "notesZh": ["这是 GPIO_StructInit 埋下的经典坑。"]
+    },
+
+    "GPIO_Remap_SWJ_JTAGDisable": {
+      "briefZh": "关闭 JTAG，保留 SWD。释放 PA15/PB3/PB4 作普通 IO。",
+      "usageZh": "想把 PA15、PB3、PB4 当普通 IO 或复用为 SPI1/TIM 时使用。PA13/PA14 仍被 SWD 占用，下载能力保留。",
+      "notesZh": ["调用前必须先使能 AFIO 时钟，否则不生效且不报错。"]
+    },
+    "GPIO_Remap_SWJ_Disable": {
+      "briefZh": "完全关闭 SWJ（JTAG + SWD 全部关闭），释放 PA13/PA14/PA15/PB3/PB4 五个引脚。",
+      "usageZh": "极端引脚不够用、且不需要再下载调试时才考虑。",
+      "notesZh": [
+        "危险：执行后下载器再也连不上芯片，必须靠 BOOT0 拉高进 ISP 模式或 Connect Under Reset 才能救回。",
+        "调试阶段绝对不要用，改用 GPIO_Remap_SWJ_JTAGDisable。"
+      ]
+    },
+    "GPIO_Remap_SWJ_NoJTRST": {
+      "briefZh": "保留完整 SWJ，但释放 NJTRST（PB4）。",
+      "usageZh": "只需要 PB4 一个引脚时用它，风险比完全关闭小。"
+    },
+
+    "RCC_APB2Periph_GPIOA": {
+      "briefZh": "APB2 总线上 GPIOA 端口的时钟使能位。",
+      "usageZh": "传给 RCC_APB2PeriphClockCmd 的第一个参数。使用 GPIOA 前必须先使能它，否则 GPIO 配置静默失效。多个外设可位或：RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB。",
+      "notesZh": ["GPIO 全部挂在 APB2 总线上，不要误用 RCC_APB1PeriphClockCmd。"]
+    },
+    "RCC_APB2Periph_AFIO": {
+      "briefZh": "AFIO（复用功能 IO）时钟使能位。",
+      "usageZh": "使用引脚重映射（GPIO_PinRemapConfig）或外部中断线配置（GPIO_EXTILineConfig）前必须使能。",
+      "notesZh": ["忘记开 AFIO 时钟是重映射与 EXTI 不生效的头号原因。"]
+    },
+    "RCC_APB2Periph_USART1": {
+      "briefZh": "APB2 总线上 USART1 的时钟使能位。",
+      "usageZh": "USART1 挂在 APB2（72MHz），而 USART2/3 挂在 APB1（36MHz）。",
+      "notesZh": ["波特率由外设时钟算出，挂错总线会导致波特率错、串口乱码。"]
+    },
+    "RCC_APB1Periph_USART2": {
+      "briefZh": "APB1 总线上 USART2 的时钟使能位。",
+      "usageZh": "用 RCC_APB1PeriphClockCmd 使能。USART2/3 都在 APB1（36MHz）。"
+    },
+    "RCC_APB1Periph_PWR": {
+      "briefZh": "APB1 总线上 PWR 的时钟使能位。",
+      "usageZh": "使用低功耗模式（PWR_EnterSTOPMode 等）或访问备份域（BKP、RTC）前必须使能。",
+      "notesZh": ["用 BKP/RTC 时忘了开 PWR 时钟，会导致写保护无法解除。"]
+    },
+    "RCC_APB1Periph_BKP": {
+      "briefZh": "APB1 总线上 BKP 的时钟使能位。",
+      "usageZh": "读写备份寄存器或配置 RTC 前使能。",
+      "notesZh": ["通常与 RCC_APB1Periph_PWR 一起使能。"]
+    },
+
+    "USART_WordLength_8b": {
+      "briefZh": "数据位 8 位（最常用）。",
+      "usageZh": "串口助手设为 8 数据位时对应此项。"
+    },
+    "USART_StopBits_1": {
+      "briefZh": "停止位 1 位（最常用）。",
+      "usageZh": "串口助手设为 1 停止位时对应此项。"
+    },
+    "USART_Parity_No": {
+      "briefZh": "无校验（最常用）。",
+      "usageZh": "串口助手设为 None 校验时对应此项。"
+    },
+    "USART_Mode_Rx": {
+      "briefZh": "接收模式。",
+      "usageZh": "与 USART_Mode_Tx 位或后赋给 USART_Mode 字段，表示全双工。"
+    },
+    "USART_Mode_Tx": {
+      "briefZh": "发送模式。",
+      "usageZh": "与 USART_Mode_Rx 位或后赋给 USART_Mode 字段，表示全双工。"
+    },
+    "USART_IT_RXNE": {
+      "briefZh": "接收数据寄存器非空中断。收到一个字节时触发。",
+      "usageZh": "接收中断里用 USART_ITConfig(USARTx, USART_IT_RXNE, ENABLE) 开启，处理时读 USART_ReceiveData 会自动清标志。",
+      "notesZh": ["读完 DR 就自动清了 RXNE 标志，不需要手动清。"]
+    },
+    "USART_FLAG_TXE": {
+      "briefZh": "发送数据寄存器空标志。",
+      "usageZh": "轮询发送时用 USART_GetFlagStatus(USARTx, USART_FLAG_TXE) 判断能否写下一个字节。",
+      "notesZh": [
+        "TXE 表示「发送寄存器空」，不代表「数据已发完」。要确认发完用 USART_FLAG_TC。",
+        "连续发送时若不等 TXE 就覆盖 DR，数据会丢失。"
+      ]
+    },
+    "USART_FLAG_TC": {
+      "briefZh": "发送完成标志。整个帧（含停止位）已移出。",
+      "usageZh": "发送完最后一段数据、准备切换 RS485 收发方向或进入低功耗前，必须等 TC 而不是 TXE。",
+      "notesZh": ["TC 需要先读 SR 再写 DR 才会清除，或直接 USART_ClearFlag 清。"]
+    },
+
+    "TIM_IT_Update": {
+      "briefZh": "更新中断（定时器溢出/重装时触发）。",
+      "usageZh": "做定时中断最常用。TIM_ITConfig(TIMx, TIM_IT_Update, ENABLE) 开启，中断里用 TIM_GetITStatus 判断后 TIM_ClearITPendingBit 清除。",
+      "notesZh": ["忘了清标志会导致反复进中断，程序看起来像卡死。"]
+    },
+    "TIM_OCMode_PWM1": {
+      "briefZh": "PWM 模式 1。计数值小于比较值时输出有效电平。",
+      "usageZh": "输出 PWM 时最常用，配合 TIM_OCInitTypeDef 的 TIM_Pulse 控制占空比。"
+    },
+    "TIM_OCPreload_Enable": {
+      "briefZh": "使能输出比较预装载。新占空比在下个更新事件生效。",
+      "usageZh": "调 PWM 占空比时开启它，可以避免改 CCR 的瞬间产生毛刺。"
+    },
+    "TIM_CounterMode_Up": {
+      "briefZh": "向上计数模式（0 计到 Period 再溢出）。",
+      "usageZh": "最常用的定时器计数方式。"
+    },
+
+    "NVIC_PriorityGroup_2": {
+      "briefZh": "中断优先级分组 2：2 位抢占优先级 + 2 位响应优先级。",
+      "usageZh": "最常用的分组方式，抢占优先级 0~3、响应优先级 0~3。整个工程只应在启动时调用一次 NVIC_PriorityGroupConfig。",
+      "notesZh": ["重复设置分组会打乱已有中断的优先级，导致行为异常。"]
+    },
+
+    "EXTI_Trigger_Falling": {
+      "briefZh": "下降沿触发。",
+      "usageZh": "按键一端接 VCC、按下拉低时使用。"
+    },
+    "EXTI_Trigger_Rising": {
+      "briefZh": "上升沿触发。",
+      "usageZh": "按键一端接 GND、按下抬高时使用。"
+    },
+    "EXTI_Mode_Interrupt": {
+      "briefZh": "中断模式。触发时进入中断服务函数。",
+      "usageZh": "与 EXTI_Mode_Event（只产生事件不中断）相对。"
+    },
+
+    "DMA_DIR_PeripheralDST": {
+      "briefZh": "数据传输方向：外设作为目的地（内存 → 外设）。",
+      "usageZh": "串口发送、DAC 输出等场景使用。"
+    },
+    "DMA_DIR_PeripheralSRC": {
+      "briefZh": "数据传输方向：外设作为源（外设 → 内存）。",
+      "usageZh": "ADC 采集、串口接收等场景使用。"
+    },
+    "DMA_Mode_Circular": {
+      "briefZh": "循环模式。传输完一轮后自动重装计数器继续。",
+      "usageZh": "ADC 连续采集、串口不定长接收常用。"
+    },
+    "DMA_Priority_High": {
+      "briefZh": "DMA 通道优先级：高。",
+      "usageZh": "多个通道同时请求时，优先级高的先传。"
+    },
+
+    "ADC_FLAG_EOC": {
+      "briefZh": "规则转换结束标志。",
+      "usageZh": "轮询单次转换时用 ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) 判断转换完成，随后 ADC_GetConversionValue 取值。",
+      "notesZh": ["读取 ConversionValue 会自动清 EOC 标志。"]
+    },
+    "ADC_ExternalTrigConv_None": {
+      "briefZh": "不使用外部触发，只能由软件启动转换。",
+      "usageZh": "ADC_SoftwareStartConvCmd 启动的场合用这个。"
+    },
+    "ADC_SampleTime_55Cycles5": {
+      "briefZh": "采样时间 55.5 个 ADC 时钟周期。",
+      "usageZh": "采样时间越长，对高阻抗信号源越准，但转换越慢。信号源内阻大时选更长的采样时间。",
+      "notesZh": ["采样时间过短会导致读数偏低或跳动，是 ADC 读数不准的常见原因。"]
+    },
+
+    "FLASH_Status": {
+      "briefZh": "Flash 操作返回状态枚举。所有 FLASH_xxx 写操作都返回它。",
+      "usageZh": "取值 FLASH_BUSY / FLASH_ERROR_PG / FLASH_ERROR_WRP / FLASH_COMPLETE / FLASH_TIMEOUT。调用后应检查是否等于 FLASH_COMPLETE。",
+      "notesZh": ["只看返回值不够——写 Flash 前必须确认目标区域已擦除（值为 0xFFFF）。"]
+    },
+
+    "IWDG_Prescaler_64": {
+      "briefZh": "独立看门狗预分频 64。",
+      "usageZh": "IWDG 时钟为 40kHz LSI，预分频 64 后为 625Hz，配合重装值设定超时时间。",
+      "notesZh": ["超时时间 = (4 × 2^预分频) × 重装值 / 40kHz，算错会导致意外复位。"]
+    },
+
+    "Bit_SET": {
+      "briefZh": "位状态：置位（1）。",
+      "usageZh": "BitAction 枚举取值，用于 GPIO_WriteBit 的第三个参数，以及读取引脚电平的比较。"
+    },
+    "Bit_RESET": {
+      "briefZh": "位状态：复位（0）。",
+      "usageZh": "BitAction 枚举取值，用于 GPIO_WriteBit 的第三个参数，以及读取引脚电平的比较。"
+    },
+
+    "FunctionalState": {
+      "briefZh": "功能状态枚举。所有 xxxCmd 类函数的 NewState 参数都是它。",
+      "usageZh": "取值只有 ENABLE 和 DISABLE 两个。"
+    },
+
+    "GPIO_InitTypeDef": {
+      "briefZh": "GPIO 初始化结构体。传给 GPIO_Init 前三个字段必须全部赋值。",
+      "usageZh": "建议先用 GPIO_StructInit 填默认值再改需要的字段，避免栈上随机值导致意外配置。",
+      "membersZh": {
+        "GPIO_Pin": "要配置的引脚，取 GPIO_Pin_x 的按位或（可一次配多个）",
+        "GPIO_Speed": "输出驱动速度，取 GPIOSpeed_TypeDef 枚举；输入模式下无效但仍须赋值",
+        "GPIO_Mode": "工作模式，取 GPIOMode_TypeDef 枚举，决定引脚是输入/输出/复用/模拟"
+      },
+      "notesZh": ["结构体成员在源码里的顺序是 Pin/Speed/Mode，但用字段名赋值就不用管顺序。"]
+    },
+    "GPIOMode_TypeDef": {
+      "briefZh": "GPIO 工作模式枚举，赋给 GPIO_InitTypeDef.GPIO_Mode。",
+      "usageZh": "八种取值覆盖了输入（模拟/浮空/上拉/下拉）与输出（开漏/推挽/复用开漏/复用推挽）。",
+      "notesZh": ["输出类模式名字里带 Out 或 AF；输入类带 IN 或 AIN。选错方向是最常见的配置错误。"]
+    },
+    "GPIOSpeed_TypeDef": {
+      "briefZh": "GPIO 输出速度枚举，赋给 GPIO_InitTypeDef.GPIO_Speed。",
+      "usageZh": "取值 2MHz / 10MHz / 50MHz，按实际需要选最低够用的档位以减小 EMI 与功耗。"
+    },
+    "BitAction": {
+      "briefZh": "位操作枚举，用于 GPIO_WriteBit 的第三个参数。",
+      "usageZh": "Bit_SET 置高、Bit_RESET 置低。传变量时需显式转换 (BitAction)。"
+    },
+    "GPIO_TypeDef": {
+      "briefZh": "GPIO 寄存器组结构体，定义了 CRL/CRH/IDR/ODR/BSRR/BRR/LCKR 等寄存器的内存布局。",
+      "usageZh": "库函数里用 GPIOx 指针访问寄存器，如 GPIOx->ODR。一般不直接操作，用库函数即可。",
+      "notesZh": ["GPIOC 这类宏就是指向该结构体的指针常量，定义在 stm32f10x.h 里。"]
+    },
+    "USART_InitTypeDef": {
+      "briefZh": "USART 初始化结构体，配置波特率、数据位、停止位、校验、流控与模式。",
+      "usageZh": "建议先用 USART_StructInit 填默认值再改需要的字段。",
+      "membersZh": {
+        "USART_BaudRate": "波特率，如 115200。实际值由外设时钟分频得到，时钟错则波特率错",
+        "USART_WordLength": "数据位长度，通常 USART_WordLength_8b",
+        "USART_StopBits": "停止位，通常 USART_StopBits_1",
+        "USART_Parity": "校验位，通常 USART_Parity_No",
+        "USART_Mode": "模式，USART_Mode_Rx | USART_Mode_Tx 为全双工",
+        "USART_HardwareFlowControl": "硬件流控，不用时填 USART_HardwareFlowControl_None"
+      }
+    },
+    "TIM_TimeBaseInitTypeDef": {
+      "briefZh": "定时器时基结构体，配置预分频、计数模式、周期与时钟分频。",
+      "usageZh": "定时频率 = 定时器时钟 / (Prescaler + 1) / (Period + 1)。例如 72MHz、Prescaler=7199、Period=9999 得到 1Hz（1 秒）。",
+      "membersZh": {
+        "TIM_Prescaler": "预分频值，实际分频为 (值+1)，取值 0~65535",
+        "TIM_Period": "自动重装值（ARR），决定计数上限，取值 0~65535（16 位定时器）",
+        "TIM_CounterMode": "计数模式，通常 TIM_CounterMode_Up",
+        "TIM_ClockDivision": "时钟分频，用于数字滤波器，通常 TIM_CKD_DIV1",
+        "TIM_RepetitionCounter": "重复计数（仅高级定时器 TIM1 有效），通用定时器填 0"
+      },
+      "notesZh": ["通用定时器 TIM2/3/4 没有重复计数器，TIM_RepetitionCounter 必须填 0。"]
+    }
+  }
+}

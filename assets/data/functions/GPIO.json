@@ -1,0 +1,1164 @@
+{
+  "schemaVersion": 1,
+  "peripheral": "GPIO",
+  "functions": [
+    {
+      "id": "GPIO_DeInit",
+      "name": "GPIO_DeInit",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec1",
+      "prototype": "void GPIO_DeInit(GPIO_TypeDef* GPIOx);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "GPIOx",
+          "type": "GPIO_TypeDef*",
+          "descEn": "where x can be (A..G) to select the GPIO peripheral.",
+          "descZh": "要复位的端口，取值 GPIOA~GPIOG。C8T6 上实际可用的是 GPIOA、GPIOB、GPIOC。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Deinitializes the GPIOx peripheral registers to their default reset values.",
+      "briefZh": "把指定 GPIO 端口的所有寄存器恢复为复位默认值。",
+      "usageZh": "需要把某个端口彻底恢复到上电状态时使用，例如复用同一组引脚做完全不同的功能前。它通过 RCC 的 APB2 复位寄存器实现，效果等同于对该端口做一次外设复位。日常点灯、读按键不需要调用它。",
+      "prerequisites": [
+        "需先使能 GPIOx 时钟（RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOx, ENABLE)）"
+      ],
+      "registers": [
+        "RCC_APB2RSTR",
+        "GPIOx_CRL",
+        "GPIOx_CRH",
+        "GPIOx_ODR"
+      ],
+      "relatedFunctions": [
+        "GPIO_Init",
+        "GPIO_AFIODeInit",
+        "RCC_APB2PeriphResetCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "复位后引脚变成浮空输入，原来接的 LED、继电器等会失去驱动，注意外部电路状态",
+        "如果只是想把某个引脚改配置，直接用 GPIO_Init 重新配置即可，不必 DeInit 整个端口"
+      ],
+      "exampleCode": "/* 把 GPIOA 恢复到上电默认状态 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);\nGPIO_DeInit(GPIOA);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "GPIOA",
+        "GPIOB",
+        "GPIOC",
+        "GPIOG",
+        "GPIO_Init",
+        "GPIO_TypeDef",
+        "RCC",
+        "RCC_APB2PeriphClockCmd",
+        "RCC_APB2Periph_GPIOA"
+      ],
+      "headerLine": 348,
+      "sourceLine": 108,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_AFIODeInit",
+      "name": "GPIO_AFIODeInit",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec1",
+      "prototype": "void GPIO_AFIODeInit(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Deinitializes the Alternate Functions (remap, event control and EXTI configuration) registers to their default reset values.",
+      "briefZh": "把 AFIO（复用功能 IO）相关寄存器恢复为复位默认值。",
+      "usageZh": "当重映射配置乱了、或者要把调试口（PA13/PA14/PA15/PB3/PB4）恢复成默认的 JTAG/SWD 功能时使用。它会清掉所有引脚重映射、EXTI 线映射与事件输出配置。",
+      "prerequisites": [
+        "需先使能 AFIO 时钟（RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE)）"
+      ],
+      "registers": [
+        "AFIO_EVCR",
+        "AFIO_MAPR",
+        "AFIO_EXTICR1",
+        "AFIO_EXTICR2",
+        "AFIO_EXTICR3",
+        "AFIO_EXTICR4"
+      ],
+      "relatedFunctions": [
+        "GPIO_PinRemapConfig",
+        "GPIO_DeInit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "如果程序里把 SWD 关掉又没留延时，芯片会连不上下载器，需要用 BOOT0 拉高进 ISP 或按住复位下载的方式救回"
+      ],
+      "exampleCode": "/* 恢复调试口，救回被禁用 SWD 的芯片 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);\nGPIO_AFIODeInit();",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "AFIO",
+        "ENABLE",
+        "EXTI",
+        "RCC_APB2PeriphClockCmd",
+        "RCC_APB2Periph_AFIO"
+      ],
+      "headerLine": 350,
+      "sourceLine": 159,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_Init",
+      "name": "GPIO_Init",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec1",
+      "prototype": "void GPIO_Init(GPIO_TypeDef* GPIOx, GPIO_InitTypeDef* GPIO_InitStruct);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "GPIOx",
+          "type": "GPIO_TypeDef*",
+          "descEn": "where x can be (A..G) to select the GPIO peripheral.",
+          "descZh": "要配置的端口，取值 GPIOA~GPIOG。C8T6 上实际可用的是 GPIOA、GPIOB、GPIOC。"
+        },
+        {
+          "name": "GPIO_InitStruct",
+          "type": "GPIO_InitTypeDef*",
+          "descEn": "pointer to a GPIO_InitTypeDef structure that contains the configuration information for the specified GPIO peripheral.",
+          "descZh": "指向配置结构体的指针，GPIO_Pin、GPIO_Speed、GPIO_Mode 三个字段都必须先赋值。建议先用 GPIO_StructInit 填默认值再改需要的字段。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Initializes the GPIOx peripheral according to the specified parameters in the GPIO_InitStruct.",
+      "briefZh": "按结构体参数初始化指定 GPIO 端口的一个或多个引脚。",
+      "usageZh": "配置引脚方向/模式/速度的唯一入口，几乎所有 GPIO 用法都要经过它。调用前必须先使能对应端口时钟，否则寄存器写入无效且不报错——这是新手最常见的坑。一次可以同时配置多个引脚：把它们的位或起来赋给 GPIO_Pin，但此时这些引脚会共用同一套 Mode 与 Speed。",
+      "prerequisites": [
+        "已调用 RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOx, ENABLE) 使能端口时钟",
+        "GPIO_InitStruct 的 GPIO_Pin、GPIO_Speed、GPIO_Mode 三个字段全部已赋值"
+      ],
+      "registers": [
+        "GPIOx_CRL",
+        "GPIOx_CRH"
+      ],
+      "relatedFunctions": [
+        "GPIO_StructInit",
+        "GPIO_DeInit",
+        "RCC_APB2PeriphClockCmd",
+        "GPIO_PinRemapConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "PA13/PA14 默认被 SWD 占用，配成普通 GPIO 会导致下载器连不上芯片；确需使用时先 GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE) 只关 JTAG、保留 SWD",
+        "复用功能（如 USART1_TX）必须配成 GPIO_Mode_AF_PP，配成 Out_PP 收不到数据",
+        "输入模式下 GPIO_Speed 无效，但仍必须赋值，否则结构体里是随机值",
+        "PC13/PC14/PC15 属于备份域，驱动能力弱（最大 3mA），不适合直接驱动 LED 以外的大负载"
+      ],
+      "exampleCode": "GPIO_InitTypeDef GPIO_InitStructure;\n\n/* 1. 先开时钟，这一步忘了后面全白配 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);\n\n/* 2. 配置 PC13 为推挽输出，50MHz */\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;\nGPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;\nGPIO_Init(GPIOC, &GPIO_InitStructure);\n\n/* 3. 点亮（蓝板 LED 低电平点亮） */\nGPIO_ResetBits(GPIOC, GPIO_Pin_13);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "GPIOA",
+        "GPIOB",
+        "GPIOC",
+        "GPIOG",
+        "GPIO_InitTypeDef",
+        "GPIO_Mode_AF_PP",
+        "GPIO_Mode_Out_PP",
+        "GPIO_PinRemapConfig",
+        "GPIO_Pin_13",
+        "GPIO_Remap_SWJ_JTAGDisable",
+        "GPIO_ResetBits",
+        "GPIO_Speed_50MHz",
+        "GPIO_StructInit",
+        "GPIO_TypeDef",
+        "RCC_APB2PeriphClockCmd",
+        "RCC_APB2Periph_GPIOC"
+      ],
+      "headerLine": 351,
+      "sourceLine": 173,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_StructInit",
+      "name": "GPIO_StructInit",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec1",
+      "prototype": "void GPIO_StructInit(GPIO_InitTypeDef* GPIO_InitStruct);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "GPIO_InitStruct",
+          "type": "GPIO_InitTypeDef*",
+          "descEn": "pointer to a GPIO_InitTypeDef structure which will be initialized.",
+          "descZh": "待初始化的结构体指针。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Fills each GPIO_InitStruct member with its default value.",
+      "briefZh": "把 GPIO_InitTypeDef 各字段填充为默认值。",
+      "usageZh": "在 GPIO_Init 之前调用，得到一个确定的起点，避免结构体里是栈上的随机值。默认值为：GPIO_Pin = GPIO_Pin_All、GPIO_Speed = GPIO_Speed_2MHz、GPIO_Mode = GPIO_Mode_IN_FLOATING。注意默认引脚是「全部」，所以调用后必须显式改 GPIO_Pin。",
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": [
+        "GPIO_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "默认 GPIO_Pin 是 GPIO_Pin_All，忘了改会把整个端口都配掉，是隐蔽性很强的 bug"
+      ],
+      "exampleCode": "GPIO_InitTypeDef GPIO_InitStructure;\n\nGPIO_StructInit(&GPIO_InitStructure);   /* 先填默认值 */\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;  /* 再改需要的字段 */\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;\nGPIO_Init(GPIOA, &GPIO_InitStructure);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "GPIOA",
+        "GPIO_Init",
+        "GPIO_InitTypeDef",
+        "GPIO_Mode_IN_FLOATING",
+        "GPIO_Mode_IPU",
+        "GPIO_Pin_0",
+        "GPIO_Pin_All",
+        "GPIO_Speed_2MHz"
+      ],
+      "headerLine": 352,
+      "sourceLine": 266,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_ReadInputDataBit",
+      "name": "GPIO_ReadInputDataBit",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec2",
+      "prototype": "uint8_t GPIO_ReadInputDataBit(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);",
+      "returnType": "uint8_t",
+      "params": [
+        {
+          "name": "GPIOx",
+          "type": "GPIO_TypeDef*",
+          "descEn": "where x can be (A..G) to select the GPIO peripheral.",
+          "descZh": "要读取的端口，取值 GPIOA~GPIOG。"
+        },
+        {
+          "name": "GPIO_Pin",
+          "type": "uint16_t",
+          "descEn": "specifies the port bit to read. This parameter can be GPIO_Pin_x where x can be (0..15).",
+          "descZh": "要读取的引脚，只能是一个 GPIO_Pin_x，不能是多个引脚的或。"
+        }
+      ],
+      "returnDescEn": "The input port pin value.",
+      "returnDescZh": "返回引脚电平：Bit_SET（1）为高电平，Bit_RESET（0）为低电平。",
+      "briefEn": "Reads the specified input port pin.",
+      "briefZh": "读取指定引脚当前的输入电平。",
+      "usageZh": "读取按键、外部信号电平等场景。返回值为该引脚的实际电平（Bit_SET 表示高电平，Bit_RESET 表示低电平）。函数内部直接读 IDR 寄存器，速度快，可以在中断里安全调用。",
+      "prerequisites": [
+        "该引脚已配置为输入模式（GPIO_Mode_IN_FLOATING / IPU / IPD / AIN）",
+        "已使能 GPIOx 时钟"
+      ],
+      "registers": [
+        "GPIOx_IDR"
+      ],
+      "relatedFunctions": [
+        "GPIO_ReadInputData",
+        "GPIO_ReadOutputDataBit",
+        "GPIO_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "GPIO_Pin 只能传单个引脚；传多个引脚的或（如 GPIO_Pin_0 | GPIO_Pin_1）结果没有意义",
+        "按键没有硬件消抖时，需要软件延时 10~20ms 后再读一次确认"
+      ],
+      "exampleCode": "/* 读取 PA0 按键，按下为低电平 */\nif (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_0) == Bit_RESET)\n{\n  /* 按键按下 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "Bit_RESET",
+        "Bit_SET",
+        "GPIOA",
+        "GPIOG",
+        "GPIO_Mode_IN_FLOATING",
+        "GPIO_Pin_0",
+        "GPIO_Pin_1",
+        "GPIO_TypeDef"
+      ],
+      "headerLine": 353,
+      "sourceLine": 281,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_ReadInputData",
+      "name": "GPIO_ReadInputData",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec2",
+      "prototype": "uint16_t GPIO_ReadInputData(GPIO_TypeDef* GPIOx);",
+      "returnType": "uint16_t",
+      "params": [
+        {
+          "name": "GPIOx",
+          "type": "GPIO_TypeDef*",
+          "descEn": "where x can be (A..G) to select the GPIO peripheral.",
+          "descZh": "要读取的端口，取值 GPIOA~GPIOG。"
+        }
+      ],
+      "returnDescEn": "GPIO input data port value.",
+      "returnDescZh": "返回 16 位端口输入数据，bit0 对应 Px0，bit15 对应 Px15。",
+      "briefEn": "Reads the specified GPIO input data port.",
+      "briefZh": "读取整个端口的输入数据。",
+      "usageZh": "需要一次性读取 16 个引脚状态时使用，比逐位调用 GPIO_ReadInputDataBit 快得多（如并口数据、矩阵键盘）。返回值为 16 位，每一位对应一个引脚。",
+      "prerequisites": [
+        "相关引脚已配置为输入模式",
+        "已使能 GPIOx 时钟"
+      ],
+      "registers": [
+        "GPIOx_IDR"
+      ],
+      "relatedFunctions": [
+        "GPIO_ReadInputDataBit",
+        "GPIO_ReadOutputData"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "返回的是整个端口 16 位的值，判断单个引脚时要用位与运算"
+      ],
+      "exampleCode": "uint16_t portVal;\n\nportVal = GPIO_ReadInputData(GPIOB);\nif ((portVal & GPIO_Pin_5) != 0)\n{\n  /* PB5 为高电平 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "GPIOA",
+        "GPIOB",
+        "GPIOG",
+        "GPIO_Pin_5",
+        "GPIO_ReadInputDataBit",
+        "GPIO_TypeDef"
+      ],
+      "headerLine": 354,
+      "sourceLine": 305,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_ReadOutputDataBit",
+      "name": "GPIO_ReadOutputDataBit",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec2",
+      "prototype": "uint8_t GPIO_ReadOutputDataBit(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);",
+      "returnType": "uint8_t",
+      "params": [
+        {
+          "name": "GPIOx",
+          "type": "GPIO_TypeDef*",
+          "descEn": "where x can be (A..G) to select the GPIO peripheral.",
+          "descZh": "要读取的端口，取值 GPIOA~GPIOG。"
+        },
+        {
+          "name": "GPIO_Pin",
+          "type": "uint16_t",
+          "descEn": "specifies the port bit to read. This parameter can be GPIO_Pin_x where x can be (0..15).",
+          "descZh": "要读取的引脚，只能是一个 GPIO_Pin_x。"
+        }
+      ],
+      "returnDescEn": "The output port pin value.",
+      "returnDescZh": "返回引脚输出寄存器值：Bit_SET（1）为高，Bit_RESET（0）为低。",
+      "briefEn": "Reads the specified output data port bit.",
+      "briefZh": "读取指定引脚当前的输出电平。",
+      "usageZh": "读的是输出数据寄存器 ODR，即「软件让它输出什么」，而不是引脚上的实际电平。想确认引脚真实电平要用 GPIO_ReadInputDataBit（需要引脚配成输入或复用）。常用于输出状态自检、翻转电平前的判断。",
+      "prerequisites": [
+        "该引脚已配置为输出模式",
+        "已使能 GPIOx 时钟"
+      ],
+      "registers": [
+        "GPIOx_ODR"
+      ],
+      "relatedFunctions": [
+        "GPIO_ReadOutputData",
+        "GPIO_ReadInputDataBit",
+        "GPIO_WriteBit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "读的是寄存器里的期望值，不是引脚实测电平。引脚被外部拉低时这里仍读到 1"
+      ],
+      "exampleCode": "/* 翻转 PC13 的电平 */\nif (GPIO_ReadOutputDataBit(GPIOC, GPIO_Pin_13) == Bit_SET)\n{\n  GPIO_ResetBits(GPIOC, GPIO_Pin_13);\n}\nelse\n{\n  GPIO_SetBits(GPIOC, GPIO_Pin_13);\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "Bit_RESET",
+        "Bit_SET",
+        "GPIOA",
+        "GPIOC",
+        "GPIOG",
+        "GPIO_Pin_13",
+        "GPIO_ReadInputDataBit",
+        "GPIO_ResetBits",
+        "GPIO_SetBits",
+        "GPIO_TypeDef"
+      ],
+      "headerLine": 355,
+      "sourceLine": 320,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_ReadOutputData",
+      "name": "GPIO_ReadOutputData",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec2",
+      "prototype": "uint16_t GPIO_ReadOutputData(GPIO_TypeDef* GPIOx);",
+      "returnType": "uint16_t",
+      "params": [
+        {
+          "name": "GPIOx",
+          "type": "GPIO_TypeDef*",
+          "descEn": "where x can be (A..G) to select the GPIO peripheral.",
+          "descZh": "要读取的端口，取值 GPIOA~GPIOG。"
+        }
+      ],
+      "returnDescEn": "GPIO output data port value.",
+      "returnDescZh": "返回 16 位端口输出数据，bit0 对应 Px0，bit15 对应 Px15。",
+      "briefEn": "Reads the specified GPIO output data port.",
+      "briefZh": "读取整个端口的输出数据。",
+      "usageZh": "一次性读取 16 个引脚的输出设定值，如驱动并口 LCD 时保存/恢复整个端口状态。",
+      "prerequisites": [
+        "相关引脚已配置为输出模式",
+        "已使能 GPIOx 时钟"
+      ],
+      "registers": [
+        "GPIOx_ODR"
+      ],
+      "relatedFunctions": [
+        "GPIO_ReadOutputDataBit",
+        "GPIO_ReadInputData",
+        "GPIO_Write"
+      ],
+      "remarks": [],
+      "notesZh": [],
+      "exampleCode": "uint16_t oldVal = GPIO_ReadOutputData(GPIOB);\n/* ... 临时改变 PB 口输出 ... */\nGPIO_Write(GPIOB, oldVal);   /* 恢复原状态 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "GPIOA",
+        "GPIOB",
+        "GPIOG",
+        "GPIO_TypeDef",
+        "GPIO_Write"
+      ],
+      "headerLine": 356,
+      "sourceLine": 343,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_SetBits",
+      "name": "GPIO_SetBits",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec3",
+      "prototype": "void GPIO_SetBits(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "GPIOx",
+          "type": "GPIO_TypeDef*",
+          "descEn": "where x can be (A..G) to select the GPIO peripheral.",
+          "descZh": "要操作的端口，取值 GPIOA~GPIOG。"
+        },
+        {
+          "name": "GPIO_Pin",
+          "type": "uint16_t",
+          "descEn": "specifies the port bits to be written. This parameter can be any combination of GPIO_Pin_x where x can be (0..15).",
+          "descZh": "要置高的引脚，可以是多个 GPIO_Pin_x 的按位或，一次置高多个引脚。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Sets the selected data port bits.",
+      "briefZh": "把指定引脚置为高电平。",
+      "usageZh": "输出高电平最常用的方式。它写的是 BSRR 寄存器的低 16 位，是原子操作——只影响指定引脚，不会干扰同端口其它引脚的输出，也不会像「读-改-写」那样在中断里出问题。",
+      "prerequisites": [
+        "该引脚已配置为输出模式（GPIO_Mode_Out_PP 或 GPIO_Mode_Out_OD）",
+        "已使能 GPIOx 时钟"
+      ],
+      "registers": [
+        "GPIOx_BSRR"
+      ],
+      "relatedFunctions": [
+        "GPIO_ResetBits",
+        "GPIO_WriteBit",
+        "GPIO_Write",
+        "GPIO_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "蓝板（最小系统板）的 PC13 LED 是低电平点亮，用 GPIO_SetBits 是熄灭",
+        "BSRR 是原子操作，中断里改引脚不会破坏其它引脚状态，比直接操作 ODR 安全"
+      ],
+      "exampleCode": "/* 点亮共阳 LED（高电平点亮） */\nGPIO_SetBits(GPIOC, GPIO_Pin_13);\n\n/* 一次置高多个引脚 */\nGPIO_SetBits(GPIOA, GPIO_Pin_0 | GPIO_Pin_1 | GPIO_Pin_2);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "GPIOA",
+        "GPIOC",
+        "GPIOG",
+        "GPIO_Mode_Out_OD",
+        "GPIO_Mode_Out_PP",
+        "GPIO_Pin_0",
+        "GPIO_Pin_1",
+        "GPIO_Pin_13",
+        "GPIO_Pin_2",
+        "GPIO_TypeDef"
+      ],
+      "headerLine": 357,
+      "sourceLine": 358,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_ResetBits",
+      "name": "GPIO_ResetBits",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec3",
+      "prototype": "void GPIO_ResetBits(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "GPIOx",
+          "type": "GPIO_TypeDef*",
+          "descEn": "where x can be (A..G) to select the GPIO peripheral.",
+          "descZh": "要操作的端口，取值 GPIOA~GPIOG。"
+        },
+        {
+          "name": "GPIO_Pin",
+          "type": "uint16_t",
+          "descEn": "specifies the port bits to be written. This parameter can be any combination of GPIO_Pin_x where x can be (0..15).",
+          "descZh": "要置低的引脚，可以是多个 GPIO_Pin_x 的按位或。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Clears the selected data port bits.",
+      "briefZh": "把指定引脚置为低电平。",
+      "usageZh": "输出低电平最常用的方式。写的是 BSRR 寄存器的高 16 位，同样是原子操作。点灯场景里通常就是「点亮」操作（蓝板 LED 低电平点亮）。",
+      "prerequisites": [
+        "该引脚已配置为输出模式",
+        "已使能 GPIOx 时钟"
+      ],
+      "registers": [
+        "GPIOx_BSRR"
+      ],
+      "relatedFunctions": [
+        "GPIO_SetBits",
+        "GPIO_WriteBit",
+        "GPIO_Write"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "与 GPIO_SetBits 一样是原子操作，可安全用于中断"
+      ],
+      "exampleCode": "/* 点亮蓝板板载 LED（PC13，低电平点亮） */\nGPIO_ResetBits(GPIOC, GPIO_Pin_13);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "GPIOA",
+        "GPIOC",
+        "GPIOG",
+        "GPIO_Pin_13",
+        "GPIO_SetBits",
+        "GPIO_TypeDef"
+      ],
+      "headerLine": 358,
+      "sourceLine": 374,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_WriteBit",
+      "name": "GPIO_WriteBit",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec3",
+      "prototype": "void GPIO_WriteBit(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, BitAction BitVal);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "GPIOx",
+          "type": "GPIO_TypeDef*",
+          "descEn": "where x can be (A..G) to select the GPIO peripheral.",
+          "descZh": "要操作的端口，取值 GPIOA~GPIOG。"
+        },
+        {
+          "name": "GPIO_Pin",
+          "type": "uint16_t",
+          "descEn": "specifies the port bit to be written. This parameter can be one of GPIO_Pin_x where x can be (0..15).",
+          "descZh": "要操作的引脚，只能是一个 GPIO_Pin_x。"
+        },
+        {
+          "name": "BitVal",
+          "type": "BitAction",
+          "descEn": "specifies the value to be written to the selected bit. This parameter can be one of the BitAction enum values:",
+          "descZh": "写入的值。Bit_SET 置高电平，Bit_RESET 置低电平。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Sets or clears the selected data port bit.",
+      "briefZh": "按指定值设置或清除单个引脚。",
+      "usageZh": "当要写入的电平是变量（不是编译期常量）时使用，避免写 if-else 分支。内部对 BSRR 操作，也是原子的。BitVal 取 Bit_SET 置高、Bit_RESET 置低。",
+      "prerequisites": [
+        "该引脚已配置为输出模式",
+        "已使能 GPIOx 时钟"
+      ],
+      "registers": [
+        "GPIOx_BSRR"
+      ],
+      "relatedFunctions": [
+        "GPIO_SetBits",
+        "GPIO_ResetBits",
+        "GPIO_Write",
+        "GPIO_ReadOutputDataBit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "第三个参数类型是 BitAction 枚举，传变量时必须显式转换 (BitAction)，否则编译器会警告",
+        "GPIO_Pin 只能传单个引脚，不能传多个引脚的或"
+      ],
+      "exampleCode": "/* 用一个变量控制电平，不用写 if-else */\nuint8_t level = 1;\nGPIO_WriteBit(GPIOC, GPIO_Pin_13, (BitAction)level);\n\n/* 或者直接传枚举 */\nGPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_RESET);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "BitAction",
+        "Bit_RESET",
+        "Bit_SET",
+        "GPIOA",
+        "GPIOC",
+        "GPIOG",
+        "GPIO_Pin_13",
+        "GPIO_TypeDef"
+      ],
+      "headerLine": 359,
+      "sourceLine": 394,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_Write",
+      "name": "GPIO_Write",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec3",
+      "prototype": "void GPIO_Write(GPIO_TypeDef* GPIOx, uint16_t PortVal);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "GPIOx",
+          "type": "GPIO_TypeDef*",
+          "descEn": "where x can be (A..G) to select the GPIO peripheral.",
+          "descZh": "要操作的端口，取值 GPIOA~GPIOG。"
+        },
+        {
+          "name": "PortVal",
+          "type": "uint16_t",
+          "descEn": "specifies the value to be written to the port output data register.",
+          "descZh": "要写入的 16 位数据，bit0 对应 Px0，bit15 对应 Px15。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Writes data to the specified GPIO data port.",
+      "briefZh": "向整个端口写入 16 位数据。",
+      "usageZh": "一次性设置端口全部 16 个引脚的输出电平，适合并口 LCD、数码管等需要整字节/整字输出的场景。注意它直接覆盖整个 ODR，未在本次写入中置 1 的引脚会被拉低。",
+      "prerequisites": [
+        "相关引脚已配置为输出模式",
+        "已使能 GPIOx 时钟"
+      ],
+      "registers": [
+        "GPIOx_ODR"
+      ],
+      "relatedFunctions": [
+        "GPIO_SetBits",
+        "GPIO_ResetBits",
+        "GPIO_WriteBit",
+        "GPIO_ReadOutputData"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "会覆盖整个端口的输出，如果同端口还有别的引脚在用，需要先读出来改位再写回（或用 GPIO_WriteBit 单独改）",
+        "是「读-改-写」之外的整体写，中断里使用要留意是否会覆盖别的引脚状态"
+      ],
+      "exampleCode": "/* 把 PB0~PB7 作为一个字节输出（并口 LCD 数据线） */\nGPIO_Write(GPIOB, 0x00A5);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "GPIOA",
+        "GPIOB",
+        "GPIOG",
+        "GPIO_TypeDef",
+        "GPIO_WriteBit"
+      ],
+      "headerLine": 360,
+      "sourceLine": 417,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_PinLockConfig",
+      "name": "GPIO_PinLockConfig",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec4",
+      "prototype": "void GPIO_PinLockConfig(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "GPIOx",
+          "type": "GPIO_TypeDef*",
+          "descEn": "where x can be (A..G) to select the GPIO peripheral.",
+          "descZh": "要锁定的端口，取值 GPIOA~GPIOG。"
+        },
+        {
+          "name": "GPIO_Pin",
+          "type": "uint16_t",
+          "descEn": "specifies the port bit to be written. This parameter can be any combination of GPIO_Pin_x where x can be (0..15).",
+          "descZh": "要锁定的引脚，可以是多个 GPIO_Pin_x 的按位或。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Locks GPIO Pins configuration registers.",
+      "briefZh": "锁定指定引脚的配置，直到下次复位前都不能再改。",
+      "usageZh": "用于防止程序跑飞或误操作改动关键引脚的配置（如电机驱动、安全相关引脚）。锁定后该引脚的 CRL/CRH 配置位被冻结，直到系统复位才解除。锁定过程本身也遵循特定时序，需要先写锁定键再确认。",
+      "prerequisites": [
+        "该引脚已用 GPIO_Init 配置成最终需要的模式（锁定后无法再改）",
+        "已使能 GPIOx 时钟"
+      ],
+      "registers": [
+        "GPIOx_LCKR"
+      ],
+      "relatedFunctions": [
+        "GPIO_Init",
+        "GPIO_PinRemapConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "锁定只能通过复位解除，调试时锁错了会很麻烦，建议只在最终固件里用",
+        "锁定的是引脚模式配置（CRL/CRH），不影响 GPIO_SetBits 等电平操作"
+      ],
+      "exampleCode": "/* 先把引脚配好，再锁定 */\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;\nGPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;\nGPIO_Init(GPIOA, &GPIO_InitStructure);\n\nGPIO_PinLockConfig(GPIOA, GPIO_Pin_5);   /* 锁定后不可改 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "GPIOA",
+        "GPIOG",
+        "GPIO_Init",
+        "GPIO_Mode_Out_PP",
+        "GPIO_Pin_5",
+        "GPIO_SetBits",
+        "GPIO_Speed_50MHz",
+        "GPIO_TypeDef"
+      ],
+      "headerLine": 361,
+      "sourceLine": 432,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_EventOutputConfig",
+      "name": "GPIO_EventOutputConfig",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec4",
+      "prototype": "void GPIO_EventOutputConfig(uint8_t GPIO_PortSource, uint8_t GPIO_PinSource);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "GPIO_PortSource",
+          "type": "uint8_t",
+          "descEn": "selects the GPIO port to be used as source for Event output. This parameter can be GPIO_PortSourceGPIOx where x can be (A..E).",
+          "descZh": "事件输出所用的端口，取值 GPIO_PortSourceGPIOA~GPIO_PortSourceGPIOG。"
+        },
+        {
+          "name": "GPIO_PinSource",
+          "type": "uint8_t",
+          "descEn": "specifies the pin for the Event output. This parameter can be GPIO_PinSourcex where x can be (0..15).",
+          "descZh": "事件输出所用的引脚号（0~15），取值 GPIO_PinSource0~GPIO_PinSource15。注意这里传的是引脚序号而不是 GPIO_Pin_x 位掩码。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Selects the GPIO pin used as Event output.",
+      "briefZh": "选择用于事件输出（EVENTOUT）的端口与引脚号。",
+      "usageZh": "配置 EVENTOUT 脉冲信号的来源，通常配合 GPIO_EventOutputCmd 使用。事件输出能让外设事件（如定时器溢出）直接产生一个引脚脉冲，不经过中断，用于精确同步外部器件。日常开发极少用到。",
+      "prerequisites": [
+        "需先使能 AFIO 时钟（RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE)）",
+        "对应引脚需配置为复用推挽输出"
+      ],
+      "registers": [
+        "AFIO_EVCR"
+      ],
+      "relatedFunctions": [
+        "GPIO_EventOutputCmd",
+        "GPIO_EXTILineConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "第二个参数是引脚序号（GPIO_PinSource0），不是位掩码（GPIO_Pin_0），这是最容易传错的地方",
+        "与 GPIO_EXTILineConfig 的参数形式一样，注意区分两个函数的用途"
+      ],
+      "exampleCode": "RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);\n\n/* 把事件输出放到 PA0 */\nGPIO_EventOutputConfig(GPIO_PortSourceGPIOA, GPIO_PinSource0);\nGPIO_EventOutputCmd(ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "AFIO",
+        "ENABLE",
+        "GPIO_EXTILineConfig",
+        "GPIO_EventOutputCmd",
+        "GPIO_PinSource0",
+        "GPIO_PinSource15",
+        "GPIO_Pin_0",
+        "GPIO_PortSourceGPIOA",
+        "GPIO_PortSourceGPIOG",
+        "RCC_APB2PeriphClockCmd",
+        "RCC_APB2Periph_AFIO"
+      ],
+      "headerLine": 362,
+      "sourceLine": 462,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_EventOutputCmd",
+      "name": "GPIO_EventOutputCmd",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec5",
+      "prototype": "void GPIO_EventOutputCmd(FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the Event output. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能事件输出，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the Event Output.",
+      "briefZh": "使能或失能事件输出功能。",
+      "usageZh": "在 GPIO_EventOutputConfig 选好引脚后，用它打开或关闭 EVENTOUT。",
+      "prerequisites": [
+        "已调用 GPIO_EventOutputConfig 选定输出引脚",
+        "已使能 AFIO 时钟"
+      ],
+      "registers": [
+        "AFIO_EVCR"
+      ],
+      "relatedFunctions": [
+        "GPIO_EventOutputConfig"
+      ],
+      "remarks": [],
+      "notesZh": [],
+      "exampleCode": "GPIO_EventOutputCmd(ENABLE);   /* 开启事件输出 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "AFIO",
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "GPIO_EventOutputConfig"
+      ],
+      "headerLine": 363,
+      "sourceLine": 483,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_PinRemapConfig",
+      "name": "GPIO_PinRemapConfig",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec4",
+      "prototype": "void GPIO_PinRemapConfig(uint32_t GPIO_Remap, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "GPIO_Remap",
+          "type": "uint32_t",
+          "descEn": "selects the pin to remap. This parameter can be one of the following values:",
+          "descZh": "重映射宏，如 GPIO_Remap_USART1、GPIO_PartialRemap_USART3、GPIO_Remap_SWJ_JTAGDisable。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the port pin remapping. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 启用重映射，DISABLE 恢复默认引脚。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Changes the mapping of the specified pin.",
+      "briefZh": "使能或失能指定外设的引脚重映射，也可用于关闭 JTAG/SWD 调试口。",
+      "usageZh": "两个典型用途：① 把外设的复用功能从默认引脚挪到备用引脚（如 USART1 默认 PA9/PA10，重映射后到 PB6/PB7）；② 关闭 JTAG 释放 PA15/PB3/PB4 作普通 IO，或彻底关闭 SWJ。调用前必须同时使能 AFIO 时钟。注意部分重映射与完全重映射是两组不同的宏，别混用。",
+      "prerequisites": [
+        "必须使能 AFIO 时钟：RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE)",
+        "相关引脚已配置为对应的复用模式（通常是 GPIO_Mode_AF_PP）"
+      ],
+      "registers": [
+        "AFIO_MAPR"
+      ],
+      "relatedFunctions": [
+        "GPIO_EXTILineConfig",
+        "GPIO_Init",
+        "RCC_APB2PeriphClockCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "GPIO_Remap_SWJ_Disable 会同时关掉 SWD，之后下载器再也连不上，需要特殊手段才能救回。调试阶段建议只用 GPIO_Remap_SWJ_JTAGDisable",
+        "忘了开 AFIO 时钟是重映射不生效的头号原因，而且不会有任何报错",
+        "部分重映射（PartialRemap）与完全重映射（FullRemap）引脚位置不同，用错会导致引脚没输出",
+        "重映射只改变外设信号走到哪个引脚，外设本身的初始化流程不变"
+      ],
+      "exampleCode": "/* 例1：释放 PA15/PB3/PB4，保留 SWD 下载能力 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);\nGPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);\n\n/* 例2：USART1 重映射到 PB6/PB7 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);\nGPIO_PinRemapConfig(GPIO_Remap_USART1, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "AFIO",
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "GPIO_Mode_AF_PP",
+        "GPIO_PartialRemap_USART3",
+        "GPIO_Remap_SWJ_Disable",
+        "GPIO_Remap_SWJ_JTAGDisable",
+        "GPIO_Remap_USART1",
+        "RCC_APB2PeriphClockCmd",
+        "RCC_APB2Periph_AFIO",
+        "USART1"
+      ],
+      "headerLine": 364,
+      "sourceLine": 549,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_EXTILineConfig",
+      "name": "GPIO_EXTILineConfig",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec4",
+      "prototype": "void GPIO_EXTILineConfig(uint8_t GPIO_PortSource, uint8_t GPIO_PinSource);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "GPIO_PortSource",
+          "type": "uint8_t",
+          "descEn": "selects the GPIO port to be used as source for EXTI lines. This parameter can be GPIO_PortSourceGPIOx where x can be (A..G).",
+          "descZh": "引脚所在端口，取值 GPIO_PortSourceGPIOA~GPIO_PortSourceGPIOG。"
+        },
+        {
+          "name": "GPIO_PinSource",
+          "type": "uint8_t",
+          "descEn": "specifies the EXTI line to be configured. This parameter can be GPIO_PinSourcex where x can be (0..15).",
+          "descZh": "引脚序号（0~15），取值 GPIO_PinSource0~GPIO_PinSource15。注意是序号不是位掩码。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Selects the GPIO pin used as EXTI Line.",
+      "briefZh": "把某个 GPIO 引脚连接到对应的 EXTI 中断线。",
+      "usageZh": "用 GPIO 做外部中断时的必需步骤。EXTI 只有 16 条线（EXTI0~EXTI15），每条线对应所有端口的同一引脚号，靠这个函数选择接到哪个端口。例如要用 PA0 和 PB1 做中断，就要分别把 EXTI0 接到 GPIOA、EXTI1 接到 GPIOB。",
+      "prerequisites": [
+        "必须使能 AFIO 时钟：RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE)",
+        "该引脚已配置为输入模式（GPIO_Mode_IPU / IPD / IN_FLOATING）",
+        "已使能 GPIOx 时钟"
+      ],
+      "registers": [
+        "AFIO_EXTICR1",
+        "AFIO_EXTICR2",
+        "AFIO_EXTICR3",
+        "AFIO_EXTICR4"
+      ],
+      "relatedFunctions": [
+        "GPIO_Init",
+        "GPIO_PinRemapConfig",
+        "EXTI_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "PA0 与 PB0 共用 EXTI0 线，两者不能同时用作外部中断",
+        "第二个参数是 GPIO_PinSource0 而不是 GPIO_Pin_0，传错会配置到别的引脚",
+        "中断服务函数里必须 EXTI_ClearITPendingBit 清标志，否则会反复进中断"
+      ],
+      "exampleCode": "/* 用 PA0 做外部中断 */\nGPIO_InitTypeDef GPIO_InitStructure;\nEXTI_InitTypeDef EXTI_InitStructure;\nNVIC_InitTypeDef NVIC_InitStructure;\n\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_AFIO, ENABLE);\n\n/* 1. 引脚配成上拉输入 */\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;\nGPIO_Init(GPIOA, &GPIO_InitStructure);\n\n/* 2. 连到 EXTI0 线 */\nGPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource0);\n\n/* 3. 配置 EXTI */\nEXTI_InitStructure.EXTI_Line = EXTI_Line0;\nEXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;\nEXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;\nEXTI_InitStructure.EXTI_LineCmd = ENABLE;\nEXTI_Init(&EXTI_InitStructure);\n\n/* 4. 使能 NVIC */\nNVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x01;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x01;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "AFIO",
+        "ENABLE",
+        "EXTI",
+        "EXTI_ClearITPendingBit",
+        "EXTI_Init",
+        "EXTI_InitTypeDef",
+        "EXTI_Line0",
+        "EXTI_Mode_Interrupt",
+        "EXTI_Trigger_Falling",
+        "GPIOA",
+        "GPIOB",
+        "GPIO_Init",
+        "GPIO_InitTypeDef",
+        "GPIO_Mode_IPU",
+        "GPIO_PinSource0",
+        "GPIO_PinSource15",
+        "GPIO_Pin_0",
+        "GPIO_PortSourceGPIOA",
+        "GPIO_PortSourceGPIOG",
+        "NVIC",
+        "NVIC_Init",
+        "NVIC_InitTypeDef",
+        "RCC_APB2PeriphClockCmd",
+        "RCC_APB2Periph_AFIO",
+        "RCC_APB2Periph_GPIOA"
+      ],
+      "headerLine": 365,
+      "sourceLine": 609,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "GPIO_ETH_MediaInterfaceConfig",
+      "name": "GPIO_ETH_MediaInterfaceConfig",
+      "peripheral": "GPIO",
+      "sectionId": "GPIO#sec4",
+      "prototype": "void GPIO_ETH_MediaInterfaceConfig(uint32_t GPIO_ETH_MediaInterface);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "GPIO_ETH_MediaInterface",
+          "type": "uint32_t",
+          "descEn": "specifies the Media Interface mode. This parameter can be one of the following values:",
+          "descZh": "GPIO_ETH_MediaInterface_MII 或 GPIO_ETH_MediaInterface_RMII。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Selects the Ethernet media interface.",
+      "briefZh": "选择以太网 MAC 的 MII 或 RMII 接口模式。",
+      "usageZh": "仅在带以太网的型号（如 STM32F107 互联型）上使用，用于在 MII 与 RMII 之间切换。C8T6 没有以太网外设，调用它没有意义。",
+      "prerequisites": [
+        "需先使能 AFIO 时钟",
+        "仅互联型（Connectivity line）器件支持"
+      ],
+      "registers": [
+        "AFIO_MAPR"
+      ],
+      "relatedFunctions": [
+        "GPIO_PinRemapConfig"
+      ],
+      "remarks": [
+        "This function applies only to STM32 Connectivity line devices."
+      ],
+      "notesZh": [
+        "STM32F103C8T6 没有以太网 MAC，此函数在 C8T6 上无意义"
+      ],
+      "exampleCode": "/* C8T6 不支持以太网，此函数无实际用途 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "AFIO",
+        "GPIO_ETH_MediaInterface_MII",
+        "GPIO_ETH_MediaInterface_RMII"
+      ],
+      "headerLine": 366,
+      "sourceLine": 630,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "_comment": "SDIO 结构体成员中文。本型号未引出 SDIO 引脚，仅供查阅。时钟公式：SDIO_CK = HCLK / (2 × (SDIO_ClockDiv + 2))。",
+  "symbols": {
+    "SDIO_InitTypeDef": {
+      "briefZh": "SDIO 时钟与总线属性配置结构体，SDIO_Init 用它设置分频、时钟极性、旁路、省电、总线宽度与硬件流控；本型号未引出引脚，仅供查阅。",
+      "usageZh": "先用低速识别卡、再切高速，共调两次 SDIO_Init：识别阶段 ClockDiv 取 0x76（72MHz/236≈305kHz，需 ≤400kHz），传输阶段取 0（18MHz）或 1（12MHz），SD 卡上限 25MHz。顺序 SDIO_DeInit → RCC_AHBPeriphClockCmd(RCC_AHBPeriph_SDIO) → SDIO_SetPowerState(SDIO_PowerState_ON) → SDIO_Init → SDIO_ClockCmd(ENABLE) → 发命令。改分频前要先 SDIO_ClockCmd(DISABLE)。",
+      "notesZh": [
+        "STM32F103C8T6（LQFP48）没有引出 SDIO 引脚（SDIO 用 PC8~PC12 + PD2，本封装上不存在），本结构体仅供查阅，实际读卡只能用 SPI 模式。",
+        "SDIO_StructInit 的默认 ClockDiv=0，算出 72/4=18MHz，远超识别阶段允许的 400kHz，只改几个字段就 Init 必然卡在 ACMD41——必须先显式给一个大分频。",
+        "72MHz 下识别阶段最小的合规分频是 90（72MHz/184≈391kHz），取 0x76(118) 能得到更接近 305kHz 的稳点；写 88 其实只到 400kHz 边界，余量不足。",
+        "SDIO_ClockBypass 打开后 SDIO_CK 直接等于 HCLK（72MHz），SD 卡会立刻不响应，除调试时钟输出外不要打开。"
+      ],
+      "membersZh": {
+        "SDIO_ClockEdge": "采样边沿：SDIO_ClockEdge_Rising 在 SDIO_CK 上升沿采样（绝大多数 SD 卡用这个），SDIO_ClockEdge_Falling 在下降沿采样，只用于需要反向相位的设备或 DDR 场景。SD 卡协议的 SDR 模式下固定用 Rising。",
+        "SDIO_ClockBypass": "时钟旁路：SDIO_ClockBypass_Enable 时 SDIO 时钟直接等于 HCLK（C8T6 满速 72MHz，远高于 SD 卡 25MHz 上限），只适合用 MCO 观测时钟或接高速 MMC；驱动 SD 卡必须保持 SDIO_ClockBypass_Disable，让分频器生效。",
+        "SDIO_ClockPowerSave": "省电模式：SDIO_ClockPowerSave_Enable 时总线空闲会停掉 SDIO_CK 以省电，但部分卡要求时钟持续供给，会导致卡不响应；SDIO_ClockPowerSave_Disable 则一直输出时钟。调试阶段建议关闭，稳定后再按需打开。该位同时会关闭 SDIO_CK 和 SDIO_CMD 的下拉，所以卡侧上拉要接好。",
+        "SDIO_BusWide": "数据总线宽度：SDIO_BusWide_1b 只用于卡的识别阶段（CMD0~CMD7 阶段必须 1 位），SDIO_BusWide_4b 是 SD 卡数据传输阶段的标准（需卡侧先发 ACMD6 设置为 4 位，只改 MCU 侧不改卡侧会导致数据全 0xFF 或 CRC 错），SDIO_BusWide_8b 只有 MMC 支持，用在 SD 卡上会产生不可预期的响应错误。本型号未引出引脚，仅供查阅。",
+        "SDIO_HardwareFlowControl": "SDIO 硬件流控，SDIO_HardwareFlowControl_Enable 时在 SDIO_CMD 与 SDIO_D0~D3 上传送 CMD/DATA 填充字节，SDIO_HardwareFlowControl_Disable 不传送。SD 规范里 SDIO 模式下通常关闭，只有部分 MMC/SDIO 组合设备需要开启；填错会看到数据里多出一些无意义的 0xFF 填充。",
+        "SDIO_ClockDiv": "SDIO_CK 的分频系数（uint8_t，0~255），SDIO_CK = HCLK / (2 × (ClockDiv + 2))，注意分母里的 2。72MHz 下：0→18MHz、1→12MHz、7→3.6MHz、90→391kHz、118→305kHz。识别阶段必须 ≤400kHz 所以取 90 以上，数据传输阶段 ≤25MHz 所以取 0 或 1；按 HCLK/(ClockDiv+1) 算是最常见的错误，会把识别时钟算成 810kHz。"
+      }
+    },
+    "SDIO_CmdInitTypeDef": {
+      "briefZh": "SDIO 命令配置结构体，SDIO_SendCommand 用它指定命令号、参数、响应类型、等待方式与命令通路状态机；本型号未引出引脚，仅供查阅。",
+      "usageZh": "每条命令都重新填一遍：先 SDIO_ClearFlag 清掉上次残留的标志，再填本结构体调 SDIO_SendCommand，然后按 Response 类型轮询对应标志——无响应用 SDIO_FLAG_CMDSENT，短/长响应用 SDIO_FLAG_CMDREND（出错看 SDIO_FLAG_CTIMEOUT / SDIO_FLAG_CCRCFAIL）。ACMD 类命令必须先发 CMD55，中间不能插别的命令。注意 SPL 没有 SDIO_CMD_xx 宏，命令号直接写数字。",
+      "notesZh": [
+        "STM32F103C8T6（LQFP48）没有引出 SDIO 引脚（SDIO 用 PC8~PC12 + PD2，本封装上不存在），本结构体仅供查阅，实际读卡只能用 SPI 模式。",
+        "SDIO_CPSM 必须是 SDIO_CPSM_Enable，默认 Disable，漏改的表现是命令完全发不出去、一直等标志到超时，且不报任何错。",
+        "响应类型配错必然卡死：CMD0 配 Short 会永远等不到 CMDREND（它只有 CMDSENT），CMD2/CMD9 配 Short 会丢掉响应的后半段。",
+        "带数据的命令（CMD17/18/24/25）必须先 SDIO_DataConfig 再发命令，顺序反了会漏掉整个数据阶段。"
+      ],
+      "membersZh": {
+        "SDIO_Argument": "命令参数，32 位，填进 SDIO_ARG 寄存器。无参数命令（CMD0、CMD2、CMD3）填任意值但规范建议填固定值（如 CMD0 填 0）；带参数命令按协议填，例如 CMD8 常填 0x1AA，CMD7/CMD9/CMD13 要填目标卡的 RCA（如 0x1234 << 16）。注意 SDHC/SDXC 卡的块读写命令 CMD17/CMD24 填的是块地址，标准 SD 卡填字节地址。",
+        "SDIO_CmdIndex": "命令号，取值 0~63，直接写数字即可（SPL 没有 SDIO_CMD_xx 这类宏），如 CMD0→0、CMD8→8、CMD55→55、CMD17→17。硬件会自动补上起始位和传输位，不要自己把命令号左移 6 位。ACMD41 在总线上就是命令号 41，但必须先发过 CMD55（参数为 RCA）才被当作 ACMD。",
+        "SDIO_Response": "期望的响应类型：SDIO_Response_No 无响应（CMD0，只能等 CMDSENT），SDIO_Response_Short 48 位短响应 R1/R3/R6/R7（CMD8/CMD55/ACMD41/CMD3/CMD7/CMD16），SDIO_Response_Long 136 位长响应 R2（CMD2 取 CID、CMD9 取 CSD，结果分布在 RESP1~RESP4 四个寄存器里）。填错会导致等待的标志永远不来，表现为超时。",
+        "SDIO_Wait": "命令等待方式：SDIO_Wait_No 不等响应，软件自己轮询标志；SDIO_Wait_Pend 让硬件自动等响应完成（或直到超时）后再置 CMDREND/CTIMEOUT，软件只需检查结果；SDIO_Wait_IT 用中断方式。调试时用 Pend 最省事，用 No 时必须自己轮询，否则会以为命令没发出去。",
+        "SDIO_CPSM": "命令通路状态机（CPSM）使能位，SDIO_CPSM_Enable 才会真正把命令发到 SDIO_CMD 线上，SDIO_CPSM_Disable 不会送命令。几乎所有命令都要 Enable；Disable 只用于手动操作 SDIO_CMD 线做特殊时序（例如测试或发送非法命令）。忘记 Enable 是本结构体最常见的问题。"
+      }
+    },
+    "SDIO_DataInitTypeDef": {
+      "briefZh": "SDIO 数据通路配置结构体，SDIO_DataConfig 用它设置超时、总字节数、块大小、传输方向、块/流模式与数据通路使能；本型号未引出引脚，仅供查阅。",
+      "usageZh": "凡是带数据阶段的命令（CMD17/18/24/25）都要先 SDIO_DataConfig 再 SDIO_SendCommand，顺序不能反。传输结束后 DCOUNT 不会自动复原，每次传输前都要重新调用。20KB RAM 的限制下，多块传输的缓冲区要用块数 × 512 仔细核算。",
+      "notesZh": [
+        "STM32F103C8T6（LQFP48）没有引出 SDIO 引脚（SDIO 用 PC8~PC12 + PD2，本封装上不存在），本结构体仅供查阅，实际读卡只能用 SPI 模式。",
+        "SDIO_DPSM 默认是 Disable，忘记设 Enable 的表现是“命令成功但一个字节数据都没有”。",
+        "SDIO_DataLength 填总字节数而不是块数：读 4 个 512 字节块要填 2048，填 4 只会读 4 个字节。"
+      ],
+      "membersZh": {
+        "SDIO_DataTimeOut": "数据超时计数值，单位是 SDIO_CK 周期，硬件从开始传输计到该值仍未完成就置 DTIMEOUT。慢速卡（Class 2/4）或擦除操作需要放大这个值；取值太小会在读大块数据时误报超时，太大则出错后长时间卡住。",
+        "SDIO_DataLength": "本次传输的总字节数，写入 SDIO_DLEN 寄存器。单块读填 512，多块读 N 块填 512×N（不是 N）。这个值与 SDIO_DataBlockSize 配合：硬件按块计数，总长度不是块大小整数倍时最后一块会不完整，卡侧报 CRC 错误。",
+        "SDIO_DataBlockSize": "块大小，取 SDIO_DataBlockSize_1b / 8b / 16b / 32b / 64b / 128b / 256b / 512b / 1024b / … / 16384b。SD 卡标准块长是 512 字节，即 SDIO_DataBlockSize_512b；部分老卡/MMC 需要先用 CMD16 设块长再改这个字段。块大小填错会读出乱码或直接 CRC 失败。",
+        "SDIO_TransferDir": "数据方向：SDIO_TransferDir_ToSDIO 表示卡→MCU（CMD17/CMD18，读卡），SDIO_TransferDir_ToCard 表示 MCU→卡（CMD24/CMD25，写卡）。方向填反时读卡会立刻报 TXUNDERR 或者什么都不发生，是 SDIO 里最隐蔽的错误之一。",
+        "SDIO_TransferMode": "传输模式：SDIO_TransferMode_Block 按块传输（SD 卡必须用这个），SDIO_TransferMode_Stream 是连续流模式，只有 MMC 设备支持。SD 卡填 Stream 会直接失败。",
+        "SDIO_DPSM": "数据通路状态机（DPSM）使能位，SDIO_DPSM_Enable 才会真正启动数据收发，SDIO_DPSM_Disable 时命令虽然发出但数据阶段被关掉。带数据的命令必须 Enable，传输异常后要 Disable 再重新 Enable 以复位状态机。"
+      }
+    }
+  }
+}

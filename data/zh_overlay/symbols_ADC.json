@@ -1,0 +1,16 @@
+{
+  "_comment": "ADC 结构体成员中文。STM32F103C8T6 只有 ADC1（IN0~IN9 在 PA0~PA7、PB0、PB1，IN16=内部温度传感器，IN17=内部参考 Vrefint）。ADC2 虽存在于库里但本封装不引出，ADC3 不存在。ADC 挂在 APB2（72MHz），ADCCLK = PCLK2 / 2、4、6、8，最高 36MHz，而 12 位转换要求 1MHz ≤ ADCCLK ≤ 14MHz，所以通常把 PCLK2 二分频得到 36MHz 再接受精度损失，或再分频到 18MHz 以下换取精度。",
+  "symbols": {
+    "ADC_InitTypeDef": {
+      "briefZh": "ADC 初始化参数结构体，ADC_Init 用它配置多通道/连续转换、外部触发源、数据对齐与规则通道序列长度；通道号与采样时间另由 ADC_RegularChannelConfig 设置。",
+      "membersZh": {
+        "ADC_Mode": "规则/注入通道的独立或双 ADC 模式，取 ADC_Mode_Independent（默认，整个 STM32F1 系列单 ADC 都用它）或 ADC_Mode_RegSimult、ADC_Mode_FastInterl / SlowInterl、ADC_Mode_InjecSimult 等双模式。这些双模式要求同时存在 ADC1 与 ADC2（交错模式还要求 ADC1 与 ADC2 一起工作），STM32F103C8T6 只引出了 ADC1，选双模式后读到的数据不完整或根本没有数据，所以本型号永远填 ADC_Mode_Independent。",
+        "ADC_ScanConvMode": "是否扫描整组规则通道，取 ENABLE（按 ADC_RegularChannelConfig 设好的序列依次转换多个通道）或 DISABLE（只转序列里的 1 个通道，默认 DISABLE）。单通道采样填 DISABLE 即可；要按序列轮询 PA0~PA7 等多路信号时必须 ENABLE，并配合 DMA 搬运（ADC1 支持 ADC_DMACmd，DMA1_Channel1），否则后一个通道会覆盖前一个的结果。它对应 CR1 的 SCAN 位，与 ADC_NbrOfChannel 一起决定 SQR 序列的生效方式。",
+        "ADC_ContinuousConvMode": "是否连续转换，取 ENABLE（一次启动后不停转换，直到 ADC_Cmd 关闭或清 CONT/停触发）或 DISABLE（单次转换，默认）。对应 CR2 的 CONT 位。要周期性刷新数据（ADC + DMA 循环缓冲采集）就选 ENABLE，只需偶尔测一次就选 DISABLE 并在每次读取前用 ADC_SoftwareStartConvCmd 启动一次。与 ADC_ScanConvMode=ENABLE 同时打开时，DMA 每搬满一轮（NbrOfChannel 个数据）就恢复。",
+        "ADC_ExternalTrigConv": "规则通道的外部触发源，取 ADC_ExternalTrigConv_None（不选外部触发，只能靠软件 ADC_SoftwareStartConvCmd 启动，最常用）、ADC_ExternalTrigConv_T1_CC1（默认值）、ADC_ExternalTrigConv_T1_CC3、ADC_ExternalTrigConv_T2_CC2、ADC_ExternalTrigConv_T3_TRGO、ADC_ExternalTrigConv_T4_CC4、ADC_ExternalTrigConv_Ext_IT11_TIM8_TRGO。用定时器触发的好处是采样率与 PWM 周期严格同步（电机电流采样、锁相同步采样）。注意库里的断言 IS_ADC_EXT_TRIG 把 T3_CC1 等只在 ADC3 上有效的取值也一并放过；要真正用外部触发，还得调 ADC_ExternalTrigConvCmd(ADC1, ENABLE) 打开触发，只赋值这个字段是没用的。",
+        "ADC_DataAlign": "转换结果在 16 位 DR 里的对齐方式，取 ADC_DataAlign_Right（默认，结果 0~4095 放在低 12 位，直接拿来算电压）或 ADC_DataAlign_Left（结果整体左移 4 位，高 12 位有效，便于与 12 位 DAC 或 8 位音频数据拼接）。换算时别混：右对齐时电压 = 读数 × 3.3 / 4095；左对齐要先右移 4 位再算，否则读数会偏大 15 倍。",
+        "ADC_NbrOfChannel": "规则通道序列的长度，即 ADC_RegularChannelConfig 里 Rank 的最大编号，取值 1~16（断言 IS_ADC_REGULAR_LENGTH）。只采一路填 1；采 N 路要填 N，并按 1..N 的顺序调 ADC_RegularChannelConfig 设 Rank、把 ADC_ScanConvMode 选 ENABLE。这个值填小了会漏掉序列末尾的通道（SQR1 的 L 位只允许这么多次转换），填大了会转到尚未配置的通道，读到脏数据。"
+      }
+    }
+  }
+}

@@ -1,0 +1,173 @@
+{
+  "_comment": "寄存器映射结构体成员中文。",
+  "symbols": {
+    "ADC_TypeDef": {
+      "briefZh": "ADC 寄存器组。ADC1（12 位、18 个通道）与 ADC2（大容量型号才有）。C8T6 只有 ADC1。",
+      "membersZh": {
+        "SR": "状态寄存器。AWD 模拟看门狗触发、EOC 常规转换完成、JEOC 注入转换完成、JSTRT/STRT。ADC_GetFlagStatus / ADC_ClearFlag 操作这里。",
+        "CR1": "控制寄存器 1。AWDCH 看门狗通道、EOCIE/JEOCIE/AWDIE 中断使能、AWDEN/JAWDEN 看门狗使能、DUALMOD 双 ADC 模式、SCAN 扫描模式、DISCEN。ADC_Init / ADC_AnalogWatchdogCmd 写这里。",
+        "CR2": "控制寄存器 2。ADON 上电、CONT 连续转换、CAL 校准、DMA 使能、ALIGN 对齐、EXTSEL/EXTTRIG 外部触发、SWSTART 软件启动、JSWSTART 注入软件启动。ADC_SoftwareStartConvCmd / ADC_Cmd 写这里。",
+        "SMPR1": "采样时间寄存器 1。每 3 位一个字段，设定通道 10–17 的采样周期数（1.5–239.5 个 ADC 时钟）。ADC_RegularChannelConfig 写这里。",
+        "SMPR2": "采样时间寄存器 2。设定通道 0–9 的采样时间，位定义与 SMPR1 相同。",
+        "JOFR1": "注入通道 1 偏移寄存器。注入转换结果 = 原始值 − 偏移。ADC_SetInjectedOffset 写这里。",
+        "JOFR2": "注入通道 2 偏移寄存器，用法同 JOFR1。",
+        "JOFR3": "注入通道 3 偏移寄存器，用法同 JOFR1。",
+        "JOFR4": "注入通道 4 偏移寄存器，用法同 JOFR1。",
+        "HTR": "模拟看门狗高阈值寄存器。12 位，结果高于它时置 AWD 标志。ADC_AnalogWatchdogThresholdsConfig 写这里。",
+        "LTR": "模拟看门狗低阈值寄存器。12 位，结果低于它时置 AWD 标志。",
+        "SQR1": "规则序列寄存器 1。L[3:0] 指定序列长度减 1（1–16 个通道），SQ13–SQ16 是序列第 13–16 步的通道号。",
+        "SQR2": "规则序列寄存器 2。SQ7–SQ12，每 5 位一步，指定第 7–12 个转换用哪个通道。",
+        "SQR3": "规则序列寄存器 3。SQ1–SQ6，决定最先转换的 6 个通道。ADC_RegularChannelConfig 按 Rank 写 SQR1/2/3。",
+        "JSQR": "注入序列寄存器。JL 指定注入序列长度，JSQ1–JSQ4 是注入通道号。ADC_InjectedChannelConfig 写这里。",
+        "JDR1": "注入数据寄存器 1。注入序列第 1 个通道的结果。ADC_GetInjectedConversionValue(ADC_InjectedChannel_1) 读它。",
+        "JDR2": "注入数据寄存器 2。第 2 个注入通道的结果。",
+        "JDR3": "注入数据寄存器 3。第 3 个注入通道的结果。",
+        "JDR4": "注入数据寄存器 4。第 4 个注入通道的结果。",
+        "DR": "规则数据寄存器。常规序列最末一次转换的 16 位结果。ADC_GetConversionValue 读这里；单通道非扫描模式也直接读它。"
+      },
+      "memberOrder": [
+        "SR",
+        "CR1",
+        "CR2",
+        "SMPR1",
+        "SMPR2",
+        "JOFR1",
+        "JOFR2",
+        "JOFR3",
+        "JOFR4",
+        "HTR",
+        "LTR",
+        "SQR1",
+        "SQR2",
+        "SQR3",
+        "JSQR",
+        "JDR1",
+        "JDR2",
+        "JDR3",
+        "JDR4",
+        "DR"
+      ]
+    },
+    "DMA_Channel_TypeDef": {
+      "briefZh": "DMA 通道寄存器组。DMA1_Channel1–7、DMA2_Channel1–5 各一份（C8T6 只有 DMA1）。",
+      "membersZh": {
+        "CCR": "通道配置寄存器。EN 使能、TCIE/HTIE/TEIE 中断使能、DIR 方向、CIRC 循环模式、PINC/MINC 地址自增、PSIZE/MSIZE 位宽、PL 优先级、MEM2MEM 内存到内存。DMA_Init / DMA_Cmd 写这里。",
+        "CNDTR": "传输数量寄存器。剩余传输个数，每传一个减 1，减到 0 产生完成事件；循环模式下自动重装。DMA_SetCurrDataCounter / DMA_GetCurrDataCounter 读写这里。",
+        "CPAR": "外设地址寄存器。DMA 搬运的外设侧地址，通常是 &ADC1->DR、&USART1->DR 这类数据寄存器地址。",
+        "CMAR": "存储器地址寄存器。DMA 搬运的内存侧地址，通常指向数组首地址。"
+      },
+      "memberOrder": [
+        "CCR",
+        "CNDTR",
+        "CPAR",
+        "CMAR"
+      ]
+    },
+    "DMA_TypeDef": {
+      "briefZh": "DMA 控制器全局寄存器组。DMA1、DMA2 各一份；每通道的 CCR/CNDTR/CPAR/CMAR 见 DMA_Channel_TypeDef。",
+      "membersZh": {
+        "ISR": "中断状态寄存器。每通道占 4 位：TCIF 传输完成、HTIF 半传输、TEIF 传输错误、GIF 全局标志。DMA_GetFlagStatus / DMA_GetITStatus 查这里。",
+        "IFCR": "中断标志清除寄存器。对应位的 CTCIFx/CHTIFx/CTEIFx/CGIFx 写 1 清除标志。DMA_ClearFlag / DMA_ClearITPendingBit 写这里。"
+      },
+      "memberOrder": [
+        "ISR",
+        "IFCR"
+      ]
+    },
+    "EXTI_TypeDef": {
+      "briefZh": "外部中断/事件控制器寄存器组。只有一个实例 EXTI，管理 EXTI 线 0–19；线对应的端口由 AFIO->EXTICR 选择。",
+      "membersZh": {
+        "IMR": "中断屏蔽寄存器。位 n 为 1 表示 EXTI 线 n 的中断请求送到 NVIC。EXTI_Init 的 EXTI_LineCmd 写这里。",
+        "EMR": "事件屏蔽寄存器。置 1 只产生事件脉冲（可唤醒/触发其他外设），不进入中断。EXTI_Init 的 EXTI_Mode 写这里。",
+        "RTSR": "上升沿触发选择寄存器。置 1 表示 EXTI 线 n 在上升沿时请求。EXTI_Init 的 EXTI_Trigger 写这里。",
+        "FTSR": "下降沿触发选择寄存器。置 1 表示下降沿触发；与 RTSR 同时置位即双边沿触发。",
+        "SWIER": "软件中断事件寄存器。写 1 手动触发该线的中断/事件。EXTI_GenerateSWInterrupt 写这里。",
+        "PR": "挂起寄存器。哪条线发生了触发就置位，中断服务函数里读它判断来源，写 1 清除。EXTI_GetITStatus 读它，EXTI_ClearITPendingBit 写它。"
+      },
+      "memberOrder": [
+        "IMR",
+        "EMR",
+        "RTSR",
+        "FTSR",
+        "SWIER",
+        "PR"
+      ]
+    },
+    "FLASH_TypeDef": {
+      "briefZh": "FLASH 接口与闪存控制寄存器组。只有一个实例 FLASH，管 64KB（C8T6）或更大主存储区、页擦除、选项字节编程。",
+      "membersZh": {
+        "ACR": "访问控制寄存器。LATENCY 等待周期（24MHz 以下 0、24–48MHz 1、48–72MHz 2，必须与主频匹配否则乱码/跑飞）、HLFCYA 半周期访问、PRFTBE/PRFTBS 预取缓冲开关与状态。FLASH_SetLatency / FLASH_PrefetchBufferCmd 写这里。",
+        "KEYR": "密钥寄存器。依次写入 0x45670123、0xCDEF89AB 解锁 FPEC，解锁后才能编程主存储区。FLASH_Unlock 写这里。",
+        "OPTKEYR": "选项字节密钥寄存器。同样写入这两个密钥解锁选项字节操作。FLASH_Unlock / 选项字节读写流程中使用。",
+        "SR": "状态寄存器。BSY 忙、PGERR 编程错、WRPRTERR 写保护错、EOP 操作结束。FLASH_GetStatus / FLASH_WaitForLastOperation 轮询它。",
+        "CR": "控制寄存器。PG 编程、PER 页擦除、MER 全片擦除、OPTPG/OPTER 选项字节编程与擦除、STRT 启动、LOCK 加锁、OPTWRE、ERRIE/EOPIE 中断。FLASH_ProgramWord / FLASH_ErasePage / FLASH_Lock 写这里。",
+        "AR": "地址寄存器。编程或擦除的目标地址，写好后置 STRT 才开始动作。FLASH_ProgramWord / FLASH_ErasePage 先写这里。",
+        "RESERVED": "保留位。用于 32 位地址对齐的填充（对应偏移 0x18–0x1B），写它没有作用。",
+        "OBR": "选项字节寄存器。只读回显读保护（RDPRT）、USER（看门狗与复位行为）、DATA0/DATA1。FLASH_GetReadOutProtectionStatus 读这里。",
+        "WRPR": "写保护寄存器。32 位，每位保护 4KB，位为 0 表示对应页被写保护。FLASH_GetWriteProtectionStatus 读它。",
+        "RESERVED1": "保留位。用于 32 位地址对齐的填充（对应偏移 0x44–0x47），写它没有作用。",
+        "KEYR2": "密钥寄存器 2。仅大容量型号（第二个 Flash 存储区）有效，用法同 KEYR。C8T6 无第二存储区。",
+        "RESERVED2": "保留位。用于 32 位地址对齐的填充（对应偏移 0x4C–0x4F），写它没有作用。",
+        "SR2": "状态寄存器 2。仅大容量型号第二存储区有效，位定义同 SR。",
+        "CR2": "控制寄存器 2。仅大容量型号第二存储区有效，位定义同 CR。",
+        "AR2": "地址寄存器 2。仅大容量型号第二存储区有效，用法同 AR。C8T6 上这些寄存器无实际作用。"
+      },
+      "memberOrder": [
+        "ACR",
+        "KEYR",
+        "OPTKEYR",
+        "SR",
+        "CR",
+        "AR",
+        "RESERVED",
+        "OBR",
+        "WRPR",
+        "RESERVED1",
+        "KEYR2",
+        "RESERVED2",
+        "SR2",
+        "CR2",
+        "AR2"
+      ]
+    },
+    "PWR_TypeDef": {
+      "briefZh": "电源控制寄存器组。只有一个实例 PWR；用前必须先 RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR) 开时钟，否则写不进寄存器。",
+      "membersZh": {
+        "CR": "电源控制寄存器。LPDS 深度睡眠关调压器、PDDS 进入待机而非停机、CWUF 清除唤醒标志、CSBF 清除待机标志、PVDE/PVD 电压检测使能与阈值、DBP 取消备份域写保护。改 RTC/BKP 前必须 PWR_BackupAccessCmd(ENABLE) 置 DBP。",
+        "CSR": "电源控制/状态寄存器。WUF 唤醒标志、SBF 待机标志、PVDO 电压检测输出、EWUP 表示 PA0（WKUP）用作唤醒脚。PWR_GetFlagStatus / PWR_WakeUpPinCmd 读写这里。"
+      },
+      "memberOrder": [
+        "CR",
+        "CSR"
+      ]
+    },
+    "CRC_TypeDef": {
+      "briefZh": "CRC 计算单元寄存器组。只有一个实例 CRC，32 位 CRC（多项式 0x04C11DB7）；用前需开 RCC_AHBPeriph_CRC 时钟。",
+      "membersZh": {
+        "DR": "数据寄存器。写入一个 32 位字立即参与 CRC 计算，结果也从这里读。CRC_CalcCRC / CRC_CalcBlockCRC / CRC_CalcStringBuffer 读写这里。",
+        "IDR": "独立数据寄存器。写它只更新计算中间值，不触发新一次计算，用于软件逐字节/半字累加。",
+        "RESERVED0": "保留位。用于 32 位地址对齐的填充（对应偏移 0x8–0xB），写它没有作用。",
+        "RESERVED1": "保留位。用于 32 位地址对齐的填充（对应偏移 0x10–0x13），写它没有作用。",
+        "CR": "控制寄存器。RESET 位写 1 把 DR 置为 0xFFFFFFFF，开始一次新的 CRC 计算。CRC_ResetDR 写这里。"
+      },
+      "memberOrder": [
+        "DR",
+        "IDR",
+        "RESERVED0",
+        "RESERVED1",
+        "CR"
+      ]
+    },
+    "DBGMCU_TypeDef": {
+      "briefZh": "调试支持（DBGMCU）寄存器组。挂在 AHB 上，用于决定调试器暂停 CPU 时哪些外设继续运行。",
+      "membersZh": {
+        "IDCODE": "器件标识寄存器。只读，含产品编号、Flash 容量与版本号（REV_ID），可在运行时识别芯片型号/版本。",
+        "CR": "调试控制寄存器。每位置 1 表示调试暂停时该外设仍运行：DBG_TIM1_STOP–DBG_TIM4_STOP、DBG_WWDG_STOP、DBG_IWDG_STOP、DBG_I2C1_SMBUS_TIMEOUT、DBG_CAN1_STOP。单步调试看门狗/定时器时用它。"
+      },
+      "memberOrder": [
+        "IDCODE",
+        "CR"
+      ]
+    }
+  }
+}

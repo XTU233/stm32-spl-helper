@@ -1,0 +1,136 @@
+{
+  "_comment": "IWDG（独立看门狗）的中文补充：LSI 时钟、写保护解锁、分频与重装载值的喂狗周期计算。重点强调一旦启动无法关闭、只能靠复位退出，以及调试时的处理办法。",
+  "peripheral": "IWDG",
+  "functions": {
+    "IWDG_WriteAccessCmd": {
+      "briefZh": "打开或关闭对 IWDG_PR（分频）与 IWDG_RLR（重装载）寄存器的写权限。",
+      "usageZh": "IWDG 的关键寄存器被硬件写保护，**不先调用 IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable) 就直接调 IWDG_SetPrescaler 或 IWDG_SetReload，写入会被静默忽略**，最后生效的是默认值（分频 4、重装载 0xFFF），喂狗周期和你算的完全不一样。标准顺序是：解锁 → 设分频 → 设重装载 → 喂一次狗 → IWDG_Enable() → 立刻上锁。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "IWDG_WriteAccess": "写访问状态：IWDG_WriteAccess_Enable（0x5555，允许写 PR/RLR）或 IWDG_WriteAccess_Disable（0x0000，重新上锁）。"
+      },
+      "prerequisites": [
+        "IWDG 使用内部 LSI 时钟，不需要（也无法）通过 RCC_APBxPeriphClockCmd 打开 IWDG 时钟",
+        "必须在 IWDG_SetPrescaler / IWDG_SetReload 之前调用"
+      ],
+      "registers": ["IWDG_KR", "IWDG_PR", "IWDG_RLR"],
+      "relatedFunctions": ["IWDG_SetPrescaler", "IWDG_SetReload", "IWDG_Enable", "IWDG_ReloadCounter"],
+      "exampleCode": "/* 配置 IWDG 的标准顺序 */\nIWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);  /* 1. 解锁 */\nIWDG_SetPrescaler(IWDG_Prescaler_64);          /* 2. 分频 64 */\nIWDG_SetReload(625);                           /* 3. 重装载值：1 秒超时 */\nIWDG_ReloadCounter();                          /* 4. 喂一次狗 */\nIWDG_Enable();                                 /* 5. 启动（不可逆） */\nIWDG_WriteAccessCmd(IWDG_WriteAccess_Disable); /* 6. 上锁，防误改 */",
+      "notesZh": [
+        "漏掉解锁的典型现象：喂狗周期严重偏长或偏短，因为 PR/RLR 还是复位默认值",
+        "解锁与上锁是写 IWDG_KR 的两个魔数（0x5555 / 0x0000），上锁后再写 PR/RLR 不会报错但会被忽略",
+        "IWDG 用内部 LSI（约 40kHz），不占用也不依赖 APB 时钟，所以掉电/时钟故障时它仍能工作——这正是它比 WWDG 可靠的地方",
+        "启动后仍可再次解锁修改分频和重装载值，但已启动的看门狗不会因此停止"
+      ]
+    },
+
+    "IWDG_SetPrescaler": {
+      "briefZh": "设置 IWDG 的预分频系数。",
+      "usageZh": "把 LSI（典型 40kHz）分频后送给 12 位递减计数器。分频可选 4、8、16、32、64、128、256。**超时时间 = 分频系数 × (重装载值 + 1) / 40000 秒**。常用 IWDG_Prescaler_64 配合重装载值 625，得到 1 秒超时。设置前必须先解锁写保护。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "IWDG_Prescaler": "分频系数：IWDG_Prescaler_4、IWDG_Prescaler_8、IWDG_Prescaler_16、IWDG_Prescaler_32、IWDG_Prescaler_64、IWDG_Prescaler_128、IWDG_Prescaler_256。常用 IWDG_Prescaler_64。"
+      },
+      "prerequisites": [
+        "已调用 IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable) 解锁写保护"
+      ],
+      "registers": ["IWDG_PR", "IWDG_KR"],
+      "relatedFunctions": ["IWDG_WriteAccessCmd", "IWDG_SetReload", "IWDG_Enable"],
+      "exampleCode": "/* 计算：分频 64，重装载 625，LSI 约 40kHz\n   超时 = 64 * (625 + 1) / 40000 = 1.0 秒 */\nIWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);\nIWDG_SetPrescaler(IWDG_Prescaler_64);\nIWDG_SetReload(625);\nIWDG_ReloadCounter();\nIWDG_Enable();",
+      "notesZh": [
+        "计算必须按 **LSI ≈ 40kHz** 算，不能用 72MHz 或 8MHz；用错基准会让实际超时差几个数量级",
+        "LSI 的频率在 30~60kHz 之间随芯片和温度变化，实际超时可能与计算值差 ±50%，安全余量要留够",
+        "公式里的重装载值要 +1（计数器是从 RLR 递减到 0 才复位），少加 1 会略短",
+        "没解锁就调用，设置被忽略，实际用的是复位默认分频 4",
+        "分频系数越大，超时上限越长：分频 256、重装载 0xFFF 时最长约 26 秒"
+      ]
+    },
+
+    "IWDG_SetReload": {
+      "briefZh": "设置 IWDG 的重装载值，决定看门狗的超时时间。",
+      "usageZh": "12 位递减计数器的初值，取值 0~0xFFF（0~4095）。**超时时间 = 分频系数 × (Reload + 1) / 40000 秒**。这个值决定了你的主循环必须在多长时间内喂一次狗。设得太短会在正常业务抖动时误复位，设得太长则失去保护意义（程序跑飞后要等很久才复位）。设置前必须先解锁写保护，改完建议 IWDG_ReloadCounter() 让它立即生效。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "Reload": "重装载值，取值范围 0 ~ 0x0FFF（0~4095）。常用 625（配分频 64 得到 1 秒）、1250（2 秒）、4095（配分频 256 得到约 26 秒）。"
+      },
+      "prerequisites": [
+        "已调用 IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable) 解锁写保护",
+        "已设置分频系数 IWDG_SetPrescaler"
+      ],
+      "registers": ["IWDG_RLR", "IWDG_KR"],
+      "relatedFunctions": ["IWDG_SetPrescaler", "IWDG_ReloadCounter", "IWDG_WriteAccessCmd", "IWDG_Enable"],
+      "exampleCode": "/* 目标：2 秒超时。分频 64 -> 64/40000 = 1.6ms 每计数\n   Reload = 2 / 0.0016 - 1 = 1249，取 1250 留点余量 */\nIWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);\nIWDG_SetPrescaler(IWDG_Prescaler_64);\nIWDG_SetReload(1250);\nIWDG_ReloadCounter();   /* 立即把 RLR 装进计数器 */\nIWDG_Enable();",
+      "notesZh": [
+        "超范围的值（> 0xFFF）会被硬件截断成低 12 位，超时时间与预期不符",
+        "写入 RLR 后要 IWDG_ReloadCounter() 才会立即生效，否则要等当前计数递减到下溢后才装载新值",
+        "计数到 0 后不是停在 0，而是立刻产生复位；重装载值写 0 意味着极短超时，几乎立即复位",
+        "实际超时受 LSI 偏差影响很大，产品上要留 2 倍以上余量，并在最坏路径上实测"
+      ]
+    },
+
+    "IWDG_ReloadCounter": {
+      "briefZh": "喂狗：把重装载值重新装入 IWDG 计数器。",
+      "usageZh": "往 IWDG_KR 写 0xAAAA，使 12 位递减计数器重新从 RLR 开始计数。**必须在超时时间内周期性调用**，否则计数器递减到 0 时芯片被复位。喂狗位置很关键：**要放在主循环确实跑完一圈之后，或者由定时器中断按固定节奏喂**；如果放在某个可能卡死的循环里，就失去了保护意义。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {},
+      "prerequisites": [
+        "已调用 IWDG_Enable() 启动看门狗（未启动时喂狗没有意义）",
+        "喂狗间隔必须小于超时时间 = 分频 × (Reload+1) / 40000 秒"
+      ],
+      "registers": ["IWDG_KR", "IWDG_RLR"],
+      "relatedFunctions": ["IWDG_Enable", "IWDG_SetReload", "IWDG_SetPrescaler"],
+      "exampleCode": "int main(void)\n{\n  /* 初始化看门狗：1 秒超时 */\n  IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);\n  IWDG_SetPrescaler(IWDG_Prescaler_64);\n  IWDG_SetReload(625);\n  IWDG_ReloadCounter();\n  IWDG_Enable();\n\n  while (1)\n  {\n    Task_Run();        /* 所有业务都要在 1 秒内跑完一轮 */\n    IWDG_ReloadCounter();   /* 放在循环末尾：能检验整轮是否跑完 */\n  }\n}",
+      "notesZh": [
+        "喂狗放错位置是看门狗失效的头号原因：放在定时器中断里，即使主循环卡死也会一直被喂，看门狗形同虚设",
+        "喂狗间隔要小于超时时间的 50%~70%，给 LSI 偏差和业务抖动留余量",
+        "启动后无法停止喂狗——只要程序在跑就必须一直喂，任何长时间阻塞（如 Flash 擦写、等待外部器件）都要评估是否超时，必要时在阻塞循环里插喂狗",
+        "调试打断点停在主循环里，会直接被看门狗复位，表现为\"一调试就重启\""
+      ]
+    },
+
+    "IWDG_Enable": {
+      "briefZh": "启动独立看门狗。",
+      "usageZh": "往 IWDG_KR 写 0xCCCC，硬件开始递减计数。**这一步是不可逆的：IWDG 一旦启动就无法通过软件关闭，只能靠系统复位（或掉电）才能停下来**。所以调用之前必须确保分频和重装载值已经设好（先解锁、设置、喂一次狗），并且主循环里已经有喂狗语句。调试时尤其危险：如果调试器暂停后没有喂狗机制，芯片会不停复位，导致烧录和单步都做不了。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {},
+      "prerequisites": [
+        "已调用 IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable) 解锁",
+        "已调用 IWDG_SetPrescaler 与 IWDG_SetReload 设定好超时时间",
+        "已调用 IWDG_ReloadCounter 把重装载值装入计数器",
+        "主循环中已经准备好周期性的 IWDG_ReloadCounter 调用"
+      ],
+      "registers": ["IWDG_KR", "IWDG_SR"],
+      "relatedFunctions": ["IWDG_WriteAccessCmd", "IWDG_SetPrescaler", "IWDG_SetReload", "IWDG_ReloadCounter"],
+      "exampleCode": "/* 完整初始化：注意顺序，Enable 必须放最后 */\nvoid IWDG_Config(void)\n{\n  IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);  /* 解锁 */\n  IWDG_SetPrescaler(IWDG_Prescaler_64);\n  IWDG_SetReload(625);                           /* 1 秒超时 */\n  IWDG_ReloadCounter();                          /* 先喂一次，避免刚启动就复位 */\n  IWDG_Enable();                                 /* 启动，之后无法关闭 */\n}\n\n/* 调试建议：用条件编译，只在正式版本里启动看门狗 */\n#ifdef RELEASE\n  IWDG_Config();\n#endif",
+      "notesZh": [
+        "**一旦启动无法关闭**：软件里没有任何寄存器能停掉它，退出方式只有复位；想让芯片不复位就只能一直喂狗",
+        "忘记在 Enable 前 IWDG_ReloadCounter()，计数器从 0 开始，可能几毫秒内就复位",
+        "调试时最容易踩坑：在断点处暂停超过超时时间，芯片立刻被复位，Keil/IAR 里表现为\"刚连上就断开\"。解决办法是在调试配置里勾选 \"Debug: Stop watchdog\" 相关的 DBGMCU 位，或者调试阶段先不调用 IWDG_Enable",
+        "STM32F1 的 DBGMCU_CR 里 IWDG 没有单独的冻结位（只有 WWDG 有 DBG_WWDG_STOP），所以 IWDG 在调试暂停时仍然会计数——这是 F1 与 F4 的重要差别，调试时只能靠临时不启动或改用 WWDG",
+        "IWDG 复位后 IWDG_KR 的启动位保持，但复位本身会重启程序；如果程序一上电就启动看门狗而启动流程太慢，会陷入复位循环",
+        "上电后 LSI 起振需要一点时间，立即启动看门狗在极端情况下可能立刻超时；保险做法是启动前先喂一次"
+      ]
+    },
+
+    "IWDG_GetFlagStatus": {
+      "briefZh": "查询 IWDG 的状态标志（分频/重装载值更新是否完成）。",
+      "usageZh": "可查询 IWDG_FLAG_PVU（预分频值更新中）和 IWDG_FLAG_RVU（重装载值更新中）。IWDG_PR 和 IWDG_RLR 是跨时钟域的寄存器，写入后需要几个 LSI 周期才能同步过去，这段时间对应的标志位为 SET。**如果要连续修改分频和重装载值，应该先等 PVU/RVU 清零再改**，否则后一次写可能覆盖失败。日常使用中大多数工程直接加延时，不查这个标志，但严格做法应该查。",
+      "returnDescZh": "返回 FlagStatus：SET 表示对应的更新正在进行中，RESET 表示已完成。",
+      "paramsZh": {
+        "IWDG_FLAG": "要查询的标志：IWDG_FLAG_PVU（预分频值更新中）或 IWDG_FLAG_RVU（重装载值更新中）。"
+      },
+      "prerequisites": [
+        "已调用 IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable) 并写入过 PR/RLR"
+      ],
+      "registers": ["IWDG_SR"],
+      "relatedFunctions": ["IWDG_SetPrescaler", "IWDG_SetReload", "IWDG_WriteAccessCmd"],
+      "exampleCode": "/* 严格做法：改完分频等更新完成，再改重装载 */\nIWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);\nIWDG_SetPrescaler(IWDG_Prescaler_64);\nwhile (IWDG_GetFlagStatus(IWDG_FLAG_PVU) != RESET) { }  /* 等分频生效 */\n\nIWDG_SetReload(625);\nwhile (IWDG_GetFlagStatus(IWDG_FLAG_RVU) != RESET) { }  /* 等重装载生效 */\n\nIWDG_ReloadCounter();\nIWDG_Enable();",
+      "notesZh": [
+        "返回 SET 表示\"正在更新\"，不是\"更新完成\"，与其它外设标志语义相反，容易判反",
+        "不要在 IWDG 未使能时死等这些标志；写入后若没有 LSI 时钟推进（极少数异常情况）会卡死",
+        "日常简单工程里用几个 __NOP 或短延时也能过，但产品代码建议按标志等待",
+        "注意这个函数只能查 PVU/RVU，IWDG 没有\"已复位\"之类的其它状态位可查；想判断本次复位是不是 IWDG 造成的，要查 RCC_GetFlagStatus(RCC_FLAG_IWDGRST)"
+      ]
+    }
+  }
+}

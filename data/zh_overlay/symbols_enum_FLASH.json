@@ -1,0 +1,15 @@
+{
+  "_comment": "FLASH 枚举成员中文（面向 STM32F103C8T6）。",
+  "symbols": {
+    "FLASH_Status": {
+      "briefZh": "Flash 操作状态枚举，作为 FLASH_ProgramWord/HalfWord、FLASH_ErasePage 等函数的返回值，也用于等待操作完成。",
+      "membersZh": {
+        "FLASH_BUSY": "操作正在进行（1）。擦写尚未结束，应继续等待；FLASH_WaitForLastOperation 会超时返回 FLASH_TIMEOUT 而不是一直卡住。在擦写 Flash 期间 CPU 取指会被暂停，中断也不能及时响应，注意时序。",
+        "FLASH_ERROR_PG": "编程错误。写入时目标位置不是已擦除状态（半字不是 0xFFFF），或写入了保留区域。排查要点：写 Flash 前必须先擦除对应页，且只能按半字/字对齐写入（F103 不支持按字节改写）。",
+        "FLASH_ERROR_WRP": "写保护错误。目标页被选项字节写保护，擦除/编程被拒绝。解除需要解锁 OPT 后修改选项字节并重新上电；F103C8T6 有 64KB Flash，写保护按 4KB 页分组（WRP0~WRP3）。",
+        "FLASH_COMPLETE": "操作成功完成。擦除/编程已正常结束。这是判断写 Flash 是否成功的唯一依据，应写成 if (FLASH_ProgramHalfWord(...) != FLASH_COMPLETE) 处理失败。",
+        "FLASH_TIMEOUT": "等待超时。在设定的超时计数内 Flash 操作仍未完成（FLASH_GetStatus 一直返回 FLASH_BUSY）。常见原因：时钟未正确配置、Flash 未解锁（未调用 FLASH_Unlock）、接口异常；出现后先 FLASH_Lock，再检查时钟/电压并重试。"
+      }
+    }
+  }
+}

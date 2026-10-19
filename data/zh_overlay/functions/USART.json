@@ -1,0 +1,649 @@
+{
+  "_comment": "USART 外设的中文补充。面向 STM32F103C8T6（LQFP48，只有 USART1/2/3）。只写需要覆盖/补充的字段，留空的字段保留 ST 英文原文。",
+  "peripheral": "USART",
+  "functions": {
+    "USART_DeInit": {
+      "briefZh": "把指定 USART 的所有寄存器恢复为复位默认值。",
+      "usageZh": "需要把一路串口彻底恢复到上电状态时使用，例如同一路串口在不同阶段要切成完全不同的配置，或者调试时想把之前乱配的参数清干净。内部通过 RCC 的外设复位寄存器实现：USART1 走 APB2，USART2/USART3 走 APB1，效果等同于对该外设做一次硬复位。日常初始化流程里不需要调用它。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要复位的外设，取值 USART1、USART2、USART3。C8T6 是中等容量器件，没有 UART4/UART5。"
+      },
+      "prerequisites": [],
+      "registers": ["RCC_APB2RSTR", "RCC_APB1RSTR", "USART_CR1", "USART_CR2", "USART_CR3", "USART_BRR", "USART_GTPR"],
+      "relatedFunctions": ["USART_Init", "USART_Cmd", "RCC_APB2PeriphResetCmd", "RCC_APB1PeriphResetCmd"],
+      "exampleCode": "/* 把 USART1 恢复到上电默认状态 */\nUSART_DeInit(USART1);\n\n/* 复位会关掉外设使能位，之后必须重新初始化才能用 */\nUSART_Init(USART1, &USART_InitStructure);\nUSART_Cmd(USART1, ENABLE);",
+      "notesZh": [
+        "复位会清掉 CR1 的 UE 位以及所有中断/DMA 使能设置，只调 DeInit 不重新初始化，串口会彻底不工作",
+        "它不会动 GPIO 的引脚配置，引脚仍然停留在复用状态",
+        "如果只是想换一个波特率或数据格式，直接重新调用 USART_Init 即可，不必 DeInit"
+      ]
+    },
+
+    "USART_Init": {
+      "briefZh": "按结构体参数初始化串口，并根据当前 APB 时钟自动计算波特率分频值写入 BRR。",
+      "usageZh": "串口初始化的核心函数，一次性配置字长、停止位、校验、收发模式和硬件流控，同时算出 BRR。推荐调用顺序：开 GPIO 时钟 → 开 USART 时钟 → 配 TX/RX 引脚 → （同步模式才需要）USART_ClockInit → USART_Init → USART_ITConfig / USART_DMACmd → USART_Cmd(ENABLE)。它内部会调用 RCC_GetClocksFreq() 读取真实时钟：USART1 取 PCLK2，其余取 PCLK1，所以只要时钟树在调用它之前已经配好，波特率就是准的。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要初始化的外设。C8T6 上取值 USART1（挂 APB2，72MHz）、USART2 或 USART3（挂 APB1，36MHz）。",
+        "USART_InitStruct": "指向 USART_InitTypeDef 的指针，六个字段都必须先赋值：USART_BaudRate、USART_WordLength、USART_StopBits、USART_Parity、USART_Mode、USART_HardwareFlowControl。建议先用 USART_StructInit 填默认值再改需要的字段。"
+      },
+      "prerequisites": [
+        "已使能外设时钟：USART1 用 RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE)，USART2/USART3 用 RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2 或 _USART3, ENABLE)",
+        "TX 引脚已配置为 GPIO_Mode_AF_PP，RX 引脚已配置为 GPIO_Mode_IN_FLOATING 或 GPIO_Mode_IPU",
+        "系统时钟树已配置完成（默认 SYSCLK 72MHz、APB1 36MHz），且不会再改动",
+        "USART_InitStruct 的六个字段全部已赋值（推荐先用 USART_StructInit）"
+      ],
+      "registers": ["USART_CR1", "USART_CR2", "USART_CR3", "USART_BRR"],
+      "relatedFunctions": ["USART_StructInit", "USART_Cmd", "USART_ITConfig", "USART_ClockInit", "USART_DeInit", "RCC_APB2PeriphClockCmd", "RCC_APB1PeriphClockCmd"],
+      "exampleCode": "USART_InitTypeDef USART_InitStructure;\nGPIO_InitTypeDef GPIO_InitStructure;\n\n/* 1. 开时钟：GPIOA 与 USART1 都在 APB2 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_USART1, ENABLE);\n\n/* 2. TX = PA9，必须配成复用推挽 */\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;\nGPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;\nGPIO_Init(GPIOA, &GPIO_InitStructure);\n\n/* 3. RX = PA10，配成浮空输入或上拉输入 */\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;\nGPIO_Init(GPIOA, &GPIO_InitStructure);\n\n/* 4. 串口参数：先填默认值再改，避免结构体里是随机值 */\nUSART_StructInit(&USART_InitStructure);\nUSART_InitStructure.USART_BaudRate = 115200;\nUSART_InitStructure.USART_WordLength = USART_WordLength_8b;\nUSART_InitStructure.USART_StopBits = USART_StopBits_1;\nUSART_InitStructure.USART_Parity = USART_Parity_No;\nUSART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;\nUSART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;\nUSART_Init(USART1, &USART_InitStructure);\n\n/* 5. 最后一定要使能，否则收发都不工作 */\nUSART_Cmd(USART1, ENABLE);",
+      "notesZh": [
+        "USART1 挂在 APB2（72MHz），USART2/USART3 挂在 APB1（36MHz）。BRR 由函数内部按实际 PCLK 计算，一般不会错；但如果自己在 USART_Init 之后又改了 RCC 时钟（切换 HSE/HSI、改 APB 分频），BRR 不会自动更新，串口立刻乱码，必须重新 USART_Init",
+        "USART_Mode 忘了带 USART_Mode_Tx 就发不出数据，忘了 USART_Mode_Rx 就收不到数据，现象是程序不报错但串口毫无反应",
+        "结构体六个字段一个都不能漏，漏掉的字段是栈上随机值，可能配出奇怪的波特率或校验方式；最稳的写法是先 USART_StructInit",
+        "硬件流控不用时必须填 USART_HardwareFlowControl_None；若误填 RTS/CTS，而 RTS/CTS 引脚悬空，CTS 一直无效会导致发送被硬件卡住",
+        "引脚配错是另一个高频问题：TX 必须 GPIO_Mode_AF_PP，配成 Out_PP 或 IPU 都发不出波形；RX 配成 AF_PP 也收不到数据",
+        "只初始化不调用 USART_Cmd(USART1, ENABLE)，UE 位为 0，串口完全不工作",
+        "9600 和 115200 在 72MHz 下的 BRR 分频值都能精确表示，误差极小；真正容易出问题的是时钟源本身不准，比如用未校准的内部 HSI"
+      ]
+    },
+
+    "USART_StructInit": {
+      "briefZh": "把 USART_InitTypeDef 各字段填充为默认值。",
+      "usageZh": "在 USART_Init 之前调用，得到一个确定的起点，避免结构体里是栈上的随机值。默认值为：USART_BaudRate = 9600、USART_WordLength = USART_WordLength_8b、USART_StopBits = USART_StopBits_1、USART_Parity = USART_Parity_No、USART_Mode = USART_Mode_Rx | USART_Mode_Tx、USART_HardwareFlowControl = USART_HardwareFlowControl_None。注意默认波特率是 9600 而不是常用的 115200，调用后必须显式改。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USART_InitStruct": "待初始化的结构体指针。"
+      },
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": ["USART_Init", "USART_ClockStructInit"],
+      "exampleCode": "USART_InitTypeDef USART_InitStructure;\n\nUSART_StructInit(&USART_InitStructure);        /* 先填默认值 */\nUSART_InitStructure.USART_BaudRate = 115200;   /* 默认是 9600，必须改 */\nUSART_Init(USART1, &USART_InitStructure);",
+      "notesZh": [
+        "默认波特率是 9600，忘了改成 115200 会导致电脑端按 115200 打开时满屏乱码，这类问题往往排查很久",
+        "默认值已经是 8 位数据、1 位停止、无校验、收发都开、无硬件流控，是绝大多数场景想要的组合，通常只需要再改波特率",
+        "在 Keil 里局部结构体不初始化也不会报错，只是内容是随机值，所以这一步不能省"
+      ]
+    },
+
+    "USART_ClockInit": {
+      "briefZh": "配置同步模式下的时钟输出（CR2 的 CLKEN、CPOL、CPHA、LBCL 位）。",
+      "usageZh": "只在同步模式（USART_Clock_Enable，由 SCLK 引脚输出时钟，用法类似 SPI 主机）或智能卡模式下才有意义。普通异步串口通信完全不需要调用它，保持默认的 USART_Clock_Disable 即可。函数只改写 CR2 中 CLKEN/CPOL/CPHA/LBCL 这几位，不会动停止位配置。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要配置的外设，SPL 的断言只允许 USART1、USART2、USART3。",
+        "USART_ClockInitStruct": "指向 USART_ClockInitTypeDef 的指针，四个字段都要赋值：USART_Clock、USART_CPOL、USART_CPHA、USART_LastBit。建议先用 USART_ClockStructInit。"
+      },
+      "prerequisites": [
+        "已使能外设时钟",
+        "同步模式下 SCLK 对应引脚需配置为 GPIO_Mode_AF_PP（USART1 是 PA8，USART2 是 PA4，USART3 是 PB12）"
+      ],
+      "registers": ["USART_CR2"],
+      "relatedFunctions": ["USART_ClockStructInit", "USART_Init", "USART_Cmd"],
+      "exampleCode": "USART_ClockInitTypeDef USART_ClockInitStructure;\n\n/* 同步模式：USART1 在 SCLK（PA8）上输出时钟 */\nUSART_ClockStructInit(&USART_ClockInitStructure);\nUSART_ClockInitStructure.USART_Clock = USART_Clock_Enable;\nUSART_ClockInitStructure.USART_CPOL = USART_CPOL_Low;\nUSART_ClockInitStructure.USART_CPHA = USART_CPHA_1Edge;\nUSART_ClockInitStructure.USART_LastBit = USART_LastBit_Disable;\nUSART_ClockInit(USART1, &USART_ClockInitStructure);",
+      "notesZh": [
+        "异步串口（绝大多数项目）不要调用它，USART_Clock 保持 Disable",
+        "C8T6 的 USART1/2/3 都支持同步模式，但实际项目里几乎不用，遇到相关代码多半是从别的例程抄来的",
+        "同步模式下还要额外配置 SCLK 引脚为复用推挽，否则时钟出不来"
+      ]
+    },
+
+    "USART_ClockStructInit": {
+      "briefZh": "把 USART_ClockInitTypeDef 各字段填充为默认值。",
+      "usageZh": "配合 USART_ClockInit 使用，避免结构体里是随机值。默认值为：USART_Clock = USART_Clock_Disable、USART_CPOL = USART_CPOL_Low、USART_CPHA = USART_CPHA_1Edge、USART_LastBit = USART_LastBit_Disable，也就是「不开同步时钟」。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USART_ClockInitStruct": "待初始化的结构体指针。"
+      },
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": ["USART_ClockInit"],
+      "exampleCode": "USART_ClockInitTypeDef USART_ClockInitStructure;\n\nUSART_ClockStructInit(&USART_ClockInitStructure);\nUSART_ClockInitStructure.USART_Clock = USART_Clock_Enable;   /* 再改成需要的值 */\nUSART_ClockInit(USART1, &USART_ClockInitStructure);",
+      "notesZh": [
+        "只在做同步模式或智能卡时才会用到，普通异步串口一路都不会调用它"
+      ]
+    },
+
+    "USART_Cmd": {
+      "briefZh": "使能或关闭整个 USART 外设（CR1 的 UE 位）。",
+      "usageZh": "初始化序列的最后一步，必须在 USART_Init 之后调用 USART_Cmd(USARTx, ENABLE)，否则串口完全不工作。反过来，需要临时改配置（重新算波特率、切换工作模式）时，规范做法是先 USART_Cmd(DISABLE)，改完再 ENABLE。发送过程中不要随手 DISABLE，会把当前字节截断。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要使能或关闭的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "NewState": "ENABLE 使能外设（置 UE 位），DISABLE 关闭外设（清 UE 位）。"
+      },
+      "prerequisites": [
+        "已用 USART_Init 配置好参数，否则使能的是一个复位默认状态的串口",
+        "已使能对应的外设时钟"
+      ],
+      "registers": ["USART_CR1"],
+      "relatedFunctions": ["USART_Init", "USART_DeInit", "USART_ITConfig", "USART_DMACmd"],
+      "exampleCode": "/* 初始化序列的最后一步 */\nUSART_Cmd(USART1, ENABLE);\n\n/* 需要临时改配置时：先关、再改、再开 */\nUSART_Cmd(USART1, DISABLE);\nUSART_Init(USART1, &USART_InitStructure);\nUSART_Cmd(USART1, ENABLE);",
+      "notesZh": [
+        "忘记调用是最常见的「串口没反应」原因：程序不报错、不卡死，就是既收不到也发不出",
+        "DISABLE 会清 UE 位，正在发送的字节会被打断；确实需要关的时候，先等 USART_FLAG_TC 置位再关",
+        "本函数只改 UE 位，不会清掉之前用 USART_ITConfig 配好的中断使能位，重新 ENABLE 后那些中断仍然有效",
+        "在 USART_Init 之前调用没有意义，配置会被随后的 USART_Init 改写"
+      ]
+    },
+
+    "USART_ITConfig": {
+      "briefZh": "使能或关闭指定的 USART 中断源。",
+      "usageZh": "用中断方式收发数据时的必经步骤。典型接收流程：USART_ITConfig(USART1, USART_IT_RXNE, ENABLE) 打开接收中断 → 用 NVIC_Init 使能 USART1_IRQn → 实现 USART1_IRQHandler。要注意本函数只负责开外设侧的中断使能位（CR1/CR2/CR3），NVIC 必须另外配置，两者缺一不可。断言允许的值是：USART_IT_PE、USART_IT_TXE、USART_IT_TC、USART_IT_RXNE、USART_IT_IDLE、USART_IT_LBD、USART_IT_CTS、USART_IT_ERR。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要配置的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "USART_IT": "中断源，一次只能传一个：USART_IT_RXNE（收到数据）、USART_IT_TXE（发送寄存器空）、USART_IT_TC（发送完成）、USART_IT_IDLE（总线空闲，常用来判断一帧结束）、USART_IT_PE、USART_IT_LBD、USART_IT_CTS、USART_IT_ERR（错误中断组合）。",
+        "NewState": "ENABLE 打开该中断，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已使能外设时钟并完成 USART_Init",
+        "已在 NVIC 中使能对应通道：USART1_IRQn / USART2_IRQn / USART3_IRQn",
+        "已实现对应的中断服务函数 USART1_IRQHandler / USART2_IRQHandler / USART3_IRQHandler"
+      ],
+      "registers": ["USART_CR1", "USART_CR2", "USART_CR3", "USART_SR"],
+      "relatedFunctions": ["USART_GetITStatus", "USART_ClearITPendingBit", "USART_Cmd", "NVIC_Init", "USART_DMACmd"],
+      "exampleCode": "NVIC_InitTypeDef NVIC_InitStructure;\n\n/* 1. 打开串口侧的接收中断使能位 */\nUSART_ITConfig(USART1, USART_IT_RXNE, ENABLE);\n\n/* 2. NVIC 也必须配，只调 USART_ITConfig 是进不了中断的 */\nNVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\n/* 3. 最后使能串口 */\nUSART_Cmd(USART1, ENABLE);\n\n/* 4. 中断服务函数 */\nvoid USART1_IRQHandler(void)\n{\n  if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)\n  {\n    uint8_t ch = (uint8_t)USART_ReceiveData(USART1);\n    /* 处理 ch ... */\n  }\n}",
+      "notesZh": [
+        "只调 USART_ITConfig 不配 NVIC，中断永远不会进来，这是最常见的漏配",
+        "USART_IT_ERR 是一个组合位，会同时打开帧错误、噪声错误、溢出错误中断；调试阶段建议先只开 USART_IT_RXNE",
+        "用 TXE 中断做不定长发送很方便，但最后一个字节发出后必须 USART_ITConfig(USARTx, USART_IT_TXE, DISABLE)，否则 TXE 一直是 1，会无限进中断",
+        "接收中断里若长时间不读 DR，会置 ORE 溢出标志并丢数据；ORE 不清掉会反复进中断",
+        "中断服务函数名必须和启动文件里的向量名完全一致，拼错不会报错，只会跑进默认的死循环"
+      ]
+    },
+
+    "USART_DMACmd": {
+      "briefZh": "使能或关闭 USART 的 DMA 发送/接收请求。",
+      "usageZh": "需要大数据量、高波特率连续收发（例如 115200 以上不停收包、串口刷屏）时用 DMA 代替中断，可以大幅降低 CPU 占用。调用顺序：先配置并初始化 DMA 通道 → USART_DMACmd 打开 USART 侧的 DMA 请求 → DMA_Cmd 启动传输 → USART_Cmd(ENABLE)。F103 的对应关系是：USART1_TX 用 DMA1_Channel4、USART1_RX 用 DMA1_Channel5；USART2_TX 用 DMA1_Channel7、USART2_RX 用 DMA1_Channel6；USART3_TX 用 DMA1_Channel2、USART3_RX 用 DMA1_Channel3。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要配置的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "USART_DMAReq": "DMA 请求方向，取值 USART_DMAReq_Tx（置 CR3 的 DMAT 位）或 USART_DMAReq_Rx（置 DMAR 位），两者可以按位或同时使用。",
+        "NewState": "ENABLE 打开 DMA 请求，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已使能 DMA1 时钟（RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE)）",
+        "已用 DMA_Init 配置好对应通道，外设地址填 &USARTx->DR",
+        "已用 USART_Init 完成串口配置"
+      ],
+      "registers": ["USART_CR3", "USART_DR", "USART_SR"],
+      "relatedFunctions": ["DMA_Init", "DMA_Cmd", "USART_Init", "USART_GetFlagStatus", "USART_ITConfig"],
+      "exampleCode": "DMA_InitTypeDef DMA_InitStructure;\n\n/* 1. 开 DMA1 时钟 */\nRCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);\n\n/* 2. 配置 USART1_TX 对应的 DMA1 通道 4 */\nDMA_DeInit(DMA1_Channel4);\nDMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&USART1->DR;\nDMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)txBuffer;\nDMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;\nDMA_InitStructure.DMA_BufferSize = len;\nDMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;\nDMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;\nDMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;\nDMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;\nDMA_InitStructure.DMA_Mode = DMA_Mode_Normal;\nDMA_InitStructure.DMA_Priority = DMA_Priority_Medium;\nDMA_InitStructure.DMA_M2M = DMA_M2M_Disable;\nDMA_Init(DMA1_Channel4, &DMA_InitStructure);\n\n/* 3. 先打开 USART 的 DMA 发送请求，再启动 DMA，顺序反了会丢第一个字节 */\nUSART_DMACmd(USART1, USART_DMAReq_Tx, ENABLE);\nDMA_Cmd(DMA1_Channel4, ENABLE);",
+      "notesZh": [
+        "顺序不能反：必须先 USART_DMACmd 打开请求、再启动 DMA 传输，否则第一个字节可能丢失",
+        "用 DMA 发送时，最后一个字节从数据寄存器搬进移位寄存器后 USART_FLAG_TC 才置位；判断「整帧真的发完」要等 DMA 传输完成中断再等 TC，只看其中一个会提前",
+        "接收用 DMA 时通常配成 DMA_Mode_Circular 循环模式，配合 USART_IT_IDLE 中断来判断一帧结束，这是最常用的不定长收包方案",
+        "DMA 请求打开后 RXNE 中断依然会触发，两种方式同时用会导致同一个字节被读两次，二选一",
+        "通道选错是隐蔽错误：USART1_RX 必须用 DMA1_Channel5，配到别的通道上现象是收不到任何数据且不报错"
+      ]
+    },
+
+    "USART_SetAddress": {
+      "briefZh": "设置多机通信时本节点的地址（写入 CR2 的 ADD 位）。",
+      "usageZh": "只在多处理器通信（Multiprocessor communication）模式下有意义。配合 USART_WakeUpConfig(USART_WakeUp_AddressMark) 使用：从机在静默模式下收到地址帧后由硬件与本地地址比较，匹配才唤醒并产生接收中断。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要配置的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "USART_Address": "本节点地址，只有 4 位，取值 0~15（断言要求 ADDRESS <= 0xF）。"
+      },
+      "prerequisites": [
+        "已用 USART_Init 完成基本配置",
+        "需配合 USART_WakeUpConfig 选择地址标记唤醒方式"
+      ],
+      "registers": ["USART_CR2"],
+      "relatedFunctions": ["USART_WakeUpConfig", "USART_ReceiverWakeUpCmd", "USART_Init"],
+      "exampleCode": "/* 多机通信：本机地址设为 3 */\nUSART_SetAddress(USART2, 0x03);\nUSART_WakeUpConfig(USART2, USART_WakeUp_AddressMark);\nUSART_ReceiverWakeUpCmd(USART2, ENABLE);   /* 进入静默，等待地址匹配唤醒 */",
+      "notesZh": [
+        "适用场景：一条总线上挂多个从机、靠地址区分节点；普通点对点串口完全不需要",
+        "地址只有 4 位，一条总线上最多 16 个节点",
+        "地址匹配由硬件完成，唤醒后软件仍然要读 DR 才能取到数据"
+      ]
+    },
+
+    "USART_WakeUpConfig": {
+      "briefZh": "选择多机通信的唤醒方式：空闲总线唤醒或地址标记唤醒。",
+      "usageZh": "同样只在多处理器通信模式下使用。USART_WakeUp_IdleLine 表示检测到一段空闲电平后唤醒；USART_WakeUp_AddressMark 表示收到地址字节（最高位为 1）后唤醒，后者更常用，也才能配合 USART_SetAddress 做地址过滤。函数只改写 CR1 的 WAKE 位。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要配置的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "USART_WakeUp": "唤醒方式，取值 USART_WakeUp_IdleLine（空闲总线唤醒）或 USART_WakeUp_AddressMark（地址标记唤醒）。"
+      },
+      "prerequisites": [
+        "已用 USART_Init 完成基本配置",
+        "需配合 USART_ReceiverWakeUpCmd 进入/退出静默模式"
+      ],
+      "registers": ["USART_CR1"],
+      "relatedFunctions": ["USART_ReceiverWakeUpCmd", "USART_SetAddress", "USART_Init"],
+      "exampleCode": "USART_WakeUpConfig(USART2, USART_WakeUp_AddressMark);\nUSART_ReceiverWakeUpCmd(USART2, ENABLE);   /* 进入静默模式 */",
+      "notesZh": [
+        "适用场景：多机通信（一条总线多从机）；普通串口通信用不到",
+        "选地址标记唤醒时记得同时用 USART_SetAddress 设置本机地址，否则不会唤醒"
+      ]
+    },
+
+    "USART_ReceiverWakeUpCmd": {
+      "briefZh": "让接收端进入或退出静默模式（CR1 的 RWU 位）。",
+      "usageZh": "多机通信时，从机平时处于静默模式，不产生 RXNE 中断，收到匹配的地址或空闲信号后被硬件自动唤醒。ENABLE 进入静默，DISABLE 退出。普通点对点通信里用不到。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要操作的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "NewState": "ENABLE 进入静默模式，DISABLE 退出静默模式。"
+      },
+      "prerequisites": [
+        "已用 USART_WakeUpConfig 选好唤醒方式"
+      ],
+      "registers": ["USART_CR1"],
+      "relatedFunctions": ["USART_WakeUpConfig", "USART_SetAddress"],
+      "exampleCode": "USART_ReceiverWakeUpCmd(USART2, ENABLE);    /* 进入静默，等待被唤醒 */\n/* ... 收到匹配的地址帧后硬件自动唤醒 ... */\nUSART_ReceiverWakeUpCmd(USART2, DISABLE);   /* 退出静默 */",
+      "notesZh": [
+        "适用场景：多机通信从机侧；普通串口不要调用",
+        "静默模式下 RXNE 不置位，收不到任何数据，误开会导致「串口突然收不到数据」且很难查"
+      ]
+    },
+
+    "USART_LINBreakDetectLengthConfig": {
+      "briefZh": "设置 LIN 模式下的 break 检测长度（10 位或 11 位）。",
+      "usageZh": "只在 LIN 总线通信时使用，决定检测到连续多少位低电平才算一个 break 帧。从机侧按 LIN 协议规范配置，多数情况用 11 位。检测到 break 后 SR 的 LBD 标志置位，可用 USART_FLAG_LBD 查询或 USART_IT_LBD 中断处理。普通串口通信不需要。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要配置的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "USART_LINBreakDetectLength": "break 检测长度，取值 USART_LINBreakDetectLength_10b（10 位）或 USART_LINBreakDetectLength_11b（11 位）。"
+      },
+      "prerequisites": [
+        "已用 USART_Init 完成基本配置",
+        "需配合 USART_LINCmd(ENABLE) 使用"
+      ],
+      "registers": ["USART_CR2"],
+      "relatedFunctions": ["USART_LINCmd", "USART_SendBreak", "USART_ITConfig", "USART_GetFlagStatus"],
+      "exampleCode": "USART_LINBreakDetectLengthConfig(USART2, USART_LINBreakDetectLength_11b);\nUSART_LINCmd(USART2, ENABLE);\nUSART_ITConfig(USART2, USART_IT_LBD, ENABLE);   /* 检测到 break 时进中断 */",
+      "notesZh": [
+        "适用场景：车载 LIN 总线、与 LIN 传感器/执行器通信",
+        "STM32F103 常被用作 LIN 主节点，配合 USART_SendBreak 发同步间隔，从机侧用本函数配检测长度",
+        "普通 UART 通信请保持默认，改错这一位不会报错，只会在 LIN 通信时表现为收不到 break"
+      ]
+    },
+
+    "USART_LINCmd": {
+      "briefZh": "使能或关闭 LIN 模式（CR2 的 LINEN 位）。",
+      "usageZh": "做 LIN 总线通信时打开。开启后发送 break 由 CR1 的 SBK 位控制，配合 USART_LINBreakDetectLengthConfig 与 USART_SendBreak 使用。普通 UART 通信保持关闭。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要配置的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "NewState": "ENABLE 进入 LIN 模式，DISABLE 退出 LIN 模式。"
+      },
+      "prerequisites": [
+        "已用 USART_Init 完成基本配置",
+        "如需检测 break，还要调用 USART_LINBreakDetectLengthConfig 设置检测长度"
+      ],
+      "registers": ["USART_CR2"],
+      "relatedFunctions": ["USART_LINBreakDetectLengthConfig", "USART_SendBreak", "USART_ITConfig"],
+      "exampleCode": "/* LIN 主机：先开 LIN 模式，再发同步间隔 */\nUSART_LINCmd(USART2, ENABLE);\nUSART_SendBreak(USART2);",
+      "notesZh": [
+        "适用场景：LIN 总线（车载低速网络、车身控制）；普通串口不需要",
+        "误开不会立刻报错，但 break 相关行为会改变，排查串口异常时记得检查这一位",
+        "LIN 模式下同样需要正确的波特率，LIN 规范常见速率为 9600 或 19200"
+      ]
+    },
+
+    "USART_SendData": {
+      "briefZh": "通过串口发送一个字节（写入 DR 寄存器，只取低 9 位）。",
+      "usageZh": "发送数据的基本函数，内部就是 USARTx->DR = Data & 0x01FF。关键点：它只把数据塞进发送数据寄存器，并不等待发送完成。连续发送时必须先等 USART_FLAG_TXE 置位（发送寄存器空），否则上一次的数据还没搬进移位寄存器就被覆盖，会丢字节。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要发送的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "Data": "要发送的数据，类型是 uint16_t，实际只写入低 9 位（断言要求 Data <= 0x1FF）。8 位数据模式下传 0x00~0xFF 即可。"
+      },
+      "prerequisites": [
+        "已调用 USART_Cmd(USARTx, ENABLE)，UE 位为 1",
+        "USART_InitStruct.USART_Mode 中包含 USART_Mode_Tx（TE 位为 1）",
+        "TX 引脚已配置为 GPIO_Mode_AF_PP 并已使能外设时钟"
+      ],
+      "registers": ["USART_DR", "USART_SR"],
+      "relatedFunctions": ["USART_GetFlagStatus", "USART_ReceiveData", "USART_ITConfig", "USART_SendBreak", "USART_Cmd"],
+      "exampleCode": "/* 阻塞方式发送一个字节 */\nvoid USART1_SendByte(uint8_t ch)\n{\n  /* 必须等发送数据寄存器空，否则会覆盖上一次的数据 */\n  while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);\n  USART_SendData(USART1, ch);\n}\n\n/* 发送字符串，末尾等真正发完 */\nvoid USART1_SendString(char *str)\n{\n  while (*str != 0)\n  {\n    USART1_SendByte((uint8_t)(*str));\n    str++;\n  }\n  /* TXE 只说明寄存器空，TC 才说明最后一个位也发到线上了 */\n  while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);\n}",
+      "notesZh": [
+        "不等 TXE 就连续调用，是丢数据的第一大原因；115200 下一个字节约 87us，CPU 跑得比串口快得多",
+        "TXE 只表示「发送数据寄存器空了，可以写下一个」，不代表数据已经发到线上；要确认整帧发完必须等 USART_FLAG_TC",
+        "复位后第一次发送前 TXE 默认就是置位的，可以直接写，不需要额外等",
+        "参数是 uint16_t，9 位数据模式（USART_WordLength_9b）下可以取到 0x1FF；8 位模式传超过 0xFF 的值会被截断",
+        "在 TXE 中断里发送时，最后一个字节写完后必须关掉 TXE 中断，否则会无限进中断",
+        "用 printf 重定向到串口时，重写的 fputc 里同样要先等 TXE 再调 USART_SendData"
+      ]
+    },
+
+    "USART_ReceiveData": {
+      "briefZh": "读取最近一次收到的数据（读 DR 寄存器，返回低 9 位）。",
+      "usageZh": "接收数据的基本函数，内部就是 return USARTx->DR & 0x01FF。最重要的副作用：读 DR 会自动清除 RXNE 标志，所以在 RXNE 中断服务函数里调用它之后不需要再手动清标志。查询方式下应先确认 USART_FLAG_RXNE 已置位再读。",
+      "returnDescZh": "返回最近收到的数据，类型 uint16_t，实际只有低 9 位有效（8 位数据模式取低 8 位）。",
+      "paramsZh": {
+        "USARTx": "要读取的外设，C8T6 上取值 USART1、USART2、USART3。"
+      },
+      "prerequisites": [
+        "已调用 USART_Cmd(USARTx, ENABLE)，UE 位为 1",
+        "USART_InitStruct.USART_Mode 中包含 USART_Mode_Rx（RE 位为 1）",
+        "RX 引脚已配置为 GPIO_Mode_IN_FLOATING 或 GPIO_Mode_IPU",
+        "查询方式下需先确认 USART_FLAG_RXNE 已置位"
+      ],
+      "registers": ["USART_DR", "USART_SR"],
+      "relatedFunctions": ["USART_GetFlagStatus", "USART_SendData", "USART_ITConfig", "USART_GetITStatus", "USART_ClearFlag"],
+      "exampleCode": "uint8_t ch;\n\n/* 方式一：查询接收 */\nwhile (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) == RESET);\nch = (uint8_t)USART_ReceiveData(USART1);\n\n/* 方式二：中断接收（推荐，不占用主循环） */\nvoid USART1_IRQHandler(void)\n{\n  if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)\n  {\n    /* 读 DR 的同时自动清掉 RXNE，不需要手动清标志 */\n    ch = (uint8_t)USART_ReceiveData(USART1);\n  }\n}",
+      "notesZh": [
+        "读 DR 会自动清 RXNE，中断里不要再调 USART_ClearITPendingBit(USART1, USART_IT_RXNE)，多此一举",
+        "RXNE 没置位就读 DR，拿到的是上一次的旧数据而不是 0，容易出现「数据莫名重复」的现象",
+        "接收溢出（ORE）后必须按「先读 USART_SR、再读 USART_DR」的序列清除，只读 DR 是清不掉的",
+        "同时用 DMA 和 RXNE 中断接收会导致同一个字节被读两次，二选一",
+        "用中断接收时若中断里处理太慢，下一个字节到来会置 ORE 并丢数据；接收处理要尽量短，大块数据用缓冲区加标志位交给主循环处理"
+      ]
+    },
+
+    "USART_SendBreak": {
+      "briefZh": "发送一个 break 帧（把 CR1 的 SBK 位置 1）。",
+      "usageZh": "用于 LIN 总线主节点发送同步间隔，或某些自定义协议里用作帧起始/总线复位信号。函数只是把 CR1 的 SBK 位置 1，实际的 break 帧由发送端在发完当前数据后产生（一整帧的低电平）。普通串口通信基本用不到。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要操作的外设，C8T6 上取值 USART1、USART2、USART3。"
+      },
+      "prerequisites": [
+        "已调用 USART_Cmd(USARTx, ENABLE)",
+        "USART_InitStruct.USART_Mode 中包含 USART_Mode_Tx"
+      ],
+      "registers": ["USART_CR1", "USART_DR"],
+      "relatedFunctions": ["USART_LINCmd", "USART_LINBreakDetectLengthConfig", "USART_SendData", "USART_GetFlagStatus"],
+      "exampleCode": "/* LIN 主机发送同步间隔 */\nUSART_LINCmd(USART2, ENABLE);\nUSART_SendBreak(USART2);\n/* 后面通常紧跟同步字节 0x55 */\nwhile (USART_GetFlagStatus(USART2, USART_FLAG_TXE) == RESET);\nUSART_SendData(USART2, 0x55);",
+      "notesZh": [
+        "适用场景：LIN 总线同步间隔、部分自定义协议的总线复位信号",
+        "函数只置位 SBK，不会帮你等发送结束；后面还要继续发数据时，建议先确认 USART_FLAG_TC 再写下一个字节",
+        "普通 UART 点对点通信里没有使用场景，发了对端只会当成一帧错误数据"
+      ]
+    },
+
+    "USART_SetGuardTime": {
+      "briefZh": "设置智能卡模式下的保护时间（写入 GTPR 的高 8 位）。",
+      "usageZh": "只在智能卡（Smart Card）模式下使用，用于在两次发送之间插入保护时间，满足 ISO7816 的时序要求。SPL 的断言只允许 USART1/2/3，UART4/UART5 没有这组位。函数只改写 GTPR 的高 8 位，不影响低 8 位的预分频值。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "取值 USART1、USART2、USART3（断言限制，UART4/UART5 不支持）。",
+        "USART_GuardTime": "保护时间，单位是波特率时钟周期数，写入 GTPR[15:8]，取值 0~255。"
+      },
+      "prerequisites": [
+        "已用 USART_Init 完成基本配置",
+        "需配合 USART_SmartCardCmd(USARTx, ENABLE) 才有意义"
+      ],
+      "registers": ["USART_GTPR", "USART_CR3"],
+      "relatedFunctions": ["USART_SmartCardCmd", "USART_SetPrescaler", "USART_SmartCardNACKCmd", "USART_Init"],
+      "exampleCode": "/* 智能卡模式：保护时间 0，预分频按卡片时钟要求设置 */\nUSART_SmartCardCmd(USART2, ENABLE);\nUSART_SetGuardTime(USART2, 0);\nUSART_SetPrescaler(USART2, 5);",
+      "notesZh": [
+        "适用场景：ISO7816 智能卡读卡器、IC 卡接口",
+        "不做智能卡就别调用，普通 UART 模式下 GTPR 不起作用",
+        "和 USART_SetPrescaler 共用 GTPR 寄存器：一个占高 8 位、一个占低 8 位，互不干扰，但调用顺序会影响最终值，两个都要设"
+      ]
+    },
+
+    "USART_SetPrescaler": {
+      "briefZh": "设置时钟预分频（写入 GTPR 的低 8 位），主要供 IrDA 低功耗模式使用。",
+      "usageZh": "给 IrDA（红外）低功耗模式用，用来把红外编解码时钟降下来，使输出脉宽符合 IrDA 规范。函数只改写 GTPR 的低 8 位，不影响高 8 位的保护时间。普通 UART 通信不需要。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要配置的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "USART_Prescaler": "预分频值，写入 GTPR[7:0]，取值 0~255。具体分频关系见参考手册 USART_GTPR 寄存器说明。"
+      },
+      "prerequisites": [
+        "已用 USART_Init 完成基本配置",
+        "IrDA 低功耗模式下需配合 USART_IrDAConfig(USARTx, USART_IrDAMode_LowPower) 与 USART_IrDACmd(ENABLE)"
+      ],
+      "registers": ["USART_GTPR", "USART_CR3"],
+      "relatedFunctions": ["USART_IrDAConfig", "USART_IrDACmd", "USART_SetGuardTime"],
+      "exampleCode": "/* IrDA 低功耗模式 */\nUSART_IrDAConfig(USART2, USART_IrDAMode_LowPower);\nUSART_IrDACmd(USART2, ENABLE);\nUSART_SetPrescaler(USART2, 1);",
+      "notesZh": [
+        "适用场景：红外数据通信、红外遥控收发",
+        "只有 IrDA 低功耗模式才需要设置；常规 IrDA 模式和普通 UART 下这个值没有作用",
+        "忘了设置预分频，现象是红外波形脉宽不对、对端完全收不到，而且不会有任何报错"
+      ]
+    },
+
+    "USART_SmartCardCmd": {
+      "briefZh": "使能或关闭智能卡模式（CR3 的 SCEN 位）。",
+      "usageZh": "做 ISO7816 智能卡接口时打开。开启后通常还要配合 USART_SetGuardTime 设保护时间、USART_SetPrescaler 设卡片时钟分频，并且 TX 引脚要按单线双向的方式接（开漏加外部上拉）。断言只允许 USART1/2/3。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "取值 USART1、USART2、USART3（UART4/UART5 不支持智能卡模式）。",
+        "NewState": "ENABLE 进入智能卡模式，DISABLE 退出。"
+      },
+      "prerequisites": [
+        "已用 USART_Init 完成基本配置",
+        "智能卡是单线双向接口，TX 引脚通常需配成开漏输出并加外部上拉电阻"
+      ],
+      "registers": ["USART_CR3"],
+      "relatedFunctions": ["USART_SmartCardNACKCmd", "USART_SetGuardTime", "USART_SetPrescaler", "USART_Init"],
+      "exampleCode": "USART_SmartCardCmd(USART2, ENABLE);\nUSART_SetGuardTime(USART2, 0);\nUSART_SetPrescaler(USART2, 5);",
+      "notesZh": [
+        "适用场景：ISO7816 智能卡读卡器",
+        "普通串口千万不要开：开了之后 TX 变成单线双向的漏极开路行为，接普通 USB-TTL 会收发不正常",
+        "建议在 USART_Init 之后再打开模式位，顺序更清晰也不容易漏配保护时间和预分频"
+      ]
+    },
+
+    "USART_SmartCardNACKCmd": {
+      "briefZh": "使能或关闭智能卡模式下的 NACK 发送（CR3 的 NACK 位）。",
+      "usageZh": "智能卡通信中，接收端检测到奇偶校验错误时用它决定是否自动回一个 NACK 通知卡片重发。只有先打开 USART_SmartCardCmd 才有意义。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "取值 USART1、USART2、USART3。",
+        "NewState": "ENABLE 允许在检测到校验错误时发送 NACK，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已调用 USART_SmartCardCmd(USARTx, ENABLE)"
+      ],
+      "registers": ["USART_CR3"],
+      "relatedFunctions": ["USART_SmartCardCmd", "USART_SetGuardTime", "USART_SetPrescaler"],
+      "exampleCode": "USART_SmartCardCmd(USART2, ENABLE);\nUSART_SmartCardNACKCmd(USART2, ENABLE);   /* 校验错时自动回 NACK */",
+      "notesZh": [
+        "适用场景：智能卡协议层的自动重传机制；普通串口用不到",
+        "要在智能卡模式下才有效，单独调用没有作用"
+      ]
+    },
+
+    "USART_HalfDuplexCmd": {
+      "briefZh": "使能或关闭单线半双工模式（CR3 的 HDSEL 位）。",
+      "usageZh": "只有一根数据线、收发分时复用时打开。开启后 TX 与 RX 在芯片内部相连，只用 TX 引脚收发：发送时由 TX 驱动总线，空闲时引脚被释放，靠外部上拉电阻维持高电平；接收时数据从 TX 引脚进来，RX 引脚不再使用。常见于省引脚的调试口或单总线设备。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要配置的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "NewState": "ENABLE 进入单线半双工，DISABLE 恢复全双工。"
+      },
+      "prerequisites": [
+        "已用 USART_Init 完成基本配置",
+        "TX 引脚需要外部上拉电阻（半双工下它是开漏的，没有上拉收不到正确电平）"
+      ],
+      "registers": ["USART_CR3"],
+      "relatedFunctions": ["USART_Init", "USART_Cmd", "USART_SendData", "USART_ReceiveData", "USART_GetFlagStatus"],
+      "exampleCode": "/* 单线半双工：只用 PA9 一根线 */\nUSART_HalfDuplexCmd(USART1, ENABLE);\n\n/* 发送，发完等 TC 再收 */\nwhile (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);\nUSART_SendData(USART1, 0x55);\nwhile (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);\n\n/* 接收 */\nwhile (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) == RESET);\nch = (uint8_t)USART_ReceiveData(USART1);",
+      "notesZh": [
+        "适用场景：单线通信、省引脚的调试口；很多所谓 RS485 半双工项目其实用普通全双工加外部收发器，不需要开这个",
+        "开启后收发方向由硬件管理，软件上要避免同时发送和接收，发完必须等 TC 再期待收到数据",
+        "外部上拉电阻不能省，否则总线空闲时电平不确定，接收会收到随机数据",
+        "误开这个位之后 RX 引脚彻底失效，现象是「只能发不能收」，而且不会有任何报错"
+      ]
+    },
+
+    "USART_OverSampling8Cmd": {
+      "briefZh": "使能或关闭 8 倍过采样（CR1 的 OVER8 位）。",
+      "usageZh": "把接收采样从默认的 16 倍改成 8 倍。作用是同样时钟下能支持更高的波特率（采样时钟更快），代价是抗噪声能力下降。必须在 USART_Init 之前调用，因为 USART_Init 计算 BRR 时会读这一位；顺序反了波特率会算错。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要配置的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "NewState": "ENABLE 使用 8 倍过采样，DISABLE 使用默认的 16 倍过采样。"
+      },
+      "prerequisites": [
+        "必须在 USART_Init 之前调用（ST 官方注释明确要求）"
+      ],
+      "registers": ["USART_CR1", "USART_BRR"],
+      "relatedFunctions": ["USART_Init", "USART_ClockInit", "USART_OneBitMethodCmd"],
+      "exampleCode": "/* 必须先开 8 倍过采样，再 USART_Init，BRR 才会按 8 倍采样计算 */\nUSART_OverSampling8Cmd(USART1, ENABLE);\nUSART_Init(USART1, &USART_InitStructure);",
+      "notesZh": [
+        "官方注释：本函数必须在 USART_Init 之前调用，否则波特率分频值不正确",
+        "顺序错了波特率会静默地偏掉，现象就是乱码，很难联想到是采样率的问题",
+        "普通应用保持 16 倍过采样即可，不要为了「想跑更高波特率」随手打开；8 倍采样的噪声容限明显更差"
+      ]
+    },
+
+    "USART_OneBitMethodCmd": {
+      "briefZh": "使能或关闭单比特采样方式（CR3 的 ONEBITE 位）。",
+      "usageZh": "一种降低接收采样率的冷门选项，每个位只在中间采样一次。抗干扰能力比默认的三点采样差，但功耗略低。普通串口通信不需要，实际项目里极少使用。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要配置的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "NewState": "ENABLE 打开单比特采样，DISABLE 恢复默认的三点采样。"
+      },
+      "prerequisites": [
+        "已用 USART_Init 完成基本配置"
+      ],
+      "registers": ["USART_CR3"],
+      "relatedFunctions": ["USART_Init", "USART_OverSampling8Cmd"],
+      "exampleCode": "/* 冷门功能，普通串口不要使用 */\nUSART_OneBitMethodCmd(USART1, ENABLE);",
+      "notesZh": [
+        "适用场景：特殊的低功耗或低速场景，普通 UART 通信请保持关闭",
+        "打开后噪声容限下降，线材长或干扰大时容易误码；遇到「偶尔收到错字节」时可以检查这一位是不是被误开了"
+      ]
+    },
+
+    "USART_IrDAConfig": {
+      "briefZh": "配置 IrDA 模式为低功耗或常规（CR3 的 IRLP 位）。",
+      "usageZh": "做红外通信时使用。USART_IrDAMode_Normal 是常规 IrDA，需要外部红外编解码模块；USART_IrDAMode_LowPower 是低功耗 IrDA，片内完成窄脉冲编解码，需要配合 USART_SetPrescaler 设置时钟分频。本函数只选模式，还要再调 USART_IrDACmd(ENABLE) 才真正生效。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要配置的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "USART_IrDAMode": "红外模式，取值 USART_IrDAMode_Normal（常规模式）或 USART_IrDAMode_LowPower（低功耗模式）。"
+      },
+      "prerequisites": [
+        "已用 USART_Init 完成基本配置",
+        "使用低功耗模式时还需要调用 USART_SetPrescaler 设置时钟分频"
+      ],
+      "registers": ["USART_CR3", "USART_GTPR"],
+      "relatedFunctions": ["USART_IrDACmd", "USART_SetPrescaler", "USART_Init"],
+      "exampleCode": "/* 低功耗红外：先选模式，再开 IrDA，最后设预分频 */\nUSART_IrDAConfig(USART2, USART_IrDAMode_LowPower);\nUSART_IrDACmd(USART2, ENABLE);\nUSART_SetPrescaler(USART2, 1);",
+      "notesZh": [
+        "适用场景：红外数据通信、红外遥控收发",
+        "低功耗模式必须配合 USART_SetPrescaler，忘了设会导致红外波形脉宽不对、对端收不到",
+        "普通串口千万别开：开了之后 TX 会按红外窄脉冲方式调制，接普通 USB-TTL 只会收到乱码"
+      ]
+    },
+
+    "USART_IrDACmd": {
+      "briefZh": "使能或关闭 IrDA 接口（CR3 的 IREN 位）。",
+      "usageZh": "在 USART_IrDAConfig 选好模式之后打开红外功能。关闭后恢复成普通 UART 时序。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要配置的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "NewState": "ENABLE 打开红外模式，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已用 USART_IrDAConfig 选定模式；低功耗模式还需 USART_SetPrescaler 设置分频"
+      ],
+      "registers": ["USART_CR3"],
+      "relatedFunctions": ["USART_IrDAConfig", "USART_SetPrescaler", "USART_Init"],
+      "exampleCode": "USART_IrDAConfig(USART2, USART_IrDAMode_Normal);\nUSART_IrDACmd(USART2, ENABLE);",
+      "notesZh": [
+        "适用场景：红外通信；普通串口不要调用",
+        "打开后引脚上不再是标准 UART 波形，用普通串口助手是解不出来的",
+        "调试红外问题时先确认这一位和 USART_IrDAConfig 的模式位是否配对"
+      ]
+    },
+
+    "USART_GetFlagStatus": {
+      "briefZh": "查询指定的 USART 状态标志是否置位。",
+      "usageZh": "查询方式收发数据的核心函数，直接读 USART_SR。最常用的三个标志：USART_FLAG_TXE（发送数据寄存器空，可以写下一个字节）、USART_FLAG_TC（发送完成，最后一个位的停止位也发完了）、USART_FLAG_RXNE（收到一个字节）。发送循环里等 TXE、收尾或切 RS485 方向前等 TC，是最经典的用法。",
+      "returnDescZh": "返回标志状态：SET 表示标志已置位，RESET 表示未置位。",
+      "paramsZh": {
+        "USARTx": "要查询的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "USART_FLAG": "要查询的标志，一次只能传一个：USART_FLAG_TXE、USART_FLAG_TC、USART_FLAG_RXNE、USART_FLAG_IDLE、USART_FLAG_ORE、USART_FLAG_PE、USART_FLAG_FE、USART_FLAG_NE、USART_FLAG_LBD、USART_FLAG_CTS。"
+      },
+      "prerequisites": [
+        "已使能外设时钟并完成 USART_Init",
+        "查询 RXNE 前需保证接收模式已打开（RE 位为 1）"
+      ],
+      "registers": ["USART_SR"],
+      "relatedFunctions": ["USART_ClearFlag", "USART_SendData", "USART_ReceiveData", "USART_GetITStatus"],
+      "exampleCode": "uint8_t ch;\n\n/* 查询方式发一个字节 */\nwhile (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);\nUSART_SendData(USART1, 0x5A);\n\n/* 确认整帧发完：切 RS485 收发方向、进低功耗、复位前必须等这个 */\nwhile (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);\n\n/* 查询方式收一个字节 */\nwhile (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) == RESET);\nch = (uint8_t)USART_ReceiveData(USART1);",
+      "notesZh": [
+        "TXE 和 TC 的区别最容易搞混：TXE 表示发送数据寄存器空（可以写下一个字节），TC 表示整个帧含停止位已经发完。用 TXE 判断「发送结束」会提前，导致关电源或切 RS485 方向时最后一个字节发不出去",
+        "本函数读 SR 本身没有副作用，但 PE/FE/NE/ORE/IDLE 这几个标志必须靠「先读 SR、再读 DR」的序列才能清除，单独调用它清不掉",
+        "复位后 TXE 默认就是置位的，所以第一次发送前的等待会立刻通过",
+        "USART_FLAG_CTS 只对 USART1/2/3 有效，UART4/UART5 没有这个标志",
+        "查询方式会一直占着 CPU 空转，115200 以上或需要同时干别的事情时应该改用中断或 DMA"
+      ]
+    },
+
+    "USART_ClearFlag": {
+      "briefZh": "清除指定的 USART 状态标志（写 USART_SR）。",
+      "usageZh": "查询方式下需要手动清标志时使用。注意 SPL 的断言只允许清这四个：USART_FLAG_CTS、USART_FLAG_LBD、USART_FLAG_TC、USART_FLAG_RXNE。PE、FE、NE、ORE、IDLE 这五个标志不能用它清，必须用「先读 USART_SR、再读 USART_DR」的序列清除，这是接收代码里非常容易踩的坑。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要操作的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "USART_FLAG": "要清除的标志，只能是 USART_FLAG_CTS、USART_FLAG_LBD、USART_FLAG_TC、USART_FLAG_RXNE 中的一个或它们的按位或。传其它标志会触发断言失败。"
+      },
+      "prerequisites": [
+        "已使能外设时钟并完成 USART_Init"
+      ],
+      "registers": ["USART_SR", "USART_DR"],
+      "relatedFunctions": ["USART_GetFlagStatus", "USART_ClearITPendingBit", "USART_ReceiveData", "USART_SendData"],
+      "exampleCode": "/* 清 TC 标志 */\nUSART_ClearFlag(USART1, USART_FLAG_TC);\n\n/* 清 ORE 溢出标志：必须是「先读 SR，再读 DR」的序列 */\nif (USART_GetFlagStatus(USART1, USART_FLAG_ORE) != RESET)   /* 这一步读的是 SR */\n{\n  (void)USART_ReceiveData(USART1);                          /* 这一步读的是 DR，ORE 才被清掉 */\n}",
+      "notesZh": [
+        "RXNE 在读 DR（USART_ReceiveData）时就自动清了，一般不需要再调这个函数",
+        "ORE/FE/NE/PE/IDLE 不能用本函数清，必须「先读 SR 再读 DR」；只读 DR 是清不掉的",
+        "TXE 只能靠写 DR 清除，任何清标志的函数对它都无效",
+        "接收中断里如果 ORE 一直没清，会反复进中断，表现为「串口一收到数据就卡死在中断里」",
+        "开了 assert_param 时传错标志会直接卡在断言里；关掉断言则静默无效，问题更难查"
+      ]
+    },
+
+    "USART_GetITStatus": {
+      "briefZh": "查询指定 USART 中断是否真正发生（同时检查中断使能位与状态标志）。",
+      "usageZh": "中断服务函数里判断中断源的标准写法。它和 USART_GetFlagStatus 的区别很重要：本函数会同时检查 CR1/CR2/CR3 里的中断使能位和 SR 里的对应标志，两者都为 1 才返回 SET；而 GetFlagStatus 只看 SR。所以在 ISR 里应该用本函数。断言允许的值：USART_IT_CTS、USART_IT_LBD、USART_IT_TXE、USART_IT_TC、USART_IT_RXNE、USART_IT_IDLE、USART_IT_ORE、USART_IT_NE、USART_IT_FE、USART_IT_PE。",
+      "returnDescZh": "返回中断状态：SET 表示该中断已发生且已使能，RESET 表示未发生或未使能。",
+      "paramsZh": {
+        "USARTx": "要查询的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "USART_IT": "要查询的中断源，一次只能传一个：USART_IT_RXNE、USART_IT_TXE、USART_IT_TC、USART_IT_IDLE、USART_IT_ORE、USART_IT_PE、USART_IT_LBD、USART_IT_CTS、USART_IT_NE、USART_IT_FE。"
+      },
+      "prerequisites": [
+        "已用 USART_ITConfig 使能对应中断",
+        "已在 NVIC 中使能 USARTx_IRQn，并实现了 USARTx_IRQHandler"
+      ],
+      "registers": ["USART_SR", "USART_CR1", "USART_CR2", "USART_CR3"],
+      "relatedFunctions": ["USART_ITConfig", "USART_ClearITPendingBit", "USART_GetFlagStatus", "USART_ReceiveData", "USART_SendData"],
+      "exampleCode": "void USART1_IRQHandler(void)\n{\n  uint8_t ch;\n\n  /* 接收中断：RXNE 置位说明收到一个字节 */\n  if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)\n  {\n    ch = (uint8_t)USART_ReceiveData(USART1);   /* 读 DR 会自动清 RXNE */\n    /* 处理 ch ... */\n  }\n\n  /* 空闲中断：一帧结束，必须靠读 DR 清标志 */\n  if (USART_GetITStatus(USART1, USART_IT_IDLE) != RESET)\n  {\n    (void)USART_ReceiveData(USART1);\n  }\n\n  /* 溢出错误：不清掉会反复进中断 */\n  if (USART_GetITStatus(USART1, USART_IT_ORE) != RESET)\n  {\n    (void)USART_ReceiveData(USART1);\n  }\n}",
+      "notesZh": [
+        "ISR 里用 USART_GetFlagStatus 代替它也能跑，但会误判那些没有使能的中断源，规范做法是用 USART_GetITStatus",
+        "中断服务函数名必须和启动文件里的向量名完全一致：USART1_IRQHandler / USART2_IRQHandler / USART3_IRQHandler，拼错不会报错，只会跑进默认死循环",
+        "RXNE 中断里读 DR 就自动清了，不要重复清标志",
+        "IDLE 和 ORE 不能用 USART_ClearITPendingBit 清，必须「先读 SR 再读 DR」，否则中断会反复触发",
+        "TXE 中断发完最后一个字节一定要关掉，否则 TXE 一直是 1，会一直进中断",
+        "判断顺序建议把 RXNE 放最前面，它是最高频的中断源"
+      ]
+    },
+
+    "USART_ClearITPendingBit": {
+      "briefZh": "清除指定的 USART 中断挂起位（写 USART_SR）。",
+      "usageZh": "中断服务函数里清标志用。注意 SPL 的断言只允许四个值：USART_IT_TC、USART_IT_RXNE、USART_IT_LBD、USART_IT_CTS。IDLE、ORE、PE、FE、NE 和 TXE 都不在允许列表里，传进去会断言失败。这几种要用别的方式清：RXNE 读 DR 就清了；IDLE/ORE/PE/FE/NE 必须「先读 USART_SR、再读 USART_DR」；TXE 只能靠写 DR 清除。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "USARTx": "要操作的外设，C8T6 上取值 USART1、USART2、USART3。",
+        "USART_IT": "要清除的中断挂起位，只能是 USART_IT_TC、USART_IT_RXNE、USART_IT_LBD、USART_IT_CTS 中的一个。"
+      },
+      "prerequisites": [
+        "已在 NVIC 与 USART_ITConfig 中使能对应中断"
+      ],
+      "registers": ["USART_SR", "USART_DR"],
+      "relatedFunctions": ["USART_GetITStatus", "USART_ITConfig", "USART_ClearFlag", "USART_ReceiveData", "USART_SendData"],
+      "exampleCode": "void USART1_IRQHandler(void)\n{\n  /* TC 中断：可以用 ClearITPendingBit 清 */\n  if (USART_GetITStatus(USART1, USART_IT_TC) != RESET)\n  {\n    USART_ClearITPendingBit(USART1, USART_IT_TC);\n  }\n\n  /* RXNE 中断：读 DR 自动清，不需要再调 ClearITPendingBit */\n  if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)\n  {\n    (void)USART_ReceiveData(USART1);\n  }\n}",
+      "notesZh": [
+        "接收中断里读 USART_ReceiveData 已经自动清了 RXNE，再调本函数是多余的",
+        "想清 IDLE 而写 USART_ClearITPendingBit(USART1, USART_IT_IDLE) 是典型错误：这个值不在断言白名单里，开了 assert_param 会直接卡死，关掉断言则静默无效，IDLE 中断会反复触发",
+        "清标志的位置要在处理完数据之后，清得太早可能在处理期间丢字节",
+        "TXE 中断没有对应的清除函数，只能写 DR 或直接关掉 TXE 中断",
+        "本函数是通过写 SR 的对应位为 0 实现的，不要和 USART_ClearFlag 混用，两者允许的标志集合一样但语义不同（一个清中断挂起，一个清状态标志）"
+      ]
+    }
+  }
+}

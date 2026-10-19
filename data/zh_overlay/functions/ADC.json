@@ -1,0 +1,796 @@
+{
+  "_comment": "ADC（模数转换）36 个函数的中文补充。重点：开 ADC1 时钟 + 复位校准/校准的固定顺序、规则组与注入组的区别、ADC 时钟不得超过 14MHz、C8T6 只有 ADC1/ADC2 的 10 个外部通道。",
+  "peripheral": "ADC",
+  "functions": {
+    "ADC_DeInit": {
+      "briefZh": "把 ADCx 外设的所有寄存器复位为默认值。",
+      "usageZh": "重新配置 ADC 前恢复干净状态时用。它只复位 ADC 寄存器，不会关时钟，也不会影响已配置的 GPIO（模拟输入引脚保持 GPIO_Mode_AIN）。注意复位后 ADC 的使能位、校准值、规则组序列全部清零，必须重新走完整的初始化 + 校准流程。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。**STM32F103C8T6 只有 ADC1 和 ADC2，没有 ADC3**，写 ADC3 会编译不过在链接时会找不到符号（其它 F103 大容量型号才有 ADC3）。"
+      },
+      "prerequisites": [
+        "已通过 RCC_APB2PeriphClockCmd 开启对应 ADC 时钟（如 RCC_APB2Periph_ADC1）"
+      ],
+      "registers": ["ADC_CR1", "ADC_CR2", "ADC_SMPR1", "ADC_SMPR2", "ADC_SQR1", "ADC_SQR2", "ADC_SQR3", "ADC_JSQR"],
+      "relatedFunctions": ["ADC_Init", "ADC_Cmd", "RCC_APB2PeriphClockCmd"],
+      "exampleCode": "/* 重新配置前先复位 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);\nADC_DeInit(ADC1);\n\n/* 复位后必须重新初始化 + 重新校准 */\nADC_Init(ADC1, &ADC_InitStructure);\nADC_Cmd(ADC1, ENABLE);",
+      "notesZh": [
+        "C8T6 上没有 ADC3，代码里出现 ADC3 会直接链接报错",
+        "复位后校准值丢失，必须重新执行 ADC_ResetCalibration + ADC_StartCalibration，否则精度会明显变差",
+        "调用前必须已开 ADC 时钟，时钟关闭时写寄存器无效"
+      ]
+    },
+
+    "ADC_Init": {
+      "briefZh": "按 ADC_InitTypeDef 结构体配置 ADCx 的工作模式、扫描方式、连续转换、外部触发和对齐方式。",
+      "usageZh": "**ADC 使用的第一步**，必须先调它再谈通道配置。关键字段：ADC_Mode 决定独立模式还是多重 ADC 模式（C8T6 上 ADC1+ADC2 可以做双重模式，但通常用 ADC_Mode_Independent）；ADC_ScanConvMode 决定规则组是多通道扫描还是单通道；ADC_ContinuousConvMode 决定转完一次是停下还是自动重来；ADC_ExternalTrigConv 决定由软件还是定时器触发；ADC_DataAlign 决定结果左对齐还是右对齐（**绝大多数情况用右对齐**）。\n\n注意结构体里**没有** ADC 时钟分频和通道选择，分频要用 RCC_ADCCLKConfig，通道要用 ADC_RegularChannelConfig。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "ADC_InitStruct": "指向 ADC_InitTypeDef 的指针，需填 5 个字段：ADC_Mode（ADC_Mode_Independent 独立模式，或 ADC_Mode_RegInjecSimult、ADC_Mode_RegSimult 等双重/三重模式）、ADC_ScanConvMode（ENABLE 多通道扫描 / DISABLE 单通道）、ADC_ContinuousConvMode（ENABLE 连续转换 / DISABLE 单次）、ADC_ExternalTrigConv（ADC_ExternalTrigConv_None 软件触发，或 ADC_ExternalTrigConv_T1_CC1 等定时器触发）、ADC_DataAlign（ADC_DataAlign_Right 右对齐常用，ADC_DataAlign_Left 左对齐）。"
+      },
+      "prerequisites": [
+        "已用 RCC_APB2PeriphClockCmd 开启 RCC_APB2Periph_ADC1（**必须开 ADC1 的时钟，即使只用 ADC2 也要开 ADC1 时钟**，这是 STM32F103 的硬件要求）",
+        "已用 RCC_ADCCLKConfig 设置 ADC 时钟分频，且 ADC 时钟不超过 14MHz（通常 RCC_PCLK2_Div6，PCLK2=72MHz 时得到 12MHz）",
+        "输入引脚已配成 GPIO_Mode_AIN（模拟输入）"
+      ],
+      "registers": ["ADC_CR1", "ADC_CR2", "ADC_SQR1", "ADC_JSQR"],
+      "relatedFunctions": ["ADC_StructInit", "ADC_Cmd", "ADC_RegularChannelConfig", "RCC_ADCCLKConfig", "GPIO_Init"],
+      "exampleCode": "GPIO_InitTypeDef GPIO_InitStructure;\nADC_InitTypeDef ADC_InitStructure;\n\n/* 1. 开时钟：ADC1 时钟必须开 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1 | RCC_APB2Periph_GPIOA, ENABLE);\n\n/* 2. ADC 时钟 = PCLK2/6 = 12MHz，不得超过 14MHz */\nRCC_ADCCLKConfig(RCC_PCLK2_Div6);\n\n/* 3. PA0 配成模拟输入 */\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;\nGPIO_Init(GPIOA, &GPIO_InitStructure);\n\n/* 4. 配置 ADC：单通道、单次、软件触发、右对齐 */\nADC_InitStructure.ADC_Mode = ADC_Mode_Independent;\nADC_InitStructure.ADC_ScanConvMode = DISABLE;\nADC_InitStructure.ADC_ContinuousConvMode = DISABLE;\nADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_None;\nADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;\nADC_InitStructure.ADC_NbrOfChannel = 1;\nADC_Init(ADC1, &ADC_InitStructure);\n\n/* 5. 使能 + 校准（顺序不能变） */\nADC_Cmd(ADC1, ENABLE);\nADC_ResetCalibration(ADC1);\nwhile (ADC_GetResetCalibrationStatus(ADC1));\nADC_StartCalibration(ADC1);\nwhile (ADC_GetCalibrationStatus(ADC1));",
+      "notesZh": [
+        "**ADC 时钟绝不能超过 14MHz**。PCLK2 = 72MHz 时必须用 RCC_PCLK2_Div6（12MHz）或 Div8；用 Div2/Div4 会得到 36/18MHz，转换结果会明显不准甚至乱跳",
+        "**即使只用 ADC2，也必须打开 ADC1 的时钟**（RCC_APB2Periph_ADC1）。这是 F103 的硬件设计要求，只开 ADC2 时钟会导致 ADC2 完全不工作",
+        "用 ADC 前必须开 RCC_APB2Periph_ADC1 时钟，漏开时所有 ADC 寄存器读回都是 0，表现为转换值恒为 0",
+        "**初始化后必须做校准**（ResetCalibration → StartCalibration），跳过校准会让测量值偏移几十到上百 LSB",
+        "输入引脚必须是 GPIO_Mode_AIN。配成浮空输入（GPIO_Mode_IN_FLOATING）也能读出数但精度差，配成推挽输出会直接损坏引脚",
+        "ADC_DataAlign_Left 只在需要 8 位精度快速读取时用（取高 8 位），一般用 Right，此时 12 位结果在低 12 位",
+        "ADC_ContinuousConvMode 开着时，一次 ADC_SoftwareStartConvCmd 会一直转换不停，取数要判 EOC 标志并清掉，否则读数会重复",
+        "C8T6 的 ADC 外部通道是 10 个：ADC1/ADC2 共用 ADC_IN0~ADC_IN9（PA0~PA7、PB0、PB1）。ADC_IN16 是内部温度传感器、ADC_IN17 是内部 Vrefint，都不占引脚",
+        "C8T6 的 PA0/PA1 还兼作 TIM2_CH1/CH2、PA4~PA7 与 SPI1 复用，用 ADC 前确认这些引脚没被别的外设占用"
+      ]
+    },
+
+    "ADC_StructInit": {
+      "briefZh": "把 ADC_InitTypeDef 结构体的所有字段填成库默认值。",
+      "usageZh": "在 ADC_Init 之前调用，避免漏赋值用到栈上的随机数据。默认值为：ADC_Mode_Independent、ADC_ScanConvMode = DISABLE、ADC_ContinuousConvMode = DISABLE、ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC1、ADC_DataAlign_Right、ADC_NbrOfChannel = 1。**注意默认的外部触发是 T1_CC1 而不是 None**，做纯软件触发的采样时必须手动改成 ADC_ExternalTrigConv_None，否则调了 ADC_SoftwareStartConvCmd 也没有反应。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADC_InitStruct": "指向待初始化的 ADC_InitTypeDef 结构体的指针。"
+      },
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": ["ADC_Init"],
+      "exampleCode": "ADC_InitTypeDef ADC_InitStructure;\n\nADC_StructInit(&ADC_InitStructure);\n/* 默认外部触发是 T1_CC1，软件触发必须改成 None，否则不转换 */\nADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_None;\nADC_Init(ADC1, &ADC_InitStructure);",
+      "notesZh": [
+        "默认 ADC_ExternalTrigConv 是 ADC_ExternalTrigConv_T1_CC1，不改的话软件触发无效，采样值永远不变",
+        "默认 ADC_NbrOfChannel = 1，多通道扫描要记得改大，否则只转第一个通道"
+      ]
+    },
+
+    "ADC_Cmd": {
+      "briefZh": "使能或关闭 ADCx 外设（置位/清零 CR2 的 ADON 位）。",
+      "usageZh": "ADC_Init 之后必须调用。使能后的**固定顺序**是：ADC_Cmd(ENABLE) → ADC_ResetCalibration → 等复位校准完成 → ADC_StartCalibration → 等校准完成 → 才能开始转换。顺序颠倒（先校准后使能）校准不生效。另外 ADON 位第一次写 1 是把 ADC 从掉电状态唤醒，第二次写 1 才真正启动转换（库函数帮你处理了这个细节）。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "NewState": "ENABLE 使能 ADC（首次是从掉电唤醒），DISABLE 关闭 ADC 进入掉电模式。"
+      },
+      "prerequisites": [
+        "已调用 ADC_Init 完成参数配置",
+        "已开启 ADC 时钟并设置好 ADC 分频"
+      ],
+      "registers": ["ADC_CR2"],
+      "relatedFunctions": ["ADC_Init", "ADC_ResetCalibration", "ADC_StartCalibration", "ADC_SoftwareStartConvCmd"],
+      "exampleCode": "/* 使能与校准的固定顺序，一步都不能少 */\nADC_Cmd(ADC1, ENABLE);                    /* 1. 使能 ADC */\n\nADC_ResetCalibration(ADC1);               /* 2. 复位校准寄存器 */\nwhile (ADC_GetResetCalibrationStatus(ADC1));\n\nADC_StartCalibration(ADC1);               /* 3. 开始校准 */\nwhile (ADC_GetCalibrationStatus(ADC1));\n\n/* 4. 之后才能开始转换 */\nADC_SoftwareStartConvCmd(ADC1, ENABLE);",
+      "notesZh": [
+        "**必须先 ADC_Cmd(ENABLE) 再校准**，顺序反了校准不会执行，while 会死等或者立刻跳过",
+        "漏掉 ADC_Cmd 时所有转换请求都被忽略，读到的一直是 0",
+        "DISABLE 会让 ADC 进入掉电模式，重新 ENABLE 后需要重新校准",
+        "ADON 位有「唤醒 + 启动」两段语义，库函数里已经处理，不要用寄存器直接写绕过"
+      ]
+    },
+
+    "ADC_DMACmd": {
+      "briefZh": "使能或关闭 ADCx 的 DMA 请求。",
+      "usageZh": "多通道扫描采样或高速连续采样时用 DMA 自动搬运结果，避免逐个读 DR 造成数据覆盖。ADC1 的 DMA 请求映射到 DMA1_Channel1（固定通道）。**ADC2 没有 DMA 能力**，只有 ADC1 和 ADC3 支持。使用时要配合 DMA_Init 把外设地址设为 &ADC1->DR，并开 DMA1 时钟。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1 或 ADC3（**ADC2 没有 DMA 功能**）。C8T6 上可用的只有 ADC1。",
+        "NewState": "ENABLE 允许 ADC 发 DMA 请求，DISABLE 禁止。"
+      },
+      "prerequisites": [
+        "已用 DMA_Init 配置 DMA1_Channel1（ADC1 专用），外设地址为 (uint32_t)&ADC1->DR",
+        "已用 RCC_AHBPeriphClockCmd 开启 RCC_AHBPeriph_DMA1",
+        "已调用 ADC_Cmd 使能 ADC"
+      ],
+      "registers": ["ADC_CR2"],
+      "relatedFunctions": ["DMA_Init", "DMA_Cmd", "ADC_RegularChannelConfig", "ADC_SoftwareStartConvCmd"],
+      "exampleCode": "/* ADC1 多通道扫描 + DMA 搬运到数组 */\nDMA_InitTypeDef DMA_InitStructure;\n\nRCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);\n\nDMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&ADC1->DR;  /* ADC 结果寄存器 */\nDMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)adcBuf;\nDMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;\nDMA_InitStructure.DMA_BufferSize = 4;\nDMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;\nDMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;\nDMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;\nDMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;\nDMA_InitStructure.DMA_Mode = DMA_Mode_Circular;   /* 循环模式持续刷新 */\nDMA_InitStructure.DMA_Priority = DMA_Priority_High;\nDMA_InitStructure.DMA_M2M = DMA_M2M_Disable;\nDMA_Init(DMA1_Channel1, &DMA_InitStructure);\nDMA_Cmd(DMA1_Channel1, ENABLE);\n\nADC_DMACmd(ADC1, ENABLE);",
+      "notesZh": [
+        "**ADC2 不支持 DMA**，只有 ADC1/ADC3 有；用 ADC2 配 DMA 不会有任何数据搬过来",
+        "ADC1 的 DMA 请求固定走 DMA1_Channel1，用别的通道收不到数据",
+        "外设数据宽度必须设成 HalfWord（12 位结果放 16 位），设成 Byte 会截断成 8 位",
+        "DMA 模式下不要再手动读 ADC_GetConversionValue，会与 DMA 抢 DR 导致数据错位",
+        "用单次模式（DMA_Mode_Normal）时缓冲区满了要重新 DMA_Cmd 才能继续"
+      ]
+    },
+
+    "ADC_SoftwareStartConvCmd": {
+      "briefZh": "用软件触发规则组的转换（置位 CR2 的 SWSTART 位）。",
+      "usageZh": "最常用的启动方式：当 ADC_ExternalTrigConv 配成 ADC_ExternalTrigConv_None 时用它启动规则通道转换；若配了外部触发（如定时器），则要用 ADC_ExternalTrigConvCmd 使能外部触发而不是这个函数。启动后轮询 ADC_FLAG_EOC 取结果，或在 EOC 中断里读。连续转换模式下只需启动一次，之后硬件自动重来。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "NewState": "ENABLE 产生软件启动脉冲，DISABLE 无效（写入 0 不起作用，硬件只认置 1 的瞬间）。"
+      },
+      "prerequisites": [
+        "已完成 ADC_Init、ADC_Cmd(ENABLE) 与完整校准流程",
+        "已用 ADC_RegularChannelConfig 配置好规则组通道与采样时间",
+        "ADC_InitStruct.ADC_ExternalTrigConv 必须是 ADC_ExternalTrigConv_None"
+      ],
+      "registers": ["ADC_CR2", "ADC_SR", "ADC_DR"],
+      "relatedFunctions": ["ADC_RegularChannelConfig", "ADC_GetConversionValue", "ADC_GetFlagStatus", "ADC_ExternalTrigConvCmd"],
+      "exampleCode": "/* 单次采样 PA0，轮询方式 */\nuint16_t GetAdcValue(void)\n{\n  ADC_SoftwareStartConvCmd(ADC1, ENABLE);\n  while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);  /* 等转换完成 */\n  return ADC_GetConversionValue(ADC1);                     /* 读 DR 会清 EOC */\n}",
+      "notesZh": [
+        "如果 ADC_ExternalTrigConv 没配成 None，本函数调了也不转换（硬件等待外部触发）",
+        "**读 ADC_DR 会自动清 EOC 标志**，所以轮询后不需要再手动清",
+        "连续转换模式下转换完不停，若不用 DMA 会把后面几次结果覆盖掉前面的",
+        "每次采样前若切换了通道，要重新调用 ADC_RegularChannelConfig，否则用的还是旧通道",
+        "C8T6 的 ADC 是 12 位，结果范围 0~4095，别按 0~1023 算"
+      ]
+    },
+
+    "ADC_DiscModeCmd": {
+      "briefZh": "使能或关闭规则组的间断（Discontinuous）转换模式。",
+      "usageZh": "规则组配了多个通道、但又不想一次全转完时使用。间断模式下每来一次触发只转换 n 个通道（n 由 ADC_DiscModeChannelCountConfig 决定），转完这 n 个就停下等下一次触发，可以边转边处理。不用间断模式时，一次触发会把规则组里所有通道全部扫完。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "NewState": "ENABLE 开启间断模式，DISABLE 关闭（默认，一次转完整个序列）。"
+      },
+      "prerequisites": [
+        "已用 ADC_DiscModeChannelCountConfig 设置每次转换的通道数（1~8）",
+        "规则组已配置多个通道（ADC_ScanConvMode 需为 ENABLE）"
+      ],
+      "registers": ["ADC_CR1"],
+      "relatedFunctions": ["ADC_DiscModeChannelCountConfig", "ADC_InjectedDiscModeCmd", "ADC_RegularChannelConfig"],
+      "exampleCode": "/* 4 通道规则组，中断模式下每次只转 1 个通道 */\nADC_DiscModeChannelCountConfig(ADC1, 1);\nADC_DiscModeCmd(ADC1, ENABLE);",
+      "notesZh": [
+        "开启间断模式但没有配置通道数（ADC_DiscModeChannelCountConfig），行为未定义",
+        "间断模式只对规则组生效，注入组要用 ADC_InjectedDiscModeCmd",
+        "用间断模式时每个通道转换完都会置 EOC，读 DR 前要分清楚当前是第几个通道"
+      ]
+    },
+
+    "ADC_ExternalTrigConvCmd": {
+      "briefZh": "使能或关闭规则组的外部触发转换。",
+      "usageZh": "用定时器（如 TIM2 的 CC2、TIM3 的 TRGO）周期性自动触发采样时使用。**具体用哪个触发源是在 ADC_Init 的 ADC_ExternalTrigConv 字段里选的**，本函数只是把外部触发的开关打开。做软件触发时不要调这个函数。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "NewState": "ENABLE 允许外部触发启动规则组转换，DISABLE 禁止。"
+      },
+      "prerequisites": [
+        "ADC_Init 里已把 ADC_ExternalTrigConv 设为具体触发源（非 None）",
+        "触发源外设（如 TIM2）已配置好并使能"
+      ],
+      "registers": ["ADC_CR2"],
+      "relatedFunctions": ["ADC_Init", "ADC_SoftwareStartConvCmd", "TIM_SelectOutputTrigger"],
+      "exampleCode": "/* TIM2 更新事件周期触发 ADC1 采样 */\nADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_CC2;\nADC_Init(ADC1, &ADC_InitStructure);\n\nADC_ExternalTrigConvCmd(ADC1, ENABLE);   /* 打开外部触发 */",
+      "notesZh": [
+        "只调本函数而 ADC_Init 里的触发源还是 None，不会有任何转换",
+        "同时开了外部触发又调 ADC_SoftwareStartConvCmd，会额外触发一次，采样节奏被打乱",
+        "触发频率不能超过 ADC 转换时间，否则新触发会丢失并可能置 OVR"
+      ]
+    },
+
+    "ADC_AutoInjectedConvCmd": {
+      "briefZh": "使能或关闭「规则组转换结束后自动启动注入组转换」。",
+      "usageZh": "需要「主通道 + 辅助通道成对采样」时使用，一次触发就能拿到规则组和注入组的结果，不用等下一次触发。开启后注入组不再需要自己的触发源，跟着规则组走。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "NewState": "ENABLE 规则组转完自动转注入组，DISABLE 注入组需独立触发（默认）。"
+      },
+      "prerequisites": [
+        "已用 ADC_InjectedChannelConfig 配置注入组通道",
+        "规则组已配置（否则没有「规则组结束」这个时机）"
+      ],
+      "registers": ["ADC_CR1"],
+      "relatedFunctions": ["ADC_InjectedChannelConfig", "ADC_SoftwareStartInjectedConvCmd", "ADC_GetInjectedConversionValue"],
+      "notesZh": [
+        "开启后注入组的外部触发配置失效，别指望两个触发源同时起作用",
+        "规则组结束后立刻转注入组，注入组的采样时间若太短会受前一次转换残留影响",
+        "注入组结果在 JDR1~JDR4 里，与规则组的 DR 是独立寄存器，读的时候别搞混"
+      ]
+    },
+
+    "ADC_InjectedDiscModeCmd": {
+      "briefZh": "使能或关闭注入组的间断转换模式。",
+      "usageZh": "注入组配了多个通道、想分成几次触发转完时使用。与规则组的间断模式类似，但作用于 JSQR 里配置的注入序列（最多 4 个通道）。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "NewState": "ENABLE 开启注入组间断模式，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已用 ADC_InjectedChannelConfig 与 ADC_InjectedSequencerLengthConfig 配置注入组"
+      ],
+      "registers": ["ADC_CR1", "ADC_JSQR"],
+      "relatedFunctions": ["ADC_DiscModeCmd", "ADC_InjectedChannelConfig", "ADC_InjectedSequencerLengthConfig"],
+      "notesZh": [
+        "规则组和注入组各有一个间断模式开关，配错对象是最常见的混淆点",
+        "注入组最多 4 个通道，间断模式的通道数自然也被限制在 4 以内"
+      ]
+    },
+
+    "ADC_ExternalTrigInjectedConvCmd": {
+      "briefZh": "使能或关闭注入组的外部触发转换。",
+      "usageZh": "注入组需要由外部事件（定时器捕获/比较、EXTI 线 15）触发时使用。**具体触发源由 ADC_ExternalTrigInjectedConvConfig 设置**，本函数只开开关。注入组常用于「电机换相时刻精确采样电流」这类需要与外部事件严格同步的场景。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "NewState": "ENABLE 允许外部触发启动注入组转换，DISABLE 禁止。"
+      },
+      "prerequisites": [
+        "已用 ADC_ExternalTrigInjectedConvConfig 设置注入组触发源",
+        "已用 ADC_InjectedChannelConfig 配置注入组通道"
+      ],
+      "registers": ["ADC_CR2", "ADC_JSQR"],
+      "relatedFunctions": ["ADC_ExternalTrigInjectedConvConfig", "ADC_SoftwareStartInjectedConvCmd", "ADC_AutoInjectedConvCmd"],
+      "notesZh": [
+        "注入组的触发源和规则组的触发源是两个独立配置，改一个不影响另一个",
+        "开了自动注入（ADC_AutoInjectedConvCmd）后，注入组的外部触发就不再起作用",
+        "注入组可以打断正在进行的规则组转换，这对实时性有利但会让规则组结果延迟"
+      ]
+    },
+
+    "ADC_SoftwareStartInjectedConvCmd": {
+      "briefZh": "用软件触发注入组的转换。",
+      "usageZh": "想让注入组按需立即转换（例如按键时快速读一路参考电压）时用它，不影响规则组的触发节奏。读结果要用 ADC_GetInjectedConversionValue，不要用 ADC_GetConversionValue（那是规则组的）。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "NewState": "ENABLE 产生软件启动脉冲，DISABLE 无效。"
+      },
+      "prerequisites": [
+        "已用 ADC_InjectedChannelConfig 与 ADC_InjectedSequencerLengthConfig 配置注入组",
+        "已调用 ADC_Cmd 使能 ADC 并完成校准"
+      ],
+      "registers": ["ADC_CR2", "ADC_JSQR", "ADC_JDR1"],
+      "relatedFunctions": ["ADC_InjectedChannelConfig", "ADC_GetInjectedConversionValue", "ADC_GetSoftwareStartInjectedConvCmdStatus"],
+      "exampleCode": "/* 注入组单通道软件触发采样 */\nADC_InjectedSequencerLengthConfig(ADC1, 1);\nADC_InjectedChannelConfig(ADC1, ADC_Channel_1, 1, ADC_SampleTime_55Cycles5);\n\nADC_SoftwareStartInjectedConvCmd(ADC1, ENABLE);\nwhile (ADC_GetFlagStatus(ADC1, ADC_FLAG_JEOC) == RESET);\nvalue = ADC_GetInjectedConversionValue(ADC1, ADC_Channel_1);",
+      "notesZh": [
+        "注入组的结果在 JDR1~JDR4，用 ADC_GetConversionValue 读的是规则组的 DR，会拿到错的值",
+        "注入组会打断规则组的转换，规则组的结果需要重新触发才能拿到",
+        "判断注入组完成要用 ADC_FLAG_JEOC 而不是 EOC"
+      ]
+    },
+
+    "ADC_AnalogWatchdogCmd": {
+      "briefZh": "使能或关闭模拟看门狗，并选择监视哪些通道。",
+      "usageZh": "用于电压越限检测：当转换值超出 ADC_AnalogWatchdogThresholdsConfig 设定的上下限时置 AWD 标志并可产生中断，无需 CPU 一直轮询。常用参数是 ADC_AnalogWatchdog_SingleRegEnable（监视单个规则通道）或 ADC_AnalogWatchdog_AllRegEnable（监视所有规则通道）。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "ADC_AnalogWatchdog": "看门狗配置，如 ADC_AnalogWatchdog_SingleRegEnable（单个规则通道，配合 ADC_AnalogWatchdogSingleChannelConfig）、ADC_AnalogWatchdog_AllRegEnable（全部规则通道）、ADC_AnalogWatchdog_SingleInjecEnable、ADC_AnalogWatchdog_AllInjecEnable，可组合，也可用 None 关闭。"
+      },
+      "prerequisites": [
+        "已用 ADC_AnalogWatchdogThresholdsConfig 设置上下阈值",
+        "监视单个通道时还需 ADC_AnalogWatchdogSingleChannelConfig 指定通道"
+      ],
+      "registers": ["ADC_CR1", "ADC_HTR", "ADC_LTR"],
+      "relatedFunctions": ["ADC_AnalogWatchdogThresholdsConfig", "ADC_AnalogWatchdogSingleChannelConfig", "ADC_ITConfig"],
+      "exampleCode": "/* 监视 PA0，超出 500~3500 就报警 */\nADC_AnalogWatchdogThresholdsConfig(ADC1, 3500, 500);\nADC_AnalogWatchdogSingleChannelConfig(ADC1, ADC_Channel_0);\nADC_AnalogWatchdogCmd(ADC1, ADC_AnalogWatchdog_SingleRegEnable);",
+      "notesZh": [
+        "阈值和通道都要先配置好，只开看门狗而不设阈值等于用 0 作比较",
+        "阈值是 12 位值（0~4095），写超过 4095 会被截断",
+        "看门狗只是置 AWD 标志，要触发中断还得 ADC_ITConfig 开 ADC_IT_AWD 并配 NVIC"
+      ]
+    },
+
+    "ADC_TempSensorVrefintCmd": {
+      "briefZh": "使能或关闭内部温度传感器通道（ADC_IN16）和内部参考电压通道（ADC_IN17）。",
+      "usageZh": "**这个函数没有 ADCx 参数**，一次同时控制两个内部通道。温度传感器用于测芯片温度（可用来做粗略温度补偿），Vrefint 是固定的 1.20V 基准，用来反推实际 VDDA，从而做比例法测量：VDDA = 1.20 * 4095 / Vrefint读数。使用时把 ADC_Channel_16 或 ADC_Channel_17 当普通通道，用 ADC_RegularChannelConfig 配置即可。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "NewState": "ENABLE 打开温度传感器与 Vrefint 通道，DISABLE 关闭（默认关闭，省电）。"
+      },
+      "prerequisites": [
+        "已调用 ADC_Cmd 使能 ADC",
+        "使用前建议按数据手册等待一段稳定时间（温度传感器开启后需要约 4~10us 甚至更久的建立时间）"
+      ],
+      "registers": ["ADC_CR2"],
+      "relatedFunctions": ["ADC_RegularChannelConfig", "ADC_GetConversionValue", "ADC_Init"],
+      "exampleCode": "/* 用 Vrefint 反推 VDDA，做比例法电压测量 */\nADC_TempSensorVrefintCmd(ENABLE);\n\nADC_RegularChannelConfig(ADC1, ADC_Channel_17, 1, ADC_SampleTime_239Cycles5);\nADC_SoftwareStartConvCmd(ADC1, ENABLE);\nwhile (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);\n\nvrefint = ADC_GetConversionValue(ADC1);\n/* VDDA(mV) = 1200 * 4095 / vrefint */\nvddamv = (uint32_t)1200 * 4095 / vrefint;\n\n/* 温度传感器：T(C) = (V25 - Vsense)/Avg_Slope + 25，V25 与斜率见芯片数据手册 */",
+      "notesZh": [
+        "**本函数不带 ADCx 参数**，它只对应 ADC1 的 CR2 位；用 ADC2 读内部通道时要确认硬件连接关系",
+        "温度传感器精度很差（典型 ±1.5℃ 且未校准），只能做趋势判断，不能当温度计用",
+        "Vrefint 的标称值是 1.20V，但每片芯片有偏差，要精确测量得先读出厂校准值（存于 0x1FFFF7BA 附近）",
+        "内部通道的采样时间要设长一些（建议 ADC_SampleTime_239Cycles5），设短了读数会明显偏低",
+        "开内部通道会略微增加功耗，不用时应关闭"
+      ]
+    },
+
+    "ADC_ITConfig": {
+      "briefZh": "使能或关闭 ADCx 的指定中断源。",
+      "usageZh": "常用中断源：ADC_IT_EOC（规则组转换完成，最常用）、ADC_IT_JEOC（注入组转换完成）、ADC_IT_AWD（模拟看门狗越限）。**只调这个函数不调 NVIC_Init，中断永远不会触发**，这是最常见的坑。ADC1 与 ADC2 共用 ADC1_2_IRQn 这一个中断向量，ADC3 是独立的 ADC3_IRQn（C8T6 没有）。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "ADC_IT": "中断源，可取 ADC_IT_EOC（规则组转换结束）、ADC_IT_JEOC（注入组转换结束）、ADC_IT_AWD（模拟看门狗），可用 | 组合。",
+        "NewState": "ENABLE 使能，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已调用 NVIC_Init 配置并使能 ADC1_2_IRQn（ADC1/ADC2 共用这一个向量）",
+        "已 ADC_Cmd 使能 ADC"
+      ],
+      "registers": ["ADC_CR1"],
+      "relatedFunctions": ["ADC_GetITStatus", "ADC_ClearITPendingBit", "NVIC_Init", "ADC_GetConversionValue"],
+      "exampleCode": "NVIC_InitTypeDef NVIC_InitStructure;\n\nNVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);\nNVIC_InitStructure.NVIC_IRQChannel = ADC1_2_IRQn;   /* ADC1/ADC2 共用 */\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\nADC_ITConfig(ADC1, ADC_IT_EOC, ENABLE);\nADC_SoftwareStartConvCmd(ADC1, ENABLE);\n\nvoid ADC1_2_IRQHandler(void)\n{\n  if (ADC_GetITStatus(ADC1, ADC_IT_EOC) != RESET)\n  {\n    adcValue = ADC_GetConversionValue(ADC1);   /* 读 DR 自动清 EOC */\n  }\n}",
+      "notesZh": [
+        "只调 ADC_ITConfig 不调 NVIC_Init，中断不会触发且不报错",
+        "**ADC1 和 ADC2 共用 ADC1_2_IRQn**，两个 ADC 都开中断时要在一个 ISR 里分别判 ADC1/ADC2 的标志",
+        "中断里读 ADC_DR 会自动清 EOC，不需要再 ADC_ClearITPendingBit；手动再清虽然无害但没必要",
+        "用 DMA 搬运数据时通常不需要开 EOC 中断，用 DMA 传输完成中断即可",
+        "C8T6 没有 ADC3，不要写 ADC3_IRQn"
+      ]
+    },
+
+    "ADC_GetITStatus": {
+      "briefZh": "检查 ADCx 的指定中断标志是否置位。",
+      "usageZh": "在 ADC1_2_IRQHandler 里判断是哪种中断触发的。典型结构是先判 EOC、再判 JEOC、最后判 AWD。它和 ADC_GetFlagStatus 读的是同一批位，区别只是返回类型不同。",
+      "returnDescZh": "SET 表示该中断标志已置位，RESET 表示未置位。",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "ADC_IT": "要检查的中断源，如 ADC_IT_EOC、ADC_IT_JEOC、ADC_IT_AWD。"
+      },
+      "prerequisites": [
+        "已用 ADC_ITConfig 使能对应中断源并配好 NVIC"
+      ],
+      "registers": ["ADC_SR"],
+      "relatedFunctions": ["ADC_ITConfig", "ADC_ClearITPendingBit", "ADC_GetConversionValue", "ADC_GetFlagStatus"],
+      "exampleCode": "void ADC1_2_IRQHandler(void)\n{\n  if (ADC_GetITStatus(ADC1, ADC_IT_EOC) != RESET)\n  {\n    adcValue = ADC_GetConversionValue(ADC1);   /* 读 DR 清 EOC */\n  }\n  if (ADC_GetITStatus(ADC1, ADC_IT_JEOC) != RESET)\n  {\n    injValue = ADC_GetInjectedConversionValue(ADC1, ADC_Channel_1);\n  }\n  if (ADC_GetITStatus(ADC1, ADC_IT_AWD) != RESET)\n  {\n    ADC_ClearITPendingBit(ADC1, ADC_IT_AWD);   /* AWD 必须软件清 */\n  }\n}",
+      "notesZh": [
+        "EOC 可以靠读 DR 自动清除，AWD 必须用 ADC_ClearITPendingBit 手动清，漏清会反复进中断",
+        "在 ADC1_2_IRQn 的 ISR 里必须分别判断 ADC1 与 ADC2，不能只看 ADC1",
+        "EOC 中断在多通道扫描时会每个通道都触发一次，要配合计数器或改用 DMA"
+      ]
+    },
+
+    "ADC_ClearITPendingBit": {
+      "briefZh": "清除 ADCx 的中断挂起标志。",
+      "usageZh": "主要用于清除 ADC_IT_AWD（模拟看门狗）标志，这个标志**不会**被读 DR 自动清除，必须手动清。EOC/JEOC 在读 DR/JDR 时会自动清，但显式调用也无害。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "ADC_IT": "要清除的中断标志，如 ADC_IT_EOC、ADC_IT_JEOC、ADC_IT_AWD，可用 | 组合。"
+      },
+      "prerequisites": [
+        "已进入中断服务函数并判断出中断来源"
+      ],
+      "registers": ["ADC_SR"],
+      "relatedFunctions": ["ADC_GetITStatus", "ADC_ClearFlag", "ADC_GetConversionValue"],
+      "exampleCode": "/* 看门狗越限中断必须手动清标志 */\nif (ADC_GetITStatus(ADC1, ADC_IT_AWD) != RESET)\n{\n  ADC_ClearITPendingBit(ADC1, ADC_IT_AWD);\n  /* 处理越限逻辑 */\n}",
+      "notesZh": [
+        "**AWD 标志漏清会导致中断反复触发**，CPU 一直停在 ISR 里",
+        "EOC 在读 DR 时已自动清除，再清一次不会出错但没有必要",
+        "清标志前应先读走数据，先清后读在某些序列下可能丢一次转换结果"
+      ]
+    },
+
+    "ADC_ResetCalibration": {
+      "briefZh": "复位 ADC 的校准寄存器（启动校准流程的第一步）。",
+      "usageZh": "**每次上电后使用 ADC 前必须执行两步校准，这是第一步**。固定顺序是：ADC_Cmd(ENABLE) → ADC_ResetCalibration → 轮询 ADC_GetResetCalibrationStatus 等它变 RESET → ADC_StartCalibration → 轮询 ADC_GetCalibrationStatus 等它变 RESET。跳过校准会让测量值有几十到上百 LSB 的固定偏移。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。"
+      },
+      "prerequisites": [
+        "已调用 ADC_Cmd(ADCx, ENABLE) 使能 ADC",
+        "已开启 ADC 时钟并设置好 ADC 分频（不超过 14MHz）"
+      ],
+      "registers": ["ADC_CR2"],
+      "relatedFunctions": ["ADC_GetResetCalibrationStatus", "ADC_StartCalibration", "ADC_GetCalibrationStatus", "ADC_Cmd"],
+      "exampleCode": "/* 使用 ADC 前必须完整走一遍校准 */\nADC_Cmd(ADC1, ENABLE);\n\nADC_ResetCalibration(ADC1);\nwhile (ADC_GetResetCalibrationStatus(ADC1));   /* 等复位校准完成 */\n\nADC_StartCalibration(ADC1);\nwhile (ADC_GetCalibrationStatus(ADC1));        /* 等校准完成 */\n\n/* 现在才能开始转换 */",
+      "notesZh": [
+        "**必须先 ADC_Cmd(ENABLE) 再校准**，ADC 没使能时校准位写不进去",
+        "必须等 GetResetCalibrationStatus 返回 RESET 才能进入下一步，不等会出现校准不完整、精度变差",
+        "每次从掉电模式重新唤醒（ADC_Cmd DISABLE 后再 ENABLE）都建议重新校准",
+        "用 while 死等有卡死风险，生产代码建议加超时计数"
+      ]
+    },
+
+    "ADC_SetInjectedOffset": {
+      "briefZh": "设置注入通道转换结果的偏移量（结果 = 转换值 - 偏移）。",
+      "usageZh": "用于给注入通道做硬件减偏移，例如把电流采样信号减去静态偏置，得到纯交流分量。偏移是直接减在 12 位结果上的，超出范围的值会被截断为 0 或 4095。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "ADC_InjectedChannel": "要设偏移的注入通道，取值 ADC_InjectedChannel_1 ~ ADC_InjectedChannel_4（对应注入序列的第 1~4 个位置，不是外部通道号）。",
+        "Offset": "偏移量，必须是 12 位值（0~4095）。转换结果小于它时输出 0。"
+      },
+      "prerequisites": [
+        "已用 ADC_InjectedChannelConfig 配置注入通道"
+      ],
+      "registers": ["ADC_JOFR1", "ADC_JOFR2", "ADC_JOFR3", "ADC_JOFR4"],
+      "relatedFunctions": ["ADC_InjectedChannelConfig", "ADC_GetInjectedConversionValue"],
+      "exampleCode": "/* 注入通道 1 做硬件减偏移 */\nADC_SetInjectedOffset(ADC1, ADC_InjectedChannel_1, 2048);",
+      "notesZh": [
+        "**ADC_InjectedChannel_1~4 指的是注入序列的位置，不是引脚通道号**，很容易搞混",
+        "偏移是直接相减的，实际信号小于偏移时结果恒为 0，会丢掉负半周信息",
+        "Offset 是 12 位，写超过 4095 的值会被硬件截断"
+      ]
+    },
+
+    "ADC_GetResetCalibrationStatus": {
+      "briefZh": "查询复位校准是否完成。",
+      "usageZh": "ADC_ResetCalibration 之后必须用它轮询等待，返回 RESET 表示复位校准已结束，可以进入 ADC_StartCalibration。标准写法是 while(ADC_GetResetCalibrationStatus(ADCx));。",
+      "returnDescZh": "SET 表示复位校准仍在进行中，RESET 表示已完成（可以进入下一步）。注意含义与直觉相反：**返回 RESET 才是完成**。",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。"
+      },
+      "prerequisites": [
+        "已调用 ADC_ResetCalibration(ADCx)"
+      ],
+      "registers": ["ADC_CR2"],
+      "relatedFunctions": ["ADC_ResetCalibration", "ADC_StartCalibration", "ADC_GetCalibrationStatus"],
+      "exampleCode": "ADC_ResetCalibration(ADC1);\nwhile (ADC_GetResetCalibrationStatus(ADC1));   /* 等到返回 RESET 才继续 */\nADC_StartCalibration(ADC1);\nwhile (ADC_GetCalibrationStatus(ADC1));",
+      "notesZh": [
+        "**返回 RESET 表示完成，SET 表示还在进行**，写成 while(... == SET) 会立刻跳过，校准不完整",
+        "如果这里一直返回 SET 卡住，通常是 ADC 时钟没开或 ADC_Cmd 没使能",
+        "死等有风险，建议加超时计数并在超时后重新初始化 ADC"
+      ]
+    },
+
+    "ADC_GetCalibrationStatus": {
+      "briefZh": "查询 ADC 校准是否完成。",
+      "usageZh": "ADC_StartCalibration 之后轮询等待，返回 RESET 表示校准结束，此后 ADC 的转换精度才是合格的。转换必须等校准完成后才能开始。",
+      "returnDescZh": "SET 表示校准仍在进行中，RESET 表示校准已完成（可以开始转换）。**返回 RESET 才是完成**。",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。"
+      },
+      "prerequisites": [
+        "已调用 ADC_StartCalibration(ADCx)",
+        "已完成 ADC_ResetCalibration 的等待"
+      ],
+      "registers": ["ADC_CR2"],
+      "relatedFunctions": ["ADC_StartCalibration", "ADC_ResetCalibration", "ADC_GetResetCalibrationStatus"],
+      "exampleCode": "ADC_StartCalibration(ADC1);\nwhile (ADC_GetCalibrationStatus(ADC1));   /* 校准完成前不能转换 */\nADC_SoftwareStartConvCmd(ADC1, ENABLE);",
+      "notesZh": [
+        "返回 RESET 才是完成，与 GetResetCalibrationStatus 一样容易判反",
+        "校准未完成就开始转换，前几次结果会明显偏差",
+        "校准过程约需几十个 ADC 时钟周期，12MHz 下大约几微秒，正常不会卡住；卡住说明时钟或使能有问题"
+      ]
+    },
+
+    "ADC_GetSoftwareStartConvStatus": {
+      "briefZh": "查询规则组软件启动转换位的当前状态。",
+      "usageZh": "主要**用于调试**，确认 ADC_SoftwareStartConvCmd 写进去的 SWSTART 位是否已被硬件响应清除。硬件在启动转换后会自动清该位，所以正常轮询中看到它很快变回 RESET。业务代码里判断转换是否完成应该用 ADC_FLAG_EOC，不要用这个。",
+      "returnDescZh": "SET 表示软件启动位仍置位，RESET 表示已被硬件清除（转换已启动或已完成）。",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。"
+      },
+      "prerequisites": [
+        "已调用 ADC_SoftwareStartConvCmd"
+      ],
+      "registers": ["ADC_CR2"],
+      "relatedFunctions": ["ADC_SoftwareStartConvCmd", "ADC_GetFlagStatus", "ADC_GetConversionValue"],
+      "notesZh": [
+        "它反映的是启动位状态，**不是转换完成状态**，判断完成要用 ADC_FLAG_EOC（ADC_GetFlagStatus）",
+        "一直返回 SET 说明转换根本没启动，通常是 ADC 没使能或外部触发没配置对"
+      ]
+    },
+
+    "ADC_GetConversionValue": {
+      "briefZh": "读取规则组最近一次的转换结果。",
+      "usageZh": "最常用的取数函数。12 位结果，右对齐时在返回值的低 12 位（0~4095）。**读 ADC_DR 会自动清除 EOC 标志**，所以轮询 EOC 后直接读即可，不需要额外清标志。多通道扫描时 DR 只有一个，读慢了会被下一个通道的结果覆盖——多通道务必用 DMA。",
+      "returnDescZh": "返回规则组最近一次的 12 位转换结果（0~4095）。ADC_DataAlign_Left 时结果在返回值的 bit4~bit15。",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。"
+      },
+      "prerequisites": [
+        "已完成校准并启动转换（ADC_SoftwareStartConvCmd 或外部触发）",
+        "读取前 EOC 标志已置位"
+      ],
+      "registers": ["ADC_DR", "ADC_SR"],
+      "relatedFunctions": ["ADC_SoftwareStartConvCmd", "ADC_GetFlagStatus", "ADC_RegularChannelConfig", "ADC_GetInjectedConversionValue"],
+      "exampleCode": "/* 单通道轮询采样 */\nuint16_t ReadAdc(uint8_t channel)\n{\n  ADC_RegularChannelConfig(ADC1, channel, 1, ADC_SampleTime_55Cycles5);\n  ADC_SoftwareStartConvCmd(ADC1, ENABLE);\n  while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);\n  return ADC_GetConversionValue(ADC1);   /* 读 DR 自动清 EOC */\n}",
+      "notesZh": [
+        "**读 DR 会清 EOC**，不要在读完后再去清一次（没必要），也不要在读之前清（会丢判断依据）",
+        "多通道扫描时不要用这个函数逐个读，会被下一个通道覆盖，必须用 DMA",
+        "右对齐时结果是 0~4095，换算电压是 value * 3300 / 4095（单位 mV）。别用 1023 或 1024 当满量程",
+        "注入组的结果不在这个函数里，要用 ADC_GetInjectedConversionValue"
+      ]
+    },
+
+    "ADC_GetDualModeConversionValue": {
+      "briefZh": "读取双重 ADC 模式下 ADC1 与 ADC2 的组合转换结果（32 位，高 16 位是 ADC2，低 16 位是 ADC1）。",
+      "usageZh": "只在 ADC1 与 ADC2 配成**双重模式**（ADC_Mode_RegSimult、ADC_Mode_RegInjecSimult、ADC_Mode_Interleave 等）时使用，一次读出两个 ADC 的结果。C8T6 上 ADC1/ADC2 都在，硬件上支持双重模式，但注意**本函数没有 ADCx 参数**，固定读 ADC1 的 DR。",
+      "returnDescZh": "返回 32 位组合结果：高 16 位为 ADC2 的转换值，低 16 位为 ADC1 的转换值。",
+      "paramsZh": {},
+      "prerequisites": [
+        "ADC1 已用 ADC_Init 配置为双重模式（ADC_Mode 不是 ADC_Mode_Independent）",
+        "ADC1 与 ADC2 都已完成初始化与校准"
+      ],
+      "registers": ["ADC_DR"],
+      "relatedFunctions": ["ADC_Init", "ADC_GetConversionValue", "ADC_SoftwareStartConvCmd"],
+      "exampleCode": "/* 双重模式同时读 ADC1(PA0) 与 ADC2(PA1) */\nuint32_t both = ADC_GetDualModeConversionValue();\nuint16_t adc1Val = (uint16_t)(both & 0xFFFF);        /* 低 16 位 = ADC1 */\nuint16_t adc2Val = (uint16_t)(both >> 16);           /* 高 16 位 = ADC2 */",
+      "notesZh": [
+        "单独立模式下调用会得到无意义的值（高 16 位是垃圾数据）",
+        "**没有 ADCx 参数**，固定从 ADC1 读，别指望用 ADC2 当参数",
+        "双重模式下 ADC2 不能配 DMA（ADC2 本身无 DMA 能力），数据要经 ADC1 的 DMA 通道搬走",
+        "高低 16 位的对应关系容易搞反：低 16 位才是 ADC1"
+      ]
+    },
+
+    "ADC_GetSoftwareStartInjectedConvCmdStatus": {
+      "briefZh": "查询注入组软件启动转换位的当前状态。",
+      "usageZh": "调试用，确认 ADC_SoftwareStartInjectedConvCmd 的 JSWSTART 位是否被硬件响应。判断注入组转换是否完成应该用 ADC_FLAG_JEOC。",
+      "returnDescZh": "SET 表示注入组软件启动位仍置位，RESET 表示已被硬件清除。",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。"
+      },
+      "prerequisites": [
+        "已调用 ADC_SoftwareStartInjectedConvCmd"
+      ],
+      "registers": ["ADC_CR2"],
+      "relatedFunctions": ["ADC_SoftwareStartInjectedConvCmd", "ADC_GetFlagStatus", "ADC_GetInjectedConversionValue"],
+      "notesZh": [
+        "与规则组的同类函数一样，它**不表示转换完成**，完成判断用 ADC_FLAG_JEOC",
+        "若开了自动注入（ADC_AutoInjectedConvCmd），这个启动位的行为会变得不可预期，不要依赖它做流程控制"
+      ]
+    },
+
+    "ADC_GetInjectedConversionValue": {
+      "briefZh": "读取指定注入通道的转换结果。",
+      "usageZh": "读取注入组（JDR1~JDR4）里的数据。**参数传的是注入通道枚举 ADC_InjectedChannel_1~4，对应注入序列的位置，不是外部引脚通道号**——这一点与 ADC_InjectedChannelConfig 的第二个参数含义不同，是很容易混淆的地方。",
+      "returnDescZh": "返回该注入通道的 12 位转换结果（0~4095）。",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "ADC_InjectedChannel": "注入通道，取值 ADC_InjectedChannel_1 ~ ADC_InjectedChannel_4，对应注入序列第 1~4 个位置。"
+      },
+      "prerequisites": [
+        "已用 ADC_InjectedChannelConfig 配置好该注入序列位置",
+        "注入组转换已完成（JEOC 置位）"
+      ],
+      "registers": ["ADC_JDR1", "ADC_JDR2", "ADC_JDR3", "ADC_JDR4", "ADC_SR"],
+      "relatedFunctions": ["ADC_InjectedChannelConfig", "ADC_SoftwareStartInjectedConvCmd", "ADC_InjectedSequencerLengthConfig", "ADC_GetConversionValue"],
+      "exampleCode": "/* 注入组 2 个通道 */\nADC_InjectedSequencerLengthConfig(ADC1, 2);\nADC_InjectedChannelConfig(ADC1, ADC_Channel_1, 1, ADC_SampleTime_55Cycles5);\nADC_InjectedChannelConfig(ADC1, ADC_Channel_2, 2, ADC_SampleTime_55Cycles5);\n\nADC_SoftwareStartInjectedConvCmd(ADC1, ENABLE);\nwhile (ADC_GetFlagStatus(ADC1, ADC_FLAG_JEOC) == RESET);\n\n/* 参数是注入序列位置，不是引脚通道号 */\nv1 = ADC_GetInjectedConversionValue(ADC1, ADC_InjectedChannel_1);\nv2 = ADC_GetInjectedConversionValue(ADC1, ADC_InjectedChannel_2);",
+      "notesZh": [
+        "**参数是注入序列位置而不是引脚通道号**，传 ADC_Channel_1 编译能过但含义完全不同",
+        "没配置的注入位置读出来是无效数据，不要读",
+        "读 JDR 也会清 JEOC，读完不必再手动清",
+        "注入组有 4 个独立结果寄存器，所以注入组天然支持多通道而不会覆盖，这是它与规则组 DR 的重要区别"
+      ]
+    },
+
+    "ADC_StartCalibration": {
+      "briefZh": "启动 ADC 校准（校准流程的第二步）。",
+      "usageZh": "必须在 ADC_ResetCalibration 完成之后调用，然后轮询 ADC_GetCalibrationStatus 等它结束。校准能消除 ADC 内部的电容失配误差，**不做校准测量值会偏几十到上百 LSB**，这在 12 位精度下是很明显的误差。整个校准流程必须在 ADC_Cmd(ENABLE) 之后执行。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。"
+      },
+      "prerequisites": [
+        "已调用 ADC_Cmd(ADCx, ENABLE)",
+        "已完成 ADC_ResetCalibration 并等待 ADC_GetResetCalibrationStatus 返回 RESET"
+      ],
+      "registers": ["ADC_CR2"],
+      "relatedFunctions": ["ADC_ResetCalibration", "ADC_GetCalibrationStatus", "ADC_GetResetCalibrationStatus", "ADC_Cmd"],
+      "exampleCode": "/* 完整校准流程（ADC 初始化后必做） */\nADC_Cmd(ADC1, ENABLE);\n\nADC_ResetCalibration(ADC1);\nwhile (ADC_GetResetCalibrationStatus(ADC1));\n\nADC_StartCalibration(ADC1);\nwhile (ADC_GetCalibrationStatus(ADC1));\n\n/* 校准完成后才能开始转换 */\nADC_SoftwareStartConvCmd(ADC1, ENABLE);",
+      "notesZh": [
+        "**必须先 ResetCalibration 再 StartCalibration**，跳过第一步直接第二步校准无效",
+        "校准期间不要启动转换，结果无意义",
+        "从停止/待机唤醒后 ADC 掉电重启，需要重新走完整初始化 + 校准流程",
+        "校准需要几十个 ADC 时钟周期，ADC 时钟越慢耗时越长，12MHz 下约几微秒"
+      ]
+    },
+
+    "ADC_DiscModeChannelCountConfig": {
+      "briefZh": "设置规则组间断模式下每次触发转换的通道个数。",
+      "usageZh": "配合 ADC_DiscModeCmd 使用。例如规则组配了 4 个通道，把 Number 设为 1，则每次触发只转 1 个通道，4 次触发才转完一轮，适合边采边处理的场景。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "Number": "每次转换的通道数，取值 1~8。不能超过规则组实际配置的通道数（ADC_NbrOfChannel）。"
+      },
+      "prerequisites": [
+        "已调用 ADC_DiscModeCmd(ADCx, ENABLE) 开启规则组间断模式（或即将开启）"
+      ],
+      "registers": ["ADC_CR1"],
+      "relatedFunctions": ["ADC_DiscModeCmd", "ADC_RegularChannelConfig", "ADC_Init"],
+      "exampleCode": "/* 4 通道规则组，每次触发转 1 个 */\nADC_DiscModeChannelCountConfig(ADC1, 1);\nADC_DiscModeCmd(ADC1, ENABLE);",
+      "notesZh": [
+        "**Number 最大 8**，而规则组最多 16 个通道，配 16 通道时无法一次转完",
+        "Number 大于实际配置的通道数会导致行为异常",
+        "不配合 ADC_DiscModeCmd 使能的话，这个设置不会生效"
+      ]
+    },
+
+    "ADC_RegularChannelConfig": {
+      "briefZh": "配置规则组中某个通道的转换顺序（Rank）与采样时间。",
+      "usageZh": "**ADC 使用中最常调用的配置函数**。Rank 决定转换顺序（1 最先转），同一个 Rank 写两次会覆盖。采样时间要按信号源内阻选：内阻越大需要越长采样时间。典型取值：一般电位器/分压用 ADC_SampleTime_55Cycles5 或 71Cycles5；高内阻信号（如光敏电阻、热电偶）用 ADC_SampleTime_239Cycles5。\n\n换算公式：转换时间 = (采样周期 + 12.5) / ADC时钟。12MHz 时钟下用 55.5 周期约 5.7us，239.5 周期约 21us。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "ADC_Channel": "通道号，取值 ADC_Channel_0 ~ ADC_Channel_17。**C8T6 只有 10 个外部通道 ADC_Channel_0~ADC_Channel_9**（PA0~PA7、PB0、PB1）；ADC_Channel_16 是内部温度传感器、ADC_Channel_17 是内部 Vrefint。通道 10~15 在 C8T6 上不存在。",
+        "Rank": "在规则序列中的顺序，取值 1~16。1 表示第一个转换。**注意从 1 开始，不是 0**。",
+        "ADC_SampleTime": "采样时间，取值 ADC_SampleTime_1Cycles5、7Cycles5、13Cycles5、28Cycles5、41Cycles5、55Cycles5、71Cycles5、239Cycles5。信号源内阻越大选越长，常用 55Cycles5；内部温度/Vrefint 通道必须用 239Cycles5。"
+      },
+      "prerequisites": [
+        "已调用 ADC_Init 配置好 ADC（扫描模式与通道数要与这里配置的一致）",
+        "已 ADC_Cmd 使能 ADC 并完成校准",
+        "对应的 GPIO 已配成 GPIO_Mode_AIN"
+      ],
+      "registers": ["ADC_SQR1", "ADC_SQR2", "ADC_SQR3", "ADC_SMPR1", "ADC_SMPR2"],
+      "relatedFunctions": ["ADC_Init", "ADC_SoftwareStartConvCmd", "ADC_GetConversionValue", "ADC_InjectedChannelConfig"],
+      "exampleCode": "/* 4 通道规则组扫描：PA0/PA1/PA2/PA3 */\nADC_InitStructure.ADC_ScanConvMode = ENABLE;\nADC_InitStructure.ADC_NbrOfChannel = 4;\nADC_Init(ADC1, &ADC_InitStructure);\n\n/* Rank 从 1 开始；采样时间按信号源内阻选 */\nADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_55Cycles5);\nADC_RegularChannelConfig(ADC1, ADC_Channel_1, 2, ADC_SampleTime_55Cycles5);\nADC_RegularChannelConfig(ADC1, ADC_Channel_2, 3, ADC_SampleTime_55Cycles5);\nADC_RegularChannelConfig(ADC1, ADC_Channel_3, 4, ADC_SampleTime_55Cycles5);\n\n/* 多通道必须配 DMA，否则 DR 会被覆盖 */\nADC_DMACmd(ADC1, ENABLE);",
+      "notesZh": [
+        "**Rank 从 1 开始**（1~16），写 0 是无效的，配置不生效",
+        "**ADC_NbrOfChannel 必须与这里配置的 Rank 数量一致**，不然会多转或漏转通道",
+        "C8T6 只有 10 个外部通道（ADC_Channel_0~9）。写 ADC_Channel_10~15 编译能过但引脚根本不存在，读回的是噪声",
+        "采样时间太短时，信号源内阻会让采样电容来不及充电，读数会明显偏低且随通道切换变化（串扰）",
+        "多通道扫描必须用 DMA 搬数据，否则 DR 只保留最后一个通道的结果",
+        "同一个 Rank 配置两次会覆盖前一次，排查「某个通道没数据」时要先看 Rank 有没有重复",
+        "改变通道配置后要重新启动转换才生效；连续转换模式下改了配置当次可能仍用旧参数"
+      ]
+    },
+
+    "ADC_ExternalTrigInjectedConvConfig": {
+      "briefZh": "设置注入组的外部触发源。",
+      "usageZh": "注入组需要与外部事件严格同步时使用，可选 TIM1/2/3/4/5/8 的捕获比较事件或 EXTI 线 15。**设置完还要 ADC_ExternalTrigInjectedConvCmd(ENABLE) 才真正打开外部触发**。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "ADC_ExternalTrigInjecConv": "触发源，如 ADC_ExternalTrigInjecConv_T1_TRGO、ADC_ExternalTrigInjecConv_T1_CC4、ADC_ExternalTrigInjecConv_T2_TRGO、ADC_ExternalTrigInjecConv_T3_CC4、ADC_ExternalTrigInjecConv_Ext_IT15_TIM8_CC4、ADC_ExternalTrigInjecConv_None（无外部触发）。"
+      },
+      "prerequisites": [
+        "触发源外设（如 TIM1）已配置并产生对应事件",
+        "已用 ADC_InjectedChannelConfig 配置注入组通道"
+      ],
+      "registers": ["ADC_CR2", "ADC_JSQR"],
+      "relatedFunctions": ["ADC_ExternalTrigInjectedConvCmd", "ADC_InjectedChannelConfig", "ADC_SoftwareStartInjectedConvCmd"],
+      "notesZh": [
+        "只配置触发源而不调 ADC_ExternalTrigInjectedConvCmd(ENABLE)，注入组不会被触发",
+        "规则组与注入组的触发源是两个独立字段，改一个不影响另一个",
+        "C8T6 上没有 TIM8，ADC_ExternalTrigInjecConv_Ext_IT15_TIM8_CC4 在大容量型号才有意义"
+      ]
+    },
+
+    "ADC_InjectedChannelConfig": {
+      "briefZh": "配置注入组中某个通道的顺序（Rank）与采样时间。",
+      "usageZh": "注入组最多 4 个通道，转换结果分别放在 JDR1~JDR4，各自独立不覆盖，所以注入组**不需要 DMA 也能读多个通道**。注入组的特点是能打断规则组转换（优先级更高），适合需要即时响应的采样。注意第二个参数是**外部通道号**（ADC_Channel_x），第三个参数 Rank 才是注入序列位置（1~4）。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "ADC_Channel": "外部通道号，ADC_Channel_0 ~ ADC_Channel_17。C8T6 可用的外部通道是 ADC_Channel_0~ADC_Channel_9。",
+        "Rank": "在注入序列中的位置，取值 1~4。**从 1 开始**，Rank 1 的结果落在 JDR1。",
+        "ADC_SampleTime": "采样时间，同 ADC_RegularChannelConfig，取值 ADC_SampleTime_xCycles5。"
+      },
+      "prerequisites": [
+        "已调用 ADC_Init 配置 ADC",
+        "已用 ADC_InjectedSequencerLengthConfig 设置注入序列长度（可与本函数搭配）"
+      ],
+      "registers": ["ADC_JSQR", "ADC_SMPR1", "ADC_SMPR2"],
+      "relatedFunctions": ["ADC_InjectedSequencerLengthConfig", "ADC_GetInjectedConversionValue", "ADC_SoftwareStartInjectedConvCmd", "ADC_RegularChannelConfig"],
+      "exampleCode": "/* 注入组 2 通道 */\nADC_InjectedSequencerLengthConfig(ADC1, 2);\nADC_InjectedChannelConfig(ADC1, ADC_Channel_4, 1, ADC_SampleTime_41Cycles5);\nADC_InjectedChannelConfig(ADC1, ADC_Channel_5, 2, ADC_SampleTime_41Cycles5);",
+      "notesZh": [
+        "**Rank 只能是 1~4**，注入序列最多 4 个通道，写 5 会配置到无效位置",
+        "第二个参数是引脚通道号，第四个位置读结果时用的是 ADC_InjectedChannel_x（序列位置），两套编号不要混",
+        "注入组的采样时间寄存器与规则组共用 SMPR1/SMPR2，**同一个外部通道在两组里配置的采样时间会互相覆盖**——这是很隐蔽的坑",
+        "注入组会打断规则组转换，规则组的结果需要重新触发才能拿到"
+      ]
+    },
+
+    "ADC_InjectedSequencerLengthConfig": {
+      "briefZh": "设置注入组的序列长度（有几个注入通道参与转换）。",
+      "usageZh": "配置注入组的第一步，告诉硬件注入序列里有几个通道。之后再用 ADC_InjectedChannelConfig 逐个填写。长度必须与实际配置的通道数一致。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "Length": "注入序列长度，取值 1~4。"
+      },
+      "prerequisites": [
+        "已调用 ADC_Init 配置 ADC"
+      ],
+      "registers": ["ADC_JSQR"],
+      "relatedFunctions": ["ADC_InjectedChannelConfig", "ADC_GetInjectedConversionValue"],
+      "exampleCode": "/* 3 个注入通道 */\nADC_InjectedSequencerLengthConfig(ADC1, 3);\nADC_InjectedChannelConfig(ADC1, ADC_Channel_4, 1, ADC_SampleTime_41Cycles5);\nADC_InjectedChannelConfig(ADC1, ADC_Channel_5, 2, ADC_SampleTime_41Cycles5);\nADC_InjectedChannelConfig(ADC1, ADC_Channel_6, 3, ADC_SampleTime_41Cycles5);",
+      "notesZh": [
+        "**Length 只支持 1~4**，注入组天生比规则组少（规则组最多 16 个）",
+        "Length 比实际配置的通道数大，会转换未配置的位置，结果无意义",
+        "Length 比实际配置的通道数小，多配的通道不会被转换"
+      ]
+    },
+
+    "ADC_AnalogWatchdogThresholdsConfig": {
+      "briefZh": "设置模拟看门狗的高、低阈值。",
+      "usageZh": "做电压越限报警时使用，转换值高于 HighThreshold 或低于 LowThreshold 就置 AWD 标志。阈值是 12 位值（0~4095），与转换结果直接比较。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "HighThreshold": "高阈值，12 位值（0~4095）。转换值大于它时触发看门狗。",
+        "LowThreshold": "低阈值，12 位值（0~4095）。转换值小于它时触发看门狗。"
+      },
+      "prerequisites": [
+        "已 ADC_Cmd 使能 ADC"
+      ],
+      "registers": ["ADC_HTR", "ADC_LTR"],
+      "relatedFunctions": ["ADC_AnalogWatchdogCmd", "ADC_AnalogWatchdogSingleChannelConfig", "ADC_ITConfig"],
+      "exampleCode": "/* 3.3V 供电下监视 0.4V ~ 2.8V 区间 */\n/* 0.4V -> 0.4/3.3*4095 ≈ 496，2.8V -> 2.8/3.3*4095 ≈ 3474 */\nADC_AnalogWatchdogThresholdsConfig(ADC1, 3474, 496);\nADC_AnalogWatchdogSingleChannelConfig(ADC1, ADC_Channel_0);\nADC_AnalogWatchdogCmd(ADC1, ADC_AnalogWatchdog_SingleRegEnable);",
+      "notesZh": [
+        "**HighThreshold 必须大于 LowThreshold**，写反了会一直触发或不触发",
+        "阈值是 12 位原始值不是电压，要先把电压换算成 0~4095 再填",
+        "只设阈值不调 ADC_AnalogWatchdogCmd 使能，看门狗不会工作",
+        "看门狗比较的是**转换结果**，所以受参考电压精度影响，VDDA 不稳时阈值判断也会飘"
+      ]
+    },
+
+    "ADC_AnalogWatchdogSingleChannelConfig": {
+      "briefZh": "指定模拟看门狗要监视的单个通道。",
+      "usageZh": "当 ADC_AnalogWatchdogCmd 用 ADC_AnalogWatchdog_SingleRegEnable 或 SingleInjecEnable 时，用它指定被监视的通道。若用 AllRegEnable/AllInjecEnable 监视全部通道，则不需要调用本函数。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "ADC_Channel": "要监视的通道，取值 ADC_Channel_0 ~ ADC_Channel_17。C8T6 可用的外部通道是 ADC_Channel_0~ADC_Channel_9。"
+      },
+      "prerequisites": [
+        "已用 ADC_AnalogWatchdogThresholdsConfig 设置阈值",
+        "已用 ADC_AnalogWatchdogCmd 使能单通道看门狗"
+      ],
+      "registers": ["ADC_CR1"],
+      "relatedFunctions": ["ADC_AnalogWatchdogCmd", "ADC_AnalogWatchdogThresholdsConfig"],
+      "exampleCode": "/* 只监视 PA0 通道 */\nADC_AnalogWatchdogSingleChannelConfig(ADC1, ADC_Channel_0);\nADC_AnalogWatchdogCmd(ADC1, ADC_AnalogWatchdog_SingleRegEnable);",
+      "notesZh": [
+        "**只有在单通道模式下才起作用**，用 AllRegEnable 时本函数的设置会被忽略",
+        "被监视的通道必须在规则组或注入组里真实参与转换，否则永远不比较",
+        "通道号是外部通道号（ADC_Channel_x），不是序列位置"
+      ]
+    },
+
+    "ADC_GetFlagStatus": {
+      "briefZh": "查询 ADCx 的指定状态标志是否置位。",
+      "usageZh": "轮询方式等待转换完成时最常用：ADC_FLAG_EOC 表示规则组转换结束、ADC_FLAG_JEOC 表示注入组结束、ADC_FLAG_AWD 表示看门狗越限、ADC_FLAG_STRT 表示规则组正在转换。轮询 EOC 后读 ADC_DR 会自动清 EOC。",
+      "returnDescZh": "SET 表示标志已置位，RESET 表示未置位。",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "ADC_FLAG": "要查询的标志，如 ADC_FLAG_AWD（模拟看门狗）、ADC_FLAG_EOC（规则组转换结束）、ADC_FLAG_JEOC（注入组转换结束）、ADC_FLAG_JSTRT（注入组转换开始）、ADC_FLAG_STRT（规则组转换开始）。"
+      },
+      "prerequisites": [
+        "已 ADC_Cmd 使能 ADC 并完成校准"
+      ],
+      "registers": ["ADC_SR"],
+      "relatedFunctions": ["ADC_ClearFlag", "ADC_GetConversionValue", "ADC_SoftwareStartConvCmd", "ADC_GetITStatus"],
+      "exampleCode": "/* 轮询等待转换完成的标准写法 */\nADC_SoftwareStartConvCmd(ADC1, ENABLE);\nwhile (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET);\nvalue = ADC_GetConversionValue(ADC1);   /* 读 DR 自动清 EOC */\n\n/* 判断是否越限 */\nif (ADC_GetFlagStatus(ADC1, ADC_FLAG_AWD) != RESET)\n{\n  ADC_ClearFlag(ADC1, ADC_FLAG_AWD);    /* AWD 必须手动清 */\n}",
+      "notesZh": [
+        "**轮询 EOC 必须加超时**。ADC 没使能、校准没做、外部触发没配好都会让它永远等不到，程序直接卡死",
+        "EOC 在读 ADC_DR 时自动清除，AWD 必须用 ADC_ClearFlag 手动清，漏清会反复触发",
+        "单次模式下每次转换前都要重新 ADC_SoftwareStartConvCmd；连续模式下只需启动一次",
+        "ADC_FLAG_STRT 表示正在转换，不能用来判断转换结束"
+      ]
+    },
+
+    "ADC_ClearFlag": {
+      "briefZh": "清除 ADCx 的挂起状态标志。",
+      "usageZh": "主要用于清 ADC_FLAG_AWD（模拟看门狗越限标志），这个标志不会被任何读操作自动清除。EOC/JEOC 在读 DR/JDR 时自动清除，通常不需要调用。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "ADCx": "ADC 外设，取值 ADC1、ADC2 或 ADC3。C8T6 只有 ADC1/ADC2。",
+        "ADC_FLAG": "要清除的标志，如 ADC_FLAG_AWD、ADC_FLAG_EOC、ADC_FLAG_JEOC，可用 | 组合。"
+      },
+      "prerequisites": [
+        "已用 ADC_GetFlagStatus 判断出标志来源"
+      ],
+      "registers": ["ADC_SR"],
+      "relatedFunctions": ["ADC_GetFlagStatus", "ADC_ClearITPendingBit", "ADC_GetConversionValue"],
+      "exampleCode": "/* 看门狗越限后必须清标志，否则一直保持置位 */\nif (ADC_GetFlagStatus(ADC1, ADC_FLAG_AWD) != RESET)\n{\n  ADC_ClearFlag(ADC1, ADC_FLAG_AWD);\n  /* 处理越限 */\n}",
+      "notesZh": [
+        "**AWD 标志读 SR 不会自动清**，必须显式清除，否则轮询会永远命中",
+        "EOC 在读 DR 时已自动清，先清后读反而可能丢掉「转换已完成」的判断依据",
+        "清标志前最好先把数据读走，避免结果丢失"
+      ]
+    }
+  }
+}

@@ -1,0 +1,411 @@
+{
+  "_comment": "DAC（12 位数模转换）的中文补充。重点：C8T6（LQFP48）没有 DAC、DAC 在 PA4/PA5、必须开 DAC 时钟并 DAC_Init、设置电压用 DAC_SetChannel1Data 且要注意对齐方式。",
+  "peripheral": "DAC",
+  "functions": {
+    "DAC_DeInit": {
+      "briefZh": "把 DAC 外设寄存器恢复为复位默认值。",
+      "usageZh": "重新初始化 DAC 前调用，把 CR、SWTRIGR、DHR/ DOR、SR 全部清干净。复位后 DAC 输出缓冲使能、触发源为 None（写入数据立即转换）、噪声/三角波关闭。\n\n**重要提醒：STM32F103C8T6（LQFP48，中容量）没有 DAC 外设，DAC 引脚 PA4/PA5 也没有引出的模拟输出能力。** 本函数在 C8T6 工程里可以编译，但操作的是不存在的寄存器，没有实际意义。DAC 只在 STM32F103 大容量型号（如 RCT6、ZET6）上存在。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {},
+      "prerequisites": [
+        "已调用 RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE) 打开 DAC 时钟（DAC 挂 APB1）"
+      ],
+      "registers": ["DAC_CR", "DAC_SWTRIGR", "DAC_DHR12R1", "DAC_DHR12L1", "DAC_DHR8R1", "DAC_DHR12R2", "DAC_DOR1", "DAC_DOR2", "DAC_SR"],
+      "relatedFunctions": ["DAC_Init", "DAC_Cmd", "RCC_APB1PeriphClockCmd"],
+      "exampleCode": "/* DAC 挂 APB1，先开时钟再复位 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);\nDAC_DeInit();\n\n/* C8T6 上没有 DAC 外设，以上代码在 C8T6 上不会产生任何实际输出 */",
+      "notesZh": [
+        "STM32F103C8T6 没有 DAC 外设（DAC 属于大容量产品），不要指望这段代码能输出电压",
+        "DAC 的时钟在 APB1 上，写成 RCC_APB2PeriphClockCmd 会静默失败（PCLK 上根本没有这一位）",
+        "复位会关掉两个通道的使能，复位后必须重新 DAC_Init 与 DAC_Cmd",
+        "即使换成有大容量型号，PA4/PA5 也常被其它功能占用，用之前先确认引脚分配"
+      ]
+    },
+
+    "DAC_Init": {
+      "briefZh": "按 DAC_InitTypeDef 初始化指定的 DAC 通道（触发源、波形、幅度、输出缓冲）。",
+      "usageZh": "DAC 使用的核心配置，每个通道各调一次（DAC_Channel_1 或 DAC_Channel_2）。四个字段必须想清楚：\n\n**① DAC_Trigger**：决定什么时候把 DHR 的值搬到 DOR 输出。DAC_Trigger_None 表示**写入数据后立即转换**（最简单，适合手动设电压）；DAC_Trigger_Software 需要调 DAC_SoftwareTriggerCmd 才转换；各种 DAC_Trigger_Tx_TRGO 用定时器触发，是做**固定采样率波形输出**的标准做法。\n\n**② DAC_WaveGeneration**：DAC_WaveGeneration_None 输出你写的值；Noise/Triangle 由硬件自动生成噪声或三角波。\n\n**③ DAC_LFSRUnmask_TriangleAmplitude**：噪声模式时是 LFSR 掩码，三角波模式时是幅度。注意**这个字段在 No wave 时会被忽略**（STA/DMAEN 写入但硬件不看它）。\n\n**④ DAC_OutputBuffer**：DAC_OutputBuffer_Enable（默认）时输出阻抗低、能直接驱动负载，但**输出范围被限制在约 0.2V~VDDA-0.2V**，无法满摆幅；DAC_OutputBuffer_Disable 能输出接近 0~VREF+ 的满摆幅，但驱动能力很弱，必须外接运放做跟随。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "DAC_Channel": "DAC_Channel_1（对应 PA4）或 DAC_Channel_2（对应 PA5）。C8T6 上这两个引脚存在但没有 DAC 功能。",
+        "DAC_InitStruct": "指向 DAC_InitTypeDef 的指针，四个字段：DAC_Trigger（DAC_Trigger_None 写入即转换 / DAC_Trigger_Software 软件触发 / DAC_Trigger_T2_TRGO、T3_TRGO、T4_TRGO、T5_TRGO、T6_TRGO、T7_TRGO、T8_TRGO、T15_TRGO、DAC_Trigger_Ext_IT9 外部触发）、DAC_WaveGeneration（DAC_WaveGeneration_None / Noise / Triangle）、DAC_LFSRUnmask_TriangleAmplitude（DAC_LFSRUnmask_Bit0~Bits11_0 或 DAC_TriangleAmplitude_1~4095）、DAC_OutputBuffer（DAC_OutputBuffer_Enable / Disable）。"
+      },
+      "prerequisites": [
+        "已开 DAC 时钟（RCC_APB1Periph_DAC）",
+        "已把 DAC 输出引脚配置为模拟输入模式（GPIO_Mode_AIN），否则输出会被 GPIO 的数字电路影响",
+        "选了定时器触发时，对应的定时器必须已配置并使能 TRGO 输出",
+        "目标型号确实有 DAC（C8T6 没有）"
+      ],
+      "registers": ["DAC_CR", "DAC_DHR12R1", "DAC_DHR12L1", "DAC_DHR12R2", "DAC_DHR12L2", "DAC_DHR12RD", "DAC_DHR12LD", "DAC_DHR8R1", "DAC_DHR8R2"],
+      "relatedFunctions": ["DAC_StructInit", "DAC_Cmd", "DAC_SetChannel1Data", "DAC_SetChannel2Data", "DAC_SoftwareTriggerCmd", "DAC_WaveGenerationCmd", "GPIO_Init"],
+      "exampleCode": "DAC_InitTypeDef DAC_InitStructure;\nGPIO_InitTypeDef GPIO_InitStructure;\n\n/* 1. 开时钟：DAC 在 APB1，GPIOA 在 APB2 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);\n\n/* 2. 输出引脚必须配成模拟输入，让数字部分彻底脱离引脚 */\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_4;              /* DAC1 -> PA4 */\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;\nGPIO_Init(GPIOA, &GPIO_InitStructure);\n\n/* 3. 先取默认值再改字段 */\nDAC_StructInit(&DAC_InitStructure);\nDAC_InitStructure.DAC_Trigger = DAC_Trigger_None;      /* 写入即转换，最简单 */\nDAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;\nDAC_InitStructure.DAC_LFSRUnmask_TriangleAmplitude = DAC_LFSRUnmask_Bit0;\nDAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;\nDAC_Init(DAC_Channel_1, &DAC_InitStructure);\n\n/* 4. 使能通道并给一个初值 */\nDAC_Cmd(DAC_Channel_1, ENABLE);\nDAC_SetChannel1Data(DAC_Align_12b_R, 2048);            /* 约 1/2 VREF */",
+      "notesZh": [
+        "STM32F103C8T6（LQFP48）没有 DAC 外设，PA4/PA5 上也不具备模拟输出功能；本函数在 C8T6 上没有任何实际效果",
+        "忘了把 PA4/PA5 配成 GPIO_Mode_AIN，引脚上的数字输入通路会影响输出电压的精度与稳定性",
+        "DAC 时钟在 APB1（RCC_APB1Periph_DAC），写成 APB2 会静默不生效",
+        "只 DAC_Init 不 DAC_Cmd(ENABLE)，通道不工作、输出保持 0V，而且不报错",
+        "DAC_Trigger_None 时写入 DHR 立即出现在输出；选其它触发源后 DAC_SetChannel1Data 只是把值放进 DHR，必须等触发事件才会真正输出，忘配触发会「数据写了但电压不变」",
+        "选定时器 TRGO 触发时，定时器的 TRGO 没配（TIM_SelectOutputTrigger）就永远不会有转换",
+        "DAC_OutputBuffer_Enable 时输出无法到 0V 与 VDDA 满摆幅（约 0.2V 起），需要满摆幅或驱动较大负载时应 Disable 并外加运放跟随",
+        "DAC_OutputBuffer_Disable 时输出阻抗很大（几十 kΩ），直接接万用表都会拉低电压，不能直接驱动负载",
+        "两个通道要分别 DAC_Init，并注意 PA4 与 PA5 是独立的两个引脚"
+      ]
+    },
+
+    "DAC_StructInit": {
+      "briefZh": "把 DAC_InitTypeDef 各字段填成默认值。",
+      "usageZh": "在 DAC_Init 之前调用，避免结构体残留随机值。默认值：DAC_Trigger=DAC_Trigger_None、DAC_WaveGeneration=DAC_WaveGeneration_None、DAC_LFSRUnmask_TriangleAmplitude=DAC_LFSRUnmask_Bit0、DAC_OutputBuffer=DAC_OutputBuffer_Enable。这是一组最安全的默认配置（写入即转换、无波形、缓冲使能）。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "DAC_InitStruct": "指向待初始化的 DAC_InitTypeDef 结构体。调用后四个字段被写成默认值，需要逐个覆盖关心的字段。"
+      },
+      "prerequisites": [
+        "结构体已声明"
+      ],
+      "registers": [],
+      "relatedFunctions": ["DAC_Init"],
+      "exampleCode": "DAC_InitTypeDef DAC_InitStructure;\n\nDAC_StructInit(&DAC_InitStructure);   /* 先清成默认值 */\n\n/* 只改需要改的字段 */\nDAC_InitStructure.DAC_Trigger = DAC_Trigger_None;\nDAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;\n\nDAC_Init(DAC_Channel_1, &DAC_InitStructure);",
+      "notesZh": [
+        "默认输出缓冲是使能的，如果要满摆幅输出必须显式改成 DAC_OutputBuffer_Disable",
+        "局部结构体不初始化就赋值，Debug 与 Release 的栈内容不同，会出现难复现的输出异常",
+        "默认触发是 None，也就是写入即转换；打算用定时器触发波形时一定要覆盖这一项"
+      ]
+    },
+
+    "DAC_Cmd": {
+      "briefZh": "使能或关闭指定的 DAC 通道。",
+      "usageZh": "DAC_Init 之后必须调用 DAC_Cmd(DAC_Channel_1, ENABLE) 通道才真正工作。关闭时通道停止输出，DOR 保持最后的值但引脚不再驱动。**顺序不能反**：先 DAC_Init 再 DAC_Cmd。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "DAC_Channel": "DAC_Channel_1（PA4）或 DAC_Channel_2（PA5）。C8T6 上没有 DAC 功能。",
+        "NewState": "ENABLE 使能通道，DISABLE 关闭通道。"
+      },
+      "prerequisites": [
+        "已调用 DAC_Init 配置该通道",
+        "DAC 时钟已使能"
+      ],
+      "registers": ["DAC_CR"],
+      "relatedFunctions": ["DAC_Init", "DAC_SetChannel1Data", "DAC_DMACmd"],
+      "exampleCode": "DAC_Init(DAC_Channel_1, &DAC_InitStructure);\nDAC_Cmd(DAC_Channel_1, ENABLE);                        /* 不调这句通道不工作 */\nDAC_SetChannel1Data(DAC_Align_12b_R, 2048);",
+      "notesZh": [
+        "只 DAC_Init 不 DAC_Cmd(ENABLE)，输出恒为 0V 且没有任何报错，是「配好了但没输出」的第一嫌疑",
+        "两个通道要分别使能，DAC_Cmd(DAC_Channel_1,...) 不会影响通道 2",
+        "关闭通道再使能时，DHR 中的值会保留，使能后立即输出该值",
+        "C8T6 没有 DAC 外设，本函数在 C8T6 上无实际意义"
+      ]
+    },
+
+    "DAC_DMACmd": {
+      "briefZh": "使能或关闭指定 DAC 通道的 DMA 请求。",
+      "usageZh": "做**高速波形输出**（正弦表、任意波形、音频）的标准做法：开 DMA 后每次触发转换完成，DAC 自动向 DMA 发请求搬运下一个数据，CPU 完全不参与，可以做到 MHz 级更新率。要在转换事件上产生 DMA 请求，需要 DAC_Trigger 设为定时器 TRGO 或 DAC_Trigger_Software。\n\nDMA 通道分配（F103）：**DAC 通道 1 用 DMA1_Channel3，DAC 通道 2 用 DMA1_Channel4**。配 DMA 时要选对通道，写错通道不会有任何搬运。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "DAC_Channel": "DAC_Channel_1 或 DAC_Channel_2。",
+        "NewState": "ENABLE 使能 DMA 请求，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已 DAC_Init 并 DAC_Cmd 使能通道",
+        "已用 DMA_Init 配置 DMA1_Channel3（通道 1）或 DMA1_Channel4（通道 2），并把源地址指向数据表、外设地址指向 DAC_DHR12R1 寄存器",
+        "已 DMA_Cmd 使能对应的 DMA 通道",
+        "建议同时开 DMA 传输完成中断，以便循环重填数据表"
+      ],
+      "registers": ["DAC_CR", "DMA_CCR3"],
+      "relatedFunctions": ["DMA_Init", "DMA_Cmd", "DMA_ITConfig", "DAC_Init", "DAC_Cmd", "DAC_SoftwareTriggerCmd"],
+      "exampleCode": "/* 用 DMA 把正弦表循环送到 DAC1，实现自动波形输出 */\nDAC_InitTypeDef DAC_InitStructure;\nDMA_InitTypeDef DMA_InitStructure;\n\nRCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);\n\nDAC_InitStructure.DAC_Trigger = DAC_Trigger_T2_TRGO;   /* 定时器 2 触发 */\nDAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;\nDAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;\nDAC_Init(DAC_Channel_1, &DAC_InitStructure);\nDAC_Cmd(DAC_Channel_1, ENABLE);\n\n/* DAC 通道 1 固定用 DMA1_Channel3 */\nDMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&DAC->DHR12R1;\nDMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)sine_table;\nDMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;\nDMA_InitStructure.DMA_BufferSize = SINE_TABLE_SIZE;\nDMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;\nDMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;\nDMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;\nDMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;\nDMA_InitStructure.DMA_Mode = DMA_Mode_Circular;         /* 循环，波形持续输出 */\nDMA_InitStructure.DMA_Priority = DMA_Priority_High;\nDMA_InitStructure.DMA_M2M = DMA_M2M_Disable;\nDMA_Init(DMA1_Channel3, &DMA_InitStructure);\nDMA_Cmd(DMA1_Channel3, ENABLE);\n\nDAC_DMACmd(DAC_Channel_1, ENABLE);                      /* 打通 DAC 到 DMA 的请求 */",
+      "notesZh": [
+        "忘了 DAC_DMACmd，DMA 配得再对也不会搬运，输出保持在第一次写的值",
+        "DAC 通道 1/2 分别固定用 DMA1_Channel3/Channel4，用错通道会完全不工作且不报错",
+        "数据宽度要用半字（HalfWord），因为 DHR12R1 是 12 位数据；配成 Byte 会让搬运错位",
+        "非循环模式下传输完成后 DMA 停止，需要靠 DMA 传输完成中断重新装填，否则波形只输出一遍",
+        "C8T6 上没有 DAC 外设，这套代码在 C8T6 上无法产生模拟输出"
+      ]
+    },
+
+    "DAC_SoftwareTriggerCmd": {
+      "briefZh": "触发指定 DAC 通道执行一次软件触发的转换。",
+      "usageZh": "当 DAC_Trigger 设为 DAC_Trigger_Software 时，**每次要更新输出都必须调用本函数**：先把新值写进 DHR（DAC_SetChannel1Data），再调它把值搬到 DOR 输出。好处是多个通道可以攒好数据后一起更新，避免两路输出出现时间差。\n\n它写的是 SWTRIGR 寄存器，是「自清」的触发位，调用一次产生一次转换，不需要手动清。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "DAC_Channel": "DAC_Channel_1 或 DAC_Channel_2。",
+        "NewState": "ENABLE 产生一次软件触发。库函数里此参数只用于判断，实际传 ENABLE 即可；传 DISABLE 不会产生触发。"
+      },
+      "prerequisites": [
+        "该通道的 DAC_Trigger 已配置为 DAC_Trigger_Software",
+        "通道已 DAC_Cmd 使能",
+        "要输出的值已通过 DAC_SetChannel1Data / DAC_SetChannel2Data 写入 DHR"
+      ],
+      "registers": ["DAC_SWTRIGR", "DAC_DHR12R1", "DAC_DOR1"],
+      "relatedFunctions": ["DAC_Init", "DAC_SetChannel1Data", "DAC_SetChannel2Data", "DAC_DualSoftwareTriggerCmd", "DAC_Cmd"],
+      "exampleCode": "/* DAC_Trigger 必须设为 DAC_Trigger_Software */\nDAC_InitStructure.DAC_Trigger = DAC_Trigger_Software;\nDAC_Init(DAC_Channel_1, &DAC_InitStructure);\nDAC_Cmd(DAC_Channel_1, ENABLE);\n\n/* 更新一次输出：先写数据，再软件触发 */\nDAC_SetChannel1Data(DAC_Align_12b_R, 3000);\nDAC_SoftwareTriggerCmd(DAC_Channel_1, ENABLE);\n\n/* 想输出阶梯波，就在循环里重复上面两行 */",
+      "notesZh": [
+        "DAC_Trigger 不是 DAC_Trigger_Software 时，调用本函数不会有任何转换发生（写入即转换或等待外部触发）",
+        "只写 DAC_SetChannel1Data 不调本函数，输出会一直停在上一次的电压，现象是「数据变了电压不变」",
+        "SWTRIGR 是自清位，调用一次触发一次；在循环里连续调用会产生密集的转换，注意更新率不要超过 DAC 建立时间（约 1μs）",
+        "需要两个通道严格同步更新时用 DAC_DualSoftwareTriggerCmd 而不是分别触发"
+      ]
+    },
+
+    "DAC_DualSoftwareTriggerCmd": {
+      "briefZh": "同时软件触发 DAC 的两个通道。",
+      "usageZh": "在做双路同步输出（例如 I/Q 信号、双路正交波形、XY 示波器图形）时使用：先分别用 DAC_SetDualChannelData 把两个通道的值都写进 DHR，再调本函数让两路**在同一时刻**更新输出。比分别调用两次 DAC_SoftwareTriggerCmd 少一次几微秒的时间差。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "NewState": "ENABLE 同时触发两个通道。库函数里此参数只用于判断，传 ENABLE 即可。"
+      },
+      "prerequisites": [
+        "两个通道的 DAC_Trigger 都配置为 DAC_Trigger_Software",
+        "两个通道都已 DAC_Cmd 使能",
+        "数据已用 DAC_SetDualChannelData 写入（或用各自的 SetChannelData 分别写入）"
+      ],
+      "registers": ["DAC_SWTRIGR", "DAC_DHR12RD", "DAC_DOR1", "DAC_DOR2"],
+      "relatedFunctions": ["DAC_SoftwareTriggerCmd", "DAC_SetDualChannelData", "DAC_Init"],
+      "exampleCode": "/* 两路通道都要配成软件触发 */\nDAC_InitStructure.DAC_Trigger = DAC_Trigger_Software;\nDAC_Init(DAC_Channel_1, &DAC_InitStructure);\nDAC_Init(DAC_Channel_2, &DAC_InitStructure);\nDAC_Cmd(DAC_Channel_1, ENABLE);\nDAC_Cmd(DAC_Channel_2, ENABLE);\n\n/* 同时写两路数据，再同时触发，保证两路完全同步 */\nDAC_SetDualChannelData(DAC_Align_12b_R, 2048, 1024);   /* Data2=2048, Data1=1024 */\nDAC_DualSoftwareTriggerCmd(ENABLE);",
+      "notesZh": [
+        "两个通道必须都配成 DAC_Trigger_Software，只配一个的话那一路不会被更新",
+        "参数没有通道号，它总是同时触发两路；只要一路就用 DAC_SoftwareTriggerCmd",
+        "DAC_SetDualChannelData 的参数顺序是 (对齐, Data2, Data1)，Data2 在前，容易写反导致两路电压对调",
+        "C8T6 上没有 DAC 外设，本函数在 C8T6 上无实际效果"
+      ]
+    },
+
+    "DAC_WaveGenerationCmd": {
+      "briefZh": "使能或关闭指定 DAC 通道的噪声波/三角波硬件生成。",
+      "usageZh": "让硬件自动产生波形，CPU 不用参与：\n\n**三角波**（DAC_Wave_Triangle）：以 DHR 中的值为起点，按 DAC_LFSRUnmask_TriangleAmplitude 设定的幅度自动递增到峰值再递减。**幅度必须与 DAC_Init 时设置的一致**（该参数在 Init 里设置，这里只开关）。典型用途是产生扫描信号。\n\n**噪声波**（DAC_Wave_Noise）：由 LFSR 产生伪随机序列叠加在 DHR 上，掩码决定噪声的位宽（DAC_LFSRUnmask_Bit0 只翻转最低位 → 噪声幅度最小；DAC_LFSRUnmask_Bits11_0 → 噪声幅度最大）。\n\n**关键：波形生成必须要有触发源，触发频率决定波形的频率。** 配 DAC_Trigger_None 时三角波会以极快的速度跑完一圈，看起来只是乱跳；正确做法是配 DAC_Trigger_Tx_TRGO 让定时器按固定频率触发。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "DAC_Channel": "DAC_Channel_1 或 DAC_Channel_2。",
+        "DAC_Wave": "波形类型：DAC_Wave_Noise（噪声波）或 DAC_Wave_Triangle（三角波）。",
+        "NewState": "ENABLE 开启该波形生成，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已 DAC_Init 并设置好 DAC_WaveGeneration 与 DAC_LFSRUnmask_TriangleAmplitude",
+        "已配好触发源（建议定时器 TRGO），触发频率决定输出波形频率",
+        "通道已 DAC_Cmd 使能"
+      ],
+      "registers": ["DAC_CR", "DAC_DHR12R1", "DAC_DHR12R2"],
+      "relatedFunctions": ["DAC_Init", "DAC_SoftwareTriggerCmd", "DAC_SetChannel1Data", "TIM_SelectOutputTrigger"],
+      "exampleCode": "/* 定时器 2 以 100kHz 触发，DAC 输出三角波 */\nDAC_InitStructure.DAC_Trigger = DAC_Trigger_T2_TRGO;      /* 必须有触发源 */\nDAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_Triangle;\nDAC_InitStructure.DAC_LFSRUnmask_TriangleAmplitude = DAC_TriangleAmplitude_2047;\nDAC_Init(DAC_Channel_1, &DAC_InitStructure);\n\nDAC_Cmd(DAC_Channel_1, ENABLE);\n\n/* DHR 的值是三角波的起始基准电压 */\nDAC_SetChannel1Data(DAC_Align_12b_R, 0);\n\n/* 打开三角波生成（幅度已在 DAC_Init 里设定） */\nDAC_WaveGenerationCmd(DAC_Channel_1, DAC_Wave_Triangle, ENABLE);",
+      "notesZh": [
+        "幅度不是在 DAC_WaveGenerationCmd 里设的，而是 DAC_Init 的 DAC_LFSRUnmask_TriangleAmplitude 字段；这里设成 DAC_TriangleAmplitude_4095 时若 DHR 基准值不为 0，波形会撞到 0xFFF 上限被削平",
+        "配 DAC_Trigger_None 时三角波以极高频率循环，示波器上看到的是高频杂波而非预期波形",
+        "噪声的幅度由 LFSRUnmask 掩码决定，掩码位数越多噪声越大；改掩码要重新 DAC_Init",
+        "关闭波形生成后输出会回到 DHR 中的固定值",
+        "三角波的周期 = (2 × 幅度) / 触发频率，计算输出频率时不要忘了那个 2",
+        "C8T6 上没有 DAC 外设，本函数在 C8T6 上无实际效果"
+      ]
+    },
+
+    "DAC_ITConfig": {
+      "briefZh": "使能或关闭指定 DAC 通道的中断（目前只有 DMA 下溢中断）。",
+      "usageZh": "DAC 只有一个中断源：**DAC_IT_DMAUDR（DMA 下溢）**。当 DAC 的 DMA 请求发出后没有被及时响应（DMA 停了、传输长度用完、内存搬运太慢），就会置位下溢标志。这个中断在调试 DMA 波形输出时非常有用——它直接告诉你「DMA 跟不上 DAC」。\n\n使能后还要用 NVIC_Init 使能 DAC_IRQn 通道，只开 ITConfig 中断不会进。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "DAC_Channel": "DAC_Channel_1 或 DAC_Channel_2。",
+        "DAC_IT": "中断源，取值 DAC_IT_DMAUDR（DMA 下溢中断）。",
+        "NewState": "ENABLE 使能该中断，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已 DAC_Init 并使用 DMA 方式输出（DAC_DMACmd 使能）",
+        "已用 NVIC_Init 使能 DAC_IRQn 中断通道",
+        "中断服务函数名为 DAC_IRQHandler（与启动文件一致）"
+      ],
+      "registers": ["DAC_CR", "DAC_SR"],
+      "relatedFunctions": ["DAC_GetITStatus", "DAC_ClearITPendingBit", "DAC_DMACmd", "NVIC_Init"],
+      "exampleCode": "NVIC_InitTypeDef NVIC_InitStructure;\n\nDAC_ITConfig(DAC_Channel_1, DAC_IT_DMAUDR, ENABLE);\n\nNVIC_InitStructure.NVIC_IRQChannel = DAC_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\nvoid DAC_IRQHandler(void)\n{\n  if (DAC_GetITStatus(DAC_Channel_1, DAC_IT_DMAUDR) != RESET)\n  {\n    /* DMA 跟不上 DAC：检查 DMA 是否停了、传输长度是否用完 */\n    DMA_Cmd(DMA1_Channel3, ENABLE);\n    DAC_ClearITPendingBit(DAC_Channel_1, DAC_IT_DMAUDR);\n  }\n}",
+      "notesZh": [
+        "只 DAC_ITConfig 不 NVIC_Init，中断不会进也不报错",
+        "下溢标志不清会反复进中断；清之前建议先记录次数，它反映了 DMA 的余量",
+        "下溢发生时 DAC 会输出错误的值（DOR 保持不变），波形上表现为一段平顶，靠这个中断能准确定位",
+        "要使能 DMA 请求先用 DAC_DMACmd，只开中断没有意义",
+        "C8T6 上没有 DAC 外设"
+      ]
+    },
+
+    "DAC_GetITStatus": {
+      "briefZh": "查询指定的 DAC 中断是否已发生。",
+      "usageZh": "中断服务函数里的入口判断，配合 DAC_IT_DMAUDR 使用。它同时检查中断使能位与状态标志，只有两者都成立才返回 SET。",
+      "returnDescZh": "SET 表示该中断已发生且已使能，RESET 表示未发生或未使能。",
+      "paramsZh": {
+        "DAC_Channel": "DAC_Channel_1 或 DAC_Channel_2。",
+        "DAC_IT": "要查询的中断源，取值 DAC_IT_DMAUDR（DMA 下溢）。"
+      },
+      "prerequisites": [
+        "已 DAC_ITConfig 使能该中断，并已 NVIC_Init 使能 DAC_IRQn"
+      ],
+      "registers": ["DAC_CR", "DAC_SR"],
+      "relatedFunctions": ["DAC_ITConfig", "DAC_ClearITPendingBit", "DAC_GetFlagStatus"],
+      "exampleCode": "void DAC_IRQHandler(void)\n{\n  if (DAC_GetITStatus(DAC_Channel_1, DAC_IT_DMAUDR) != RESET)\n  {\n    dma_underrun_count++;\n    DAC_ClearITPendingBit(DAC_Channel_1, DAC_IT_DMAUDR);\n  }\n}",
+      "notesZh": [
+        "必须先 DAC_ITConfig 使能，否则事件发生了也返回 RESET",
+        "两个通道的下溢共用一个 DAC_IRQHandler，进中断后要分别判断 DAC_Channel_1 与 DAC_Channel_2",
+        "判断完必须清挂起位，否则会反复进中断",
+        "C8T6 上没有 DAC 外设"
+      ]
+    },
+
+    "DAC_ClearITPendingBit": {
+      "briefZh": "清除指定 DAC 通道的中断挂起位。",
+      "usageZh": "中断处理完成后必须调用，否则会反复进中断。DAC 目前只有 DAC_IT_DMAUDR 一个挂起位，清完之后 DAC 会重新开始响应 DMA 请求（如果 DMA 那边已经恢复）。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "DAC_Channel": "DAC_Channel_1 或 DAC_Channel_2。",
+        "DAC_IT": "要清除的中断挂起位，取值 DAC_IT_DMAUDR。"
+      },
+      "prerequisites": [
+        "已用 DAC_GetITStatus 确认是该中断触发"
+      ],
+      "registers": ["DAC_SR"],
+      "relatedFunctions": ["DAC_GetITStatus", "DAC_ClearFlag", "DAC_ITConfig"],
+      "exampleCode": "void DAC_IRQHandler(void)\n{\n  if (DAC_GetITStatus(DAC_Channel_1, DAC_IT_DMAUDR) != RESET)\n  {\n    /* 先修复 DMA，再清标志，否则立刻又下溢 */\n    DMA_Cmd(DMA1_Channel3, ENABLE);\n    DAC_ClearITPendingBit(DAC_Channel_1, DAC_IT_DMAUDR);\n  }\n}",
+      "notesZh": [
+        "DMA 没恢复就清标志，会立刻再次下溢，程序会陷在中断里出不来",
+        "两个通道各有自己的下溢挂起位，清的时候通道号要对",
+        "清中断挂起位与清状态标志（DAC_ClearFlag）在本外设上操作的是同一个 SR 位",
+        "C8T6 上没有 DAC 外设"
+      ]
+    },
+
+    "DAC_SetChannel1Data": {
+      "briefZh": "把数据写入 DAC 通道 1 的数据保持寄存器（DHR），决定通道 1 的输出电压。",
+      "usageZh": "这是**设置输出电压最常用的函数**。写入的值会按对齐方式放进 DHR12R1（右对齐）、DHR12L1（左对齐）或 DHR8R1（8 位右对齐）：\n\n- **DAC_Align_12b_R**（最常用）：Data 的低 12 位有效，取值 0~4095，直接就是数字量。\n- **DAC_Align_12b_L**：Data 的低 12 位要写成 `数值 << 4`（左对齐到高 12 位），即 Data = value << 4。写错对齐方式会得到预期 1/16 或 16 倍的电压。\n- **DAC_Align_8b_R**：只取 Data 低 8 位，取值 0~255，精度降到 8 位。\n\n输出电压计算：**Vout = VREF+ × Data / 4095**（12 位时）。用 VDDA=3.3V 的常见配置，Data=2048 约输出 1.65V。\n\n写完是否立即输出取决于 DAC_Trigger：None 时立即转换；Software 时要再调 DAC_SoftwareTriggerCmd；定时器 TRGO 时要等触发事件。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "DAC_Align": "数据对齐方式：DAC_Align_12b_R（12 位右对齐，Data 取值 0~4095，最常用）、DAC_Align_12b_L（12 位左对齐，Data 需写成数值 << 4）、DAC_Align_8b_R（8 位右对齐，Data 取值 0~255）。",
+        "Data": "要输出的数字量。取值范围取决于对齐方式：12 位对齐时为 0~4095，8 位对齐时为 0~255。超出位宽的高位会被硬件忽略。"
+      },
+      "prerequisites": [
+        "已 DAC_Init(DAC_Channel_1, ...) 配置通道 1",
+        "已 DAC_Cmd(DAC_Channel_1, ENABLE) 使能通道",
+        "输出引脚 PA4 已配成 GPIO_Mode_AIN"
+      ],
+      "registers": ["DAC_DHR12R1", "DAC_DHR12L1", "DAC_DHR8R1", "DAC_DOR1"],
+      "relatedFunctions": ["DAC_Init", "DAC_Cmd", "DAC_SetChannel2Data", "DAC_SetDualChannelData", "DAC_GetDataOutputValue", "DAC_SoftwareTriggerCmd"],
+      "exampleCode": "/* 用 12 位右对齐输出 1.65V（VREF+ = 3.3V） */\nuint16_t value = (uint16_t)(1.65f / 3.3f * 4095.0f);   /* 约 2047 */\nDAC_SetChannel1Data(DAC_Align_12b_R, value);\n\n/* 输出 0V 到 3.3V 的三角扫描 */\nfor (uint16_t v = 0; v < 4096; v++)\n{\n  DAC_SetChannel1Data(DAC_Align_12b_R, v);\n  /* 若 DAC_Trigger 是 Software，这里还要 DAC_SoftwareTriggerCmd(DAC_Channel_1, ENABLE); */\n  delay_us(10);\n}",
+      "notesZh": [
+        "对齐方式写错是最常见的问题：用 DAC_Align_12b_L 时 Data 必须左移 4 位，直接填 0~4095 只能输出满量程的 1/16",
+        "Data 超过对应位宽的高位会被硬件忽略，12 位模式下传 40000 实际按 40000 & 0xFFF = 3232 处理，不会报错",
+        "DAC_Trigger 不是 None 时，写数据只是装进 DHR，必须等触发才真正输出；现象是「值写了电压不变」",
+        "输出电压上限受参考电压限制，用 VDDA 做参考时精度受电源噪声影响，要求精度应外接基准",
+        "DAC_OutputBuffer_Enable 时输出到不了 0V 和满量程（约 0.2V~VDD-0.2V），要满摆幅必须 Disable 缓冲并外加运放跟随",
+        "STM32F103C8T6（LQFP48）没有 DAC 外设，DAC 引脚 PA4/PA5 在该封装上不具备模拟输出功能",
+        "通道 2 在 PA5 上，用的是 DAC_SetChannel2Data 与 PA5；两个通道的引脚别搞混"
+      ]
+    },
+
+    "DAC_SetChannel2Data": {
+      "briefZh": "把数据写入 DAC 通道 2 的数据保持寄存器（DHR），决定通道 2 的输出电压。",
+      "usageZh": "与 DAC_SetChannel1Data 用法完全一致，只是作用于**通道 2（引脚 PA5）**，写入 DHR12R2 / DHR12L2 / DHR8R2。对齐方式与取值范围与通道 1 相同：12 位右对齐 0~4095、12 位左对齐需左移 4 位、8 位右对齐 0~255。\n\n做双路同步输出时，建议用 DAC_SetDualChannelData 一次写两路，再用 DAC_DualSoftwareTriggerCmd 同时触发。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "DAC_Align": "数据对齐方式：DAC_Align_12b_R（12 位右对齐，0~4095）、DAC_Align_12b_L（12 位左对齐，需左移 4 位）、DAC_Align_8b_R（8 位右对齐，0~255）。",
+        "Data": "要输出的数字量，范围由对齐方式决定（12 位为 0~4095）。"
+      },
+      "prerequisites": [
+        "已 DAC_Init(DAC_Channel_2, ...) 配置通道 2",
+        "已 DAC_Cmd(DAC_Channel_2, ENABLE) 使能通道 2",
+        "输出引脚 PA5 已配成 GPIO_Mode_AIN"
+      ],
+      "registers": ["DAC_DHR12R2", "DAC_DHR12L2", "DAC_DHR8R2", "DAC_DOR2"],
+      "relatedFunctions": ["DAC_Init", "DAC_Cmd", "DAC_SetChannel1Data", "DAC_SetDualChannelData", "DAC_GetDataOutputValue"],
+      "exampleCode": "/* 通道 2 输出 2.0V（VREF+ = 3.3V） */\nuint16_t v2 = (uint16_t)(2.0f / 3.3f * 4095.0f);\nDAC_SetChannel2Data(DAC_Align_12b_R, v2);",
+      "notesZh": [
+        "通道 2 必须单独 DAC_Init 与 DAC_Cmd，只配了通道 1 时写进去没有任何输出",
+        "通道 2 的引脚是 PA5，不是 PA4",
+        "对齐方式同样容易写错，规则与通道 1 一致",
+        "做双路同步时用 DAC_SetDualChannelData + DAC_DualSoftwareTriggerCmd，避免两路间出现几微秒的相位差",
+        "STM32F103C8T6 没有 DAC 外设，本函数在 C8T6 上无实际效果"
+      ]
+    },
+
+    "DAC_SetDualChannelData": {
+      "briefZh": "同时写入 DAC 两个通道的数据保持寄存器（一次写 32 位双通道寄存器）。",
+      "usageZh": "双通道同步输出的配套函数：硬件上有 DHR12RD / DHR12LD / DHR8RD 这样的双通道寄存器，一次写就能把两路数据都装好，配合 DAC_DualSoftwareTriggerCmd 可让两路在同一时刻更新。\n\n**注意参数顺序是 (DAC_Align, Data2, Data1)：Data2 是通道 2，Data1 是通道 1，顺序和直觉相反**，写反了两路电压会互换。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "DAC_Align": "数据对齐方式：DAC_Align_12b_R（12 位右对齐）、DAC_Align_12b_L（12 位左对齐，两路都要左移 4 位）、DAC_Align_8b_R（8 位右对齐）。",
+        "Data2": "**通道 2**（PA5）的数字量，12 位对齐时取值 0~4095。",
+        "Data1": "**通道 1**（PA4）的数字量，12 位对齐时取值 0~4095。"
+      },
+      "prerequisites": [
+        "两个通道都已 DAC_Init 并 DAC_Cmd 使能",
+        "两路输出引脚 PA4/PA5 都已配成 GPIO_Mode_AIN",
+        "若用软件触发，两个通道的 DAC_Trigger 都要设成 DAC_Trigger_Software"
+      ],
+      "registers": ["DAC_DHR12RD", "DAC_DHR12LD", "DAC_DHR8RD", "DAC_DOR1", "DAC_DOR2"],
+      "relatedFunctions": ["DAC_SetChannel1Data", "DAC_SetChannel2Data", "DAC_DualSoftwareTriggerCmd", "DAC_Init"],
+      "exampleCode": "/* 参数顺序是 (对齐, 通道2数据, 通道1数据)，别写反 */\nDAC_SetDualChannelData(DAC_Align_12b_R, 3000, 1000);\n/* 结果：通道 2 = 3000，通道 1 = 1000 */\n\n/* 两路同时更新输出 */\nDAC_DualSoftwareTriggerCmd(ENABLE);",
+      "notesZh": [
+        "参数顺序是 Data2 在前、Data1 在后，写反了两路输出对调，波形会镜像",
+        "两路必须都已经 DAC_Init 并 DAC_Cmd 使能，否则只有一个通道会更新",
+        "它只写数据不触发转换；DAC_Trigger 为 Software 时必须再调 DAC_DualSoftwareTriggerCmd",
+        "左对齐时两个参数都要左移 4 位，别忘了其中任意一个都会造成那一路电压偏差 16 倍",
+        "STM32F103C8T6 没有 DAC 外设，本函数在 C8T6 上无实际效果"
+      ]
+    },
+
+    "DAC_GetDataOutputValue": {
+      "briefZh": "读取指定 DAC 通道最近一次输出的数据值（DOR 寄存器内容）。",
+      "usageZh": "用于回读当前输出值，常见于闭环调节（读回现值和目标值比较后微调）或调试时确认数据真的写进去了。注意读到的是 **DOR 的值**，即最近一次实际转换的数据；如果走了波形生成或 DMA，它反映的是硬件当前正在输出的那个点。",
+      "returnDescZh": "该通道最近一次输出的数字量（0~4095，或 8 位模式下 0~255）。它不是引脚上的实测电压，只反映数字侧的输出值。",
+      "paramsZh": {
+        "DAC_Channel": "DAC_Channel_1 或 DAC_Channel_2。"
+      },
+      "prerequisites": [
+        "已 DAC_Init 并 DAC_Cmd 使能该通道，且至少写入过一次数据"
+      ],
+      "registers": ["DAC_DOR1", "DAC_DOR2"],
+      "relatedFunctions": ["DAC_SetChannel1Data", "DAC_SetChannel2Data", "DAC_GetFlagStatus"],
+      "exampleCode": "/* 增量调整：读回当前值后加一点 */\nuint16_t now = DAC_GetDataOutputValue(DAC_Channel_1);\n\nif (now < 4000)\n{\n  DAC_SetChannel1Data(DAC_Align_12b_R, now + 100);\n  DAC_SoftwareTriggerCmd(DAC_Channel_1, ENABLE);\n}",
+      "notesZh": [
+        "读的是数字量不是电压，要换算成电压还得乘 VREF+/4095，且不含输出缓冲带来的偏差",
+        "没写数据就读会得到复位默认值 0，别把它当成「输出正常」",
+        "DOR 是只读寄存器，读它不影响输出",
+        "用了波形生成或 DMA 时，读到的值会不断变化，不适合做稳定性判断",
+        "STM32F103C8T6 没有 DAC 外设"
+      ]
+    },
+
+    "DAC_GetFlagStatus": {
+      "briefZh": "查询指定 DAC 通道的标志位（目前只有 DMA 下溢标志）。",
+      "usageZh": "轮询版本的下溢检测，不用开中断也能发现「DMA 跟不上 DAC」。DAC_FLAG_DMAUDR 置位说明某次 DMA 请求没被及时响应，波形上会出现平顶或跳变。判断后必须用 DAC_ClearFlag 清除，否则下次判断仍为真。",
+      "returnDescZh": "SET 表示标志已置位，RESET 表示未置位。",
+      "paramsZh": {
+        "DAC_Channel": "DAC_Channel_1 或 DAC_Channel_2。",
+        "DAC_FLAG": "要查询的标志，取值 DAC_FLAG_DMAUDR（DMA 下溢标志）。"
+      },
+      "prerequisites": [
+        "已 DAC_Init 并使能通道，且已开始用 DMA 传输数据"
+      ],
+      "registers": ["DAC_SR"],
+      "relatedFunctions": ["DAC_ClearFlag", "DAC_DMACmd", "DAC_GetITStatus"],
+      "exampleCode": "/* 主循环里轮询下溢标志 */\nif (DAC_GetFlagStatus(DAC_Channel_1, DAC_FLAG_DMAUDR) != RESET)\n{\n  DAC_ClearFlag(DAC_Channel_1, DAC_FLAG_DMAUDR);\n  /* 下溢说明 DMA 带宽不足：减小数据量、提高优先级或降低触发频率 */\n}",
+      "notesZh": [
+        "DAC_FLAG_DMAUDR 是读后需手动清除的标志，不清会一直为真",
+        "它和 DAC_GetITStatus 查的是同一个 SR 位，区别是前者不看中断使能位",
+        "下溢只在 DMA 模式下有意义，没用 DMA 时该标志不会置位",
+        "STM32F103C8T6 没有 DAC 外设"
+      ]
+    },
+
+    "DAC_ClearFlag": {
+      "briefZh": "清除指定 DAC 通道的挂起标志。",
+      "usageZh": "轮询检测下溢后清除用。参数与 DAC_GetFlagStatus 对应，目前只有 DAC_FLAG_DMAUDR 一个标志。清除后如果 DMA 仍未恢复，标志会立刻再次置位——这本身就是有用的信息。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "DAC_Channel": "DAC_Channel_1 或 DAC_Channel_2。",
+        "DAC_FLAG": "要清除的标志，取值 DAC_FLAG_DMAUDR（DMA 下溢标志）。"
+      },
+      "prerequisites": [
+        "该标志确实已置位"
+      ],
+      "registers": ["DAC_SR"],
+      "relatedFunctions": ["DAC_GetFlagStatus", "DAC_ClearITPendingBit"],
+      "exampleCode": "if (DAC_GetFlagStatus(DAC_Channel_1, DAC_FLAG_DMAUDR) != RESET)\n{\n  DAC_ClearFlag(DAC_Channel_1, DAC_FLAG_DMAUDR);\n}",
+      "notesZh": [
+        "清标志前先把 DMA 恢复，否则下一次轮询立刻又置位，看不出改善",
+        "两个通道的标志位独立，清的时候通道号要对",
+        "与 DAC_ClearITPendingBit 操作的是同一个 SR 位，中断方式下用后者语义更清晰",
+        "STM32F103C8T6 没有 DAC 外设"
+      ]
+    }
+  }
+}

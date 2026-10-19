@@ -1,0 +1,636 @@
+{
+  "schemaVersion": 1,
+  "peripheral": "PWR",
+  "functions": [
+    {
+      "id": "PWR_DeInit",
+      "name": "PWR_DeInit",
+      "peripheral": "PWR",
+      "sectionId": "PWR#sec1",
+      "prototype": "void PWR_DeInit(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Deinitializes the PWR peripheral registers to their default reset values.",
+      "briefZh": "把 PWR 外设的所有寄存器恢复为复位默认值。",
+      "usageZh": "把 PWR_CR、PWR_CSR 复位回上电状态，即关掉备份域访问、关掉 PVD、关掉唤醒引脚、清除各标志。实际工程里几乎不用：它不会把芯片从低功耗模式里拉出来，也不会重新打开 BKP/RTC 的访问权限，反而会让已经配好的 RTC 校准、唤醒引脚配置失效。只有在做自检、或者在调试时怀疑某个 PWR 位被误置时才调它。",
+      "prerequisites": [
+        "已调用 RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE) 打开 PWR 时钟"
+      ],
+      "registers": [
+        "PWR_CR",
+        "PWR_CSR"
+      ],
+      "relatedFunctions": [
+        "RCC_APB1PeriphClockCmd",
+        "PWR_BackupAccessCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "PWR_DeInit 内部调用的是 RCC_APB1PeriphResetCmd(RCC_APB1Periph_PWR, ...)，只是复位 PWR 寄存器，不影响芯片当前所处的功耗模式",
+        "调用后 PWR_CR 中的 DBP 位被清零，BKP/RTC 立刻不可写；继续写 BKP_DR 会静默失败，读回来还是旧值",
+        "调用后唤醒引脚、PVD 配置全部丢失，需要重新配置",
+        "不要在有 RTC 走时的系统里随手调用，会打断 RTC 的正常读写时序"
+      ],
+      "exampleCode": "/* 一般在调试时才需要：把 PWR 恢复到上电默认状态 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);\nPWR_DeInit();\n\n/* 复位后备份域访问被关闭，若要继续用 RTC/BKP 必须重新打开 */\nPWR_BackupAccessCmd(ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "BKP",
+        "ENABLE",
+        "PWR",
+        "PWR_BackupAccessCmd",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1PeriphResetCmd",
+        "RCC_APB1Periph_PWR",
+        "RTC"
+      ],
+      "headerLine": 128,
+      "sourceLine": 112,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "PWR_BackupAccessCmd",
+      "name": "PWR_BackupAccessCmd",
+      "peripheral": "PWR",
+      "sectionId": "PWR#sec2",
+      "prototype": "void PWR_BackupAccessCmd(FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the access to the RTC and backup registers. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 打开备份域访问（置位 DBP），DISABLE 关闭。传 ENABLE 打开即可，通常不需要再关。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables access to the RTC and backup registers.",
+      "briefZh": "使能或关闭对备份域（BKP 备份寄存器与 RTC 寄存器）的访问权限。",
+      "usageZh": "这是访问 BKP 和 RTC 的**总开关**，写的是 PWR_CR 的 DBP 位。**任何一次对 BKP_DRx / RTC_CNT / RTC_PRL / RTC_ALR 的读写之前，都必须先调用 PWR_BackupAccessCmd(ENABLE)**，否则写操作被硬件忽略（而且不报错，只是读回来还是旧值）。典型初始化顺序是：开 PWR 时钟 → 开 BKP 时钟 → PWR_BackupAccessCmd(ENABLE) → 操作 BKP/RTC。",
+      "prerequisites": [
+        "已调用 RCC_APB1PeriphClockCmd 打开 RCC_APB1Periph_PWR 时钟（PWR 时钟不开，本函数写的位根本进不去）"
+      ],
+      "registers": [
+        "PWR_CR"
+      ],
+      "relatedFunctions": [
+        "BKP_WriteBackupRegister",
+        "BKP_ReadBackupRegister",
+        "RTC_SetCounter",
+        "RCC_APB1PeriphClockCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "必须先开 PWR 时钟再调用；只开 BKP 时钟是不够的，DBP 位属于 PWR_CR",
+        "写了 RTC/BKP 却读回旧值、或 BKP_DR 一直为 0，九成是漏了这一句",
+        "掉电（VDD 断开）后备份域由 VBAT 供电仍能保持内容，但复位后 DBP 位会回到 0，所以每次上电初始化都要重新调用",
+        "STANDBY 唤醒等同于一次上电复位，DBP 同样会被清零",
+        "不要在中断里反复开关 DBP，RTC 正在写时关闭访问可能造成正在进行的写操作丢失"
+      ],
+      "exampleCode": "/* 访问 BKP/RTC 的标准前置动作 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\n\n/* 关键：不开这个开关，后面所有对 BKP_DR / RTC 的写都是无效的 */\nPWR_BackupAccessCmd(ENABLE);\n\n/* 现在才能写备份寄存器 */\nBKP_WriteBackupRegister(BKP_DR1, 0x1234);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "BKP",
+        "BKP_DR1",
+        "BKP_WriteBackupRegister",
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "PWR",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_BKP",
+        "RCC_APB1Periph_PWR",
+        "RTC"
+      ],
+      "headerLine": 130,
+      "sourceLine": 124,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "PWR_PVDCmd",
+      "name": "PWR_PVDCmd",
+      "peripheral": "PWR",
+      "sectionId": "PWR#sec2",
+      "prototype": "void PWR_PVDCmd(FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the PVD. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 打开 PVD，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the Power Voltage Detector(PVD).",
+      "briefZh": "使能或关闭可编程电压监测器（PVD）。",
+      "usageZh": "PVD 把供电电压 VDD 与 PWR_PVDLevelConfig 设定的阈值比较，电压跌破阈值时置位 PWR_FLAG_PVDO 并可产生 EXTI16 中断。用于在电源掉电瞬间抢时间保存数据（例如往 BKP_DR 或 Flash 写关键参数），或检测电池供电电量不足。使用时通常配合 EXTI 的 EXTI_Line16 中断。",
+      "prerequisites": [
+        "已打开 PWR 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE)",
+        "已用 PWR_PVDLevelConfig 设定检测阈值",
+        "若要用中断，需配置 EXTI_Line16 并调用 NVIC_Init"
+      ],
+      "registers": [
+        "PWR_CR",
+        "PWR_CSR"
+      ],
+      "relatedFunctions": [
+        "PWR_PVDLevelConfig",
+        "PWR_GetFlagStatus",
+        "EXTI_Init",
+        "NVIC_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "不打开 PWR 时钟就调用，PWR_CR 写入无效，PVD 永远不工作",
+        "PVD 中断的 EXTI 线固定是 EXTI_Line16，中断服务函数名固定为 PVD_IRQHandler（在启动文件里）",
+        "PVD 只能监测 VDD 跌破阈值，纯 VBAT 供电时不起作用",
+        "电压恢复后 PWR_FLAG_PVDO 会自动清零，需要软件用 PWR_GetFlagStatus 判断当前是否已低于阈值"
+      ],
+      "exampleCode": "/* 1. 打开 PWR 时钟 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);\n\n/* 2. 设阈值 2.9V，并打开 PVD */\nPWR_PVDLevelConfig(PWR_PVDLevel_2V9);\nPWR_PVDCmd(ENABLE);\n\n/* 3. 用 EXTI16 产生中断，掉电时抢救数据 */\nEXTI_InitTypeDef EXTI_InitStructure;\nEXTI_InitStructure.EXTI_Line = EXTI_Line16;\nEXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;\nEXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;  /* 电压跌破阈值时触发 */\nEXTI_InitStructure.EXTI_LineCmd = ENABLE;\nEXTI_Init(&EXTI_InitStructure);\n\n/* 4. 中断服务函数名固定为 PVD_IRQHandler */\n/* void PVD_IRQHandler(void) { EXTI_ClearITPendingBit(EXTI_Line16); ... } */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "EXTI",
+        "EXTI_ClearITPendingBit",
+        "EXTI_Init",
+        "EXTI_InitTypeDef",
+        "EXTI_Line16",
+        "EXTI_Mode_Interrupt",
+        "EXTI_Trigger_Falling",
+        "FunctionalState",
+        "NVIC_Init",
+        "PWR",
+        "PWR_FLAG_PVDO",
+        "PWR_GetFlagStatus",
+        "PWR_PVDLevelConfig",
+        "PWR_PVDLevel_2V9",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_PWR"
+      ],
+      "headerLine": 131,
+      "sourceLine": 137,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "PWR_PVDLevelConfig",
+      "name": "PWR_PVDLevelConfig",
+      "peripheral": "PWR",
+      "sectionId": "PWR#sec3",
+      "prototype": "void PWR_PVDLevelConfig(uint32_t PWR_PVDLevel);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "PWR_PVDLevel",
+          "type": "uint32_t",
+          "descEn": "specifies the PVD detection level This parameter can be one of the following values:",
+          "descZh": "阈值档位：PWR_PVDLevel_2V2、PWR_PVDLevel_2V3、PWR_PVDLevel_2V4、PWR_PVDLevel_2V5、PWR_PVDLevel_2V6、PWR_PVDLevel_2V7、PWR_PVDLevel_2V8、PWR_PVDLevel_2V9。常用 PWR_PVDLevel_2V9。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the voltage threshold detected by the Power Voltage Detector(PVD).",
+      "briefZh": "设置 PVD 检测电压的阈值档位。",
+      "usageZh": "在 2.2V ~ 2.9V 之间选择一档作为报警电压，共 8 档（每档约 0.1V）。STM32F103 在 2.0V 以下 Flash 不能可靠工作、3.6V 以上会损坏，所以常用 PWR_PVDLevel_2V9 作为掉电预警点，给保存数据留出时间。此函数只写阈值，不打开 PVD，必须再调用 PWR_PVDCmd(ENABLE)。",
+      "prerequisites": [
+        "已打开 PWR 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE)"
+      ],
+      "registers": [
+        "PWR_CR"
+      ],
+      "relatedFunctions": [
+        "PWR_PVDCmd",
+        "PWR_GetFlagStatus"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "档位的实际触发电压有几十 mV 的误差，且随温度漂移，重要场合要留足余量",
+        "只设阈值不调 PWR_PVDCmd(ENABLE)，PVD 完全不工作",
+        "阈值取得太低（如 2V2）时留给软件保存数据的时间可能不够；取得太高（2V9）时正常的电源纹波可能误触发，注意电源质量",
+        "PVD 是 8 档固定值，不能任意设电压"
+      ],
+      "exampleCode": "RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);\n\n/* 阈值设 2.9V：VDD 掉到 2.9V 以下就报警，此时还能跑几十毫秒 */\nPWR_PVDLevelConfig(PWR_PVDLevel_2V9);\nPWR_PVDCmd(ENABLE);\n\n/* 轮询方式使用 */\nif (PWR_GetFlagStatus(PWR_FLAG_PVDO) != RESET)\n{\n  /* 电压已低于阈值，赶紧把关键数据写进 BKP_DR */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "PWR",
+        "PWR_FLAG_PVDO",
+        "PWR_GetFlagStatus",
+        "PWR_PVDCmd",
+        "PWR_PVDLevel_2V2",
+        "PWR_PVDLevel_2V3",
+        "PWR_PVDLevel_2V4",
+        "PWR_PVDLevel_2V5",
+        "PWR_PVDLevel_2V6",
+        "PWR_PVDLevel_2V7",
+        "PWR_PVDLevel_2V8",
+        "PWR_PVDLevel_2V9",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_PWR",
+        "RESET"
+      ],
+      "headerLine": 132,
+      "sourceLine": 158,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "PWR_WakeUpPinCmd",
+      "name": "PWR_WakeUpPinCmd",
+      "peripheral": "PWR",
+      "sectionId": "PWR#sec2",
+      "prototype": "void PWR_WakeUpPinCmd(FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the WakeUp Pin functionality. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能 WKUP 引脚唤醒，DISABLE 关闭并把 PA0 交还给 GPIO。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the WakeUp Pin functionality.",
+      "briefZh": "使能或关闭 WKUP 引脚（PA0）的唤醒功能。",
+      "usageZh": "使能后 PA0 被强制为唤醒输入，**不能再当普通 GPIO 使用**（即使你把它配成推挽输出，也读不到外部电平、输不出信号）。此函数对 STOP 和 STANDBY 两种模式都有效。STANDBY 模式下唤醒引脚是少数几个还能工作的功能之一，靠它加上 RTC 闹钟才能退出待机。",
+      "prerequisites": [
+        "已打开 PWR 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE)",
+        "必须在进入 STOP/STANDBY 之前调用，进入低功耗后再调用没有任何意义"
+      ],
+      "registers": [
+        "PWR_CSR"
+      ],
+      "relatedFunctions": [
+        "PWR_EnterSTOPMode",
+        "PWR_EnterSTANDBYMode",
+        "PWR_GetFlagStatus"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "使能后 PA0 被 PWR 外设接管，用户代码里所有对 PA0 的 GPIO 读写都会失效——这是很常见的困惑来源",
+        "PA0 是上升沿有效（高电平唤醒），外部电路要保证空闲时为低；按键接法要注意上拉/下拉方向",
+        "WKUP 引脚没有内部上拉保证，浮空时容易误唤醒，建议外加下拉电阻",
+        "C8T6 封装里 PA0 就是 WKUP 引脚，同一个引脚还复用为 TIM2_CH1、ADC12_IN0，一起用会冲突",
+        "STANDBY 唤醒后程序从复位向量重新开始执行，不是从中断返回，全局变量和 RAM 内容全部丢失"
+      ],
+      "exampleCode": "RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);\n\n/* 使能 PA0 唤醒功能：PA0 上升沿把芯片从 STOP/STANDBY 唤醒 */\nPWR_WakeUpPinCmd(ENABLE);\n\n/* 进入待机，等待 PA0 上升沿或 RTC 闹钟 */\nPWR_EnterSTANDBYMode();\n\n/* 唤醒后相当于复位重启，可以通过 PWR_FLAG_WU 判断是唤醒引脚唤醒的 */\nif (PWR_GetFlagStatus(PWR_FLAG_WU) != RESET)\n{\n  PWR_ClearFlag(PWR_FLAG_WU);\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "PWR",
+        "PWR_ClearFlag",
+        "PWR_EnterSTANDBYMode",
+        "PWR_FLAG_WU",
+        "PWR_GetFlagStatus",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_PWR",
+        "RESET",
+        "RTC"
+      ],
+      "headerLine": 133,
+      "sourceLine": 178,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "PWR_EnterSTOPMode",
+      "name": "PWR_EnterSTOPMode",
+      "peripheral": "PWR",
+      "sectionId": "PWR#sec4",
+      "prototype": "void PWR_EnterSTOPMode(uint32_t PWR_Regulator, uint8_t PWR_STOPEntry);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "PWR_Regulator",
+          "type": "uint32_t",
+          "descEn": "specifies the regulator state in STOP mode. This parameter can be one of the following values:",
+          "descZh": "停止模式下稳压器的状态：PWR_Regulator_ON（稳压器保持开启，唤醒快、功耗略高，最常用）或 PWR_Regulator_LowPower（稳压器低压，功耗更低但唤醒时会有额外延迟并可能触发一次上电复位标志）。"
+        },
+        {
+          "name": "PWR_STOPEntry",
+          "type": "uint8_t",
+          "descEn": "specifies if STOP mode in entered with WFI or WFE instruction. This parameter can be one of the following values:",
+          "descZh": "进入方式：PWR_STOPEntry_WFI（等待中断唤醒，最常用）或 PWR_STOPEntry_WFE（等待事件唤醒）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值。函数在 WFI/WFE 处阻塞，被唤醒后才返回，返回后不要假设时钟没变。",
+      "briefEn": "Enters STOP mode.",
+      "briefZh": "让 MCU 进入停止（STOP）模式，内核时钟停止、功耗大幅下降，可由中断或事件唤醒。",
+      "usageZh": "STOP 模式保留 SRAM 和寄存器内容，功耗约几十微安（典型 14uA @ 3.3V/25℃），是被唤醒后要**继续执行**（而不是重启）的场合的首选。进入前必须做好两件事：**一是配置好唤醒源**（EXTI 中断或事件，如按键 EXTI 线、USART 接收、RTC 闹钟），否则芯片会永远睡下去只能靠复位；**二是把 NVIC 的 SLEEPDEEP 位置起**（SPL 的 PWR_EnterSTOPMode 内部会置，但如果你用 WFI 宏手动实现就要自己置）。唤醒后**系统时钟会被硬件切回 HSI（约 8MHz）**，必须重新调用 SystemInit 并重配时钟（如 RCC_PLLConfig + RCC_SYSCLKConfig + RCC_APB1/2PeriphClockCmd），否则串口波特率、定时器周期全部错乱。",
+      "prerequisites": [
+        "已打开 PWR 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE)",
+        "已配置好至少一个唤醒源（EXTI 中断、USART 接收中断、RTC 闹钟等），并已 NVIC_Init 使能其通道",
+        "唤醒用的外设中断标志在进入前应已清除，避免立刻被旧标志唤醒",
+        "唤醒后必须重新配置系统时钟（SystemInit / RCC 配置），否则仍在 HSI 上运行"
+      ],
+      "registers": [
+        "PWR_CR",
+        "SCB_SCR"
+      ],
+      "relatedFunctions": [
+        "PWR_EnterSTANDBYMode",
+        "PWR_WakeUpPinCmd",
+        "EXTI_Init",
+        "NVIC_Init",
+        "RCC_HSEConfig",
+        "RCC_PLLCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "没配唤醒源就进 STOP，芯片会一直睡到复位或掉电，调试时表现为\"程序卡死\"",
+        "唤醒后系统时钟变成 HSI（8MHz），**不重新配置时钟是最经典的坑**：串口乱码、延时变长 9 倍、定时器周期全错",
+        "STOP 模式会自动关闭 HSI 和 HSE，唤醒后 PLL 需要重新锁定，因此唤醒到恢复 72MHz 之间有一段以 HSI 运行的时间",
+        "用 PWR_STOPEntry_WFI 时，只要有一个已使能的 NVIC 中断挂起就会立刻唤醒；如果唤醒源中断标志没清干净，会进入即退出",
+        "Debug 调试时 STOP 会让调试器断连，建议调试阶段先不调用本函数，或保持 DBGMCU 的调试位",
+        "PWR_Regulator_LowPower 下唤醒会产生复位类事件，返回后应重新初始化外设而不是继续用旧状态"
+      ],
+      "exampleCode": "/* ---- 进入 STOP 前：配好唤醒源（以 PA0 按键 EXTI0 为例） ---- */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_AFIO, ENABLE);\nGPIO_InitTypeDef GPIO_InitStructure;\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;      /* 下拉输入 */\nGPIO_Init(GPIOA, &GPIO_InitStructure);\n\nGPIO_EXTILineConfig(GPIO_PortSourceGPIOA, GPIO_PinSource0);\nEXTI_InitTypeDef EXTI_InitStructure;\nEXTI_InitStructure.EXTI_Line = EXTI_Line0;\nEXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;\nEXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;\nEXTI_InitStructure.EXTI_LineCmd = ENABLE;\nEXTI_Init(&EXTI_InitStructure);\n\nNVIC_InitTypeDef NVIC_InitStructure;\nNVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x01;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x01;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\n/* ---- 打开 PWR 时钟后进入 STOP ---- */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);\nPWR_EnterSTOPMode(PWR_Regulator_ON, PWR_STOPEntry_WFI);\n\n/* ---- 被唤醒：时钟已切回 HSI，必须恢复时钟 ---- */\nSystemInit();                                  /* 回到 72MHz HSE+PLL */\n/* 注意：唤醒后外设时钟寄存器（RCC_APBxENR）内容保留，\n   但如果你的重配函数里做了 RCC_DeInit，就要把所有外设时钟重新打开 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DBGMCU",
+        "ENABLE",
+        "EXTI",
+        "EXTI_Init",
+        "EXTI_InitTypeDef",
+        "EXTI_Line0",
+        "EXTI_Mode_Interrupt",
+        "EXTI_Trigger_Rising",
+        "GPIOA",
+        "GPIO_EXTILineConfig",
+        "GPIO_Init",
+        "GPIO_InitTypeDef",
+        "GPIO_Mode_IPD",
+        "GPIO_PinSource0",
+        "GPIO_Pin_0",
+        "GPIO_PortSourceGPIOA",
+        "NVIC",
+        "NVIC_Init",
+        "NVIC_InitTypeDef",
+        "PWR",
+        "PWR_Regulator_LowPower",
+        "PWR_Regulator_ON",
+        "PWR_STOPEntry_WFE",
+        "PWR_STOPEntry_WFI",
+        "RCC",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_PWR",
+        "RCC_APB2PeriphClockCmd",
+        "RCC_APB2Periph_AFIO",
+        "RCC_APB2Periph_GPIOA",
+        "RCC_DeInit",
+        "RCC_PLLConfig",
+        "RCC_SYSCLKConfig",
+        "RTC"
+      ],
+      "headerLine": 134,
+      "sourceLine": 197,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "PWR_EnterSTANDBYMode",
+      "name": "PWR_EnterSTANDBYMode",
+      "peripheral": "PWR",
+      "sectionId": "PWR#sec4",
+      "prototype": "void PWR_EnterSTANDBYMode(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值。本函数调用后不会正常返回：唤醒时芯片执行的是复位流程。",
+      "briefEn": "Enters STANDBY mode.",
+      "briefZh": "让 MCU 进入待机（STANDBY）模式，功耗最低，唤醒后相当于复位重启。",
+      "usageZh": "STANDBY 是功耗最低的模式（典型 2uA 级别），代价是**SRAM 和所有寄存器内容全部丢失**，唤醒源只有三种：WKUP 引脚（PA0）上升沿、RTC 闹钟、独立看门狗复位。唤醒后程序**从复位向量重新开始执行**，等同按了复位键（可通过 PWR_GetFlagStatus(PWR_FLAG_SB) 判断这次是不是从待机唤醒的）。适合做\"长期休眠、定时醒来干一件事\"的设备，例如电池供电的定时上报节点。",
+      "prerequisites": [
+        "已打开 PWR 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE)",
+        "已使能至少一个唤醒源：PWR_WakeUpPinCmd(ENABLE) 或配置好 RTC 闹钟（RTC_SetAlarm + RTC_ITConfig）",
+        "进入前把需要跨休眠保留的数据写入 BKP_DRx（RAM 会丢）"
+      ],
+      "registers": [
+        "PWR_CR",
+        "PWR_CSR",
+        "SCB_SCR"
+      ],
+      "relatedFunctions": [
+        "PWR_WakeUpPinCmd",
+        "PWR_GetFlagStatus",
+        "PWR_ClearFlag",
+        "RTC_SetAlarm",
+        "BKP_WriteBackupRegister",
+        "RTC_ITConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "唤醒后是**复位重启**，所有全局变量、外设配置全部丢失，main 会重新执行；指望它像 STOP 那样\"回来继续跑\"是错的",
+        "进入前一定要把关键数据写进 BKP_DRx（备份域由 VBAT 供电维持），或者写 Flash",
+        "唤醒源只有 WKUP 引脚、RTC 闹钟、IWDG 复位三种；只配了 EXTI 按键中断是唤不醒的",
+        "进入 STANDBY 后备份域访问位 DBP 被清零，醒来后要重新 PWR_BackupAccessCmd(ENABLE)",
+        "用 PWR_FLAG_SB 判断唤醒来源后必须 PWR_ClearFlag(PWR_FLAG_SB)，否则每次复位都误判为待机唤醒",
+        "待机时调试器会完全断连，且 JTAG/SWD 引脚状态丢失，反复烧录可能失败——需要按住复位或改 BOOT 引脚"
+      ],
+      "exampleCode": "/* ---- 唤醒后第一件事：判断是不是从待机唤醒的 ---- */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nif (PWR_GetFlagStatus(PWR_FLAG_SB) != RESET)\n{\n  PWR_ClearFlag(PWR_FLAG_SB);            /* 清掉，否则下次醒来还会误判 */\n  /* 从 BKP_DR1 取回休眠前保存的数据 */\n  uint16_t saved = BKP_ReadBackupRegister(BKP_DR1);\n}\n\n/* ---- 准备休眠 ---- */\nPWR_BackupAccessCmd(ENABLE);\nBKP_WriteBackupRegister(BKP_DR1, 0x5A5A); /* RAM 会丢，数据放备份寄存器 */\nPWR_WakeUpPinCmd(ENABLE);                /* PA0 上升沿或 RTC 闹钟唤醒 */\n\n/* 进入待机：之后的代码不会再执行，醒来是从 main 重新开始 */\nPWR_EnterSTANDBYMode();",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "BKP_DR1",
+        "BKP_ReadBackupRegister",
+        "BKP_WriteBackupRegister",
+        "ENABLE",
+        "EXTI",
+        "IWDG",
+        "PWR",
+        "PWR_BackupAccessCmd",
+        "PWR_ClearFlag",
+        "PWR_FLAG_SB",
+        "PWR_GetFlagStatus",
+        "PWR_WakeUpPinCmd",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_BKP",
+        "RCC_APB1Periph_PWR",
+        "RESET",
+        "RTC",
+        "RTC_ITConfig",
+        "RTC_SetAlarm"
+      ],
+      "headerLine": 135,
+      "sourceLine": 236,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "PWR_GetFlagStatus",
+      "name": "PWR_GetFlagStatus",
+      "peripheral": "PWR",
+      "sectionId": "PWR#sec5",
+      "prototype": "FlagStatus PWR_GetFlagStatus(uint32_t PWR_FLAG);",
+      "returnType": "FlagStatus",
+      "params": [
+        {
+          "name": "PWR_FLAG",
+          "type": "uint32_t",
+          "descEn": "specifies the flag to check. This parameter can be one of the following values:",
+          "descZh": "要查询的标志：PWR_FLAG_WU（唤醒事件）、PWR_FLAG_SB（待机模式唤醒）、PWR_FLAG_PVDO（电压低于 PVD 阈值）。"
+        }
+      ],
+      "returnDescEn": "The new state of PWR_FLAG (SET or RESET).",
+      "returnDescZh": "返回 FlagStatus：SET 表示标志已置位，RESET 表示未置位。",
+      "briefEn": "Checks whether the specified PWR flag is set or not.",
+      "briefZh": "查询 PWR 的某个状态标志是否置位。",
+      "usageZh": "用于判断唤醒来源和电源状态。最常用的是 PWR_FLAG_SB（是否从待机模式唤醒）和 PWR_FLAG_WU（是否发生过唤醒事件），以及 PWR_FLAG_PVDO（当前电压是否低于 PVD 阈值）。注意 PWR_FLAG_PVDO 表示的是\"当前电压低于阈值\"这一实时状态，不是锁存事件。",
+      "prerequisites": [
+        "已打开 PWR 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE)"
+      ],
+      "registers": [
+        "PWR_CSR"
+      ],
+      "relatedFunctions": [
+        "PWR_ClearFlag",
+        "PWR_PVDCmd",
+        "PWR_EnterSTANDBYMode"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "PWR_FLAG_SB 和 PWR_FLAG_WU 是锁存的，查询后**必须调用 PWR_ClearFlag 清除**，否则下次复位还是会读到置位状态，逻辑会一直走错分支",
+        "PWR_FLAG_PVDO 是实时状态位，不能清，电压回升会自动变 RESET；它反映的是\"现在低于阈值\"而不是\"曾经低于阈值\"",
+        "不打开 PWR 时钟就读 PWR_CSR 会得到全 0，看起来像标志永远没置位",
+        "PVD 中断（EXTI_Line16）产生后，该标志也会随之变化，用中断方式时不要同时轮询造成重复处理"
+      ],
+      "exampleCode": "RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);\n\n/* 判断本次复位是不是从待机模式唤醒造成的 */\nif (PWR_GetFlagStatus(PWR_FLAG_SB) != RESET)\n{\n  PWR_ClearFlag(PWR_FLAG_SB);   /* 必须清，否则会一直误判 */\n  /* 从待机唤醒：重新初始化外设并处理业务 */\n}\n\n/* 判断是不是 WKUP 引脚唤醒的 */\nif (PWR_GetFlagStatus(PWR_FLAG_WU) != RESET)\n{\n  PWR_ClearFlag(PWR_FLAG_WU);\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "EXTI_Line16",
+        "FlagStatus",
+        "PWR",
+        "PWR_ClearFlag",
+        "PWR_FLAG_PVDO",
+        "PWR_FLAG_SB",
+        "PWR_FLAG_WU",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_PWR",
+        "RESET",
+        "SET"
+      ],
+      "headerLine": 136,
+      "sourceLine": 261,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "PWR_ClearFlag",
+      "name": "PWR_ClearFlag",
+      "peripheral": "PWR",
+      "sectionId": "PWR#sec5",
+      "prototype": "void PWR_ClearFlag(uint32_t PWR_FLAG);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "PWR_FLAG",
+          "type": "uint32_t",
+          "descEn": "specifies the flag to clear. This parameter can be one of the following values:",
+          "descZh": "要清除的标志：PWR_FLAG_WU（唤醒事件标志）或 PWR_FLAG_SB（待机模式标志）。PWR_FLAG_PVDO 不能被清除。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Clears the PWR's pending flags.",
+      "briefZh": "清除 PWR 的唤醒相关挂起标志。",
+      "usageZh": "把 PWR_CSR 里的 CWU（唤醒事件标志）或 CSBF（待机标志）写 1 清除。**每次用 PWR_GetFlagStatus 判断完唤醒来源后都要调用**，否则标志一直保持置位，下一轮判断依旧成立。PWR_FLAG_PVDO 是只读实时位，不要传给本函数。",
+      "prerequisites": [
+        "已打开 PWR 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE)"
+      ],
+      "registers": [
+        "PWR_CSR"
+      ],
+      "relatedFunctions": [
+        "PWR_GetFlagStatus"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "漏清 PWR_FLAG_SB 的典型现象：每次上电都走进\"从待机唤醒\"分支，反复执行休眠前的恢复逻辑",
+        "PWR_FLAG_PVDO 是只读位，传进去不会有任何效果，想看电压是否偏低只能轮询 PWR_GetFlagStatus",
+        "不要在清标志之前就进入下一次休眠判断，否则会漏掉一次真实的唤醒事件"
+      ],
+      "exampleCode": "RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR, ENABLE);\n\n/* 一次清两个标志，避免遗漏 */\nPWR_ClearFlag(PWR_FLAG_WU | PWR_FLAG_SB);\n\n/* 正确顺序：先读、再清、最后处理业务 */\nif (PWR_GetFlagStatus(PWR_FLAG_SB) != RESET)\n{\n  PWR_ClearFlag(PWR_FLAG_SB);\n  /* 处理待机唤醒后的逻辑 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "PWR",
+        "PWR_FLAG_PVDO",
+        "PWR_FLAG_SB",
+        "PWR_FLAG_WU",
+        "PWR_GetFlagStatus",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_PWR",
+        "RESET"
+      ],
+      "headerLine": 137,
+      "sourceLine": 287,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    }
+  ]
+}

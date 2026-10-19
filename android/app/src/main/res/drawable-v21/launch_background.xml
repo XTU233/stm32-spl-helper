@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 启动画面：先铺主题背景色，再居中显示芯片图。
+     图放在 drawable-nodpi，避免系统按密度缩放导致模糊；
+     启动图只是过渡，Flutter 首帧渲染出来后就被替换掉。 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="?android:colorBackground" />
+
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/splash_logo" />
+    </item>
+</layer-list>

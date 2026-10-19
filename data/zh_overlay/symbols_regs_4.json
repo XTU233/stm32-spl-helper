@@ -1,0 +1,274 @@
+{
+  "_comment": "寄存器映射结构体成员中文。",
+  "symbols": {
+    "CAN_TypeDef": {
+      "briefZh": "CAN 寄存器组。只有一个实例 CAN1（PA11/PA12，可重映射到 PB8/PB9）；C8T6 有 CAN 但需外接收发器（如 TJA1050/SIT1050）。",
+      "membersZh": {
+        "MCR": "主控制寄存器。INRQ 初始化请求（改 BTR 前必须进入）、SLEEP 睡眠、TXFP 发送优先级、RFLM 接收锁定、NART 自动重传、AWUM 自动唤醒、ABOM 自动离线恢复、TTCM 时间触发、RESET 复位、DBF 调试冻结。CAN_Init / CAN_OperatingModeRequest 写这里。",
+        "MSR": "主状态寄存器。INA 初始化应答、SLAK 睡眠应答、ERRI/WKUI/ERRI 等中断挂起，SLKI/WAKI，ES 错误状态，SLAKI/WAKI 清除。CAN_GetFlagStatus / CAN_ClearFlag 操作这里。",
+        "TSR": "发送状态寄存器。3 个邮箱各自的 RQCP/TXOK/ALST/TERR/ABRQ 标志，TME0–2 邮箱空标志，LOW0–2 当前最低优先级邮箱号。CAN_TransmitStatus 读写这里。",
+        "RF0R": "FIFO0 接收寄存器。FMP0 消息挂起数、FULL0 满、FOVR0 溢出、RFOM0 释放邮箱。CAN_Receive 读完后写 RFOM0 释放。",
+        "RF1R": "FIFO1 接收寄存器，位定义与 RF0R 相同。",
+        "IER": "中断使能寄存器。TMEIE、FMPIE0/1、FFIE0/1、FOVIE0/1、WKUIE、SLKIE、ERRIE、BOFFIE、EPVIE、EWGIE 等。CAN_ITConfig 写这里。",
+        "ESR": "错误状态寄存器。TEC/REC 收发错误计数、LEC 最后错误类型、EWGF 警告、EPVF 被动、BOFF 离线。CAN_GetLastErrorCode / CAN_GetReceiveErrorCounter / CAN_GetLSBTransmitErrorCounter 读它。",
+        "BTR": "位时序寄存器。BRP 分频、TS1/TS2 相位段、SJW 重同步跳转宽度，以及 LOOPBACK 环回、SILM 静默、LBKM 环回模式。CAN_Init 按波特率算好写这里。",
+        "RESERVED0": "保留位。用于 32 位地址对齐的填充（对应偏移 0x1C–0x1F），写它没有作用。",
+        "sTxMailBox": "发送邮箱数组，共 3 项（TIR/TDTR/TDLR/TDHR 一组），按 CAN_TxMailBox_TypeDef 访问。",
+        "sFIFOMailBox": "接收 FIFO 邮箱数组，共 2 项（FIFO0/FIFO1），按 CAN_FIFOMailBox_TypeDef 访问。",
+        "RESERVED1": "保留位。用于 32 位地址对齐的填充（对应偏移 0x60–0x9F），写它没有作用。",
+        "FMR": "过滤器主控寄存器。FINIT 过滤器初始化模式（改过滤器前必须置 1），CAN2SB 指定 CAN2 起始过滤器（F103 只有 CAN1）。CAN_FilterInit 写这里。",
+        "FM1R": "过滤器模式寄存器。每位置 1 表示该过滤器组为标识符列表模式，置 0 为掩码模式。",
+        "RESERVED2": "保留位。用于 32 位地址对齐的填充（对应偏移 0xAC–0xAF），写它没有作用。",
+        "FS1R": "过滤器位宽寄存器。每位置 1 表示该组为 32 位，置 0 为两个 16 位过滤器。",
+        "RESERVED3": "保留位。用于 32 位地址对齐的填充（对应偏移 0xB4–0xB7），写它没有作用。",
+        "FFA1R": "过滤器 FIFO 关联寄存器。每位置 1 表示该组匹配后送 FIFO1，置 0 送 FIFO0。",
+        "RESERVED4": "保留位。用于 32 位地址对齐的填充（对应偏移 0xBC–0xBF），写它没有作用。",
+        "FA1R": "过滤器激活寄存器。每位置 1 激活对应过滤器组。CAN_FilterInit 最后写这里。",
+        "RESERVED5": "保留位。用于 32 位地址对齐的填充（对应偏移 0xC4–0xC7），写它没有作用。",
+        "sFilterRegister": "同名成员在 C 源码里的第二次声明（数组另有 14 项写在后面），物理上仍是 sFilterRegister[i]，只是结构体定义中重复出现的写法，标准库按名字访问不到它。"
+      },
+      "memberOrder": [
+        "MCR",
+        "MSR",
+        "TSR",
+        "RF0R",
+        "RF1R",
+        "IER",
+        "ESR",
+        "BTR",
+        "RESERVED0",
+        "sTxMailBox",
+        "sFIFOMailBox",
+        "RESERVED1",
+        "FMR",
+        "FM1R",
+        "RESERVED2",
+        "FS1R",
+        "RESERVED3",
+        "FFA1R",
+        "RESERVED4",
+        "FA1R",
+        "RESERVED5",
+        "sFilterRegister",
+        "sFilterRegister"
+      ]
+    },
+    "CAN_TxMailBox_TypeDef": {
+      "briefZh": "CAN 发送邮箱寄存器组。每个 CAN 有 3 个邮箱，经 CAN->sTxMailBox[0..2] 访问。",
+      "membersZh": {
+        "TIR": "发送邮箱标识寄存器。STID/EXID/IDE 标识符与帧格式（标准/扩展）、RTR 远程帧、TXRQ 置 1 启动发送、ABRQ 中止，只读侧是 RQCP/TXOK/ALST/TERR。CAN_Transmit 先把标识写这里，最后置 TXRQ 发送。",
+        "TDTR": "发送邮箱数据长度与时间戳寄存器。DLC 数据长度（0–8 字节）、TGT 时间戳。",
+        "TDLR": "发送邮箱低数据寄存器。数据字节 0–3。",
+        "TDHR": "发送邮箱高数据寄存器。数据字节 4–7。"
+      },
+      "memberOrder": [
+        "TIR",
+        "TDTR",
+        "TDLR",
+        "TDHR"
+      ]
+    },
+    "CAN_FIFOMailBox_TypeDef": {
+      "briefZh": "CAN 接收 FIFO 邮箱寄存器组。经 CAN->sFIFOMailBox[0..1] 访问，对应 FIFO0/FIFO1。",
+      "membersZh": {
+        "RIR": "接收邮箱标识寄存器。收到帧的 STID/EXID/IDE/RTR 标识信息。CAN_Receive / CAN_GetRxMessage 读这里。",
+        "RDTR": "接收邮箱数据长度与时间戳寄存器。DLC 数据长度、TIME 时间戳、FMI 命中的过滤器号。",
+        "RDLR": "接收邮箱低数据寄存器。数据字节 0–3。",
+        "RDHR": "接收邮箱高数据寄存器。数据字节 4–7。"
+      },
+      "memberOrder": [
+        "RIR",
+        "RDTR",
+        "RDLR",
+        "RDHR"
+      ]
+    },
+    "CAN_FilterRegister_TypeDef": {
+      "briefZh": "CAN 过滤器寄存器组。经 CAN->sFilterRegister[0..13] 访问，每组两个 32 位寄存器。",
+      "membersZh": {
+        "FR1": "过滤器组寄存器 1。32 位掩码模式下是 ID，列表模式下是第一个 ID；16 位模式下拆成两个 16 位过滤器。CAN_FilterInit 写这里。",
+        "FR2": "过滤器组寄存器 2。32 位掩码模式下是掩码，列表模式下是第二个 ID。"
+      },
+      "memberOrder": [
+        "FR1",
+        "FR2"
+      ]
+    },
+    "DAC_TypeDef": {
+      "briefZh": "DAC 寄存器组。STM32F103 中只有大容量型号（如 RCT6/ZET6）才有两个 DAC 通道。本型号（LQFP48）未引出相关引脚，仅供查阅。",
+      "membersZh": {
+        "CR": "控制寄存器。EN1/EN2 通道使能、BOFF1/2 输出缓冲、TEN1/2 触发使能、TSEL1/2 触发源、WAVE1/2 波形（噪声/三角）、MAMP 幅度、DMAEN、DMAUDRIE。DAC_Init / DAC_Cmd 写这里。",
+        "SWTRIGR": "软件触发寄存器。SWTRIG1/SWTRIG2 写 1 立即启动一次通道 1/2 转换，硬件自动清零。DAC_SoftwareTriggerCmd 写这里。",
+        "DHR12R1": "通道 1 的 12 位右对齐数据保持寄存器。写后由触发/软件触发送到 DOR1。DAC_SetChannel1Data(DAC_Align_12b_R) 写这里。",
+        "DHR12L1": "通道 1 的 12 位左对齐数据保持寄存器（DAC_Align_12b_L）。",
+        "DHR8R1": "通道 1 的 8 位数据保持寄存器（DAC_Align_8b_R）。",
+        "DHR12R2": "通道 2 的 12 位右对齐数据保持寄存器，用法同 DHR12R1。",
+        "DHR12L2": "通道 2 的 12 位左对齐数据保持寄存器。",
+        "DHR8R2": "通道 2 的 8 位数据保持寄存器。",
+        "DHR12RD": "双通道 12 位右对齐数据保持寄存器。低 16 位给通道 1、高 16 位给通道 2，一次写同时更新两路。DAC_SetDualChannelData(DAC_Align_12b_R) 写这里。",
+        "DHR12LD": "双通道 12 位左对齐数据保持寄存器。",
+        "DHR8RD": "双通道 8 位数据保持寄存器。",
+        "DOR1": "通道 1 数据输出寄存器。只读，当前实际输出值，驱动 DAC_OUT1 引脚。",
+        "DOR2": "通道 2 数据输出寄存器。只读，当前输出值。",
+        "SR": "状态寄存器。DMAUDR 或 DMA 欠载错误标志，写 1 清除。DAC_GetFlagStatus / DAC_ClearFlag 读写这里。"
+      },
+      "memberOrder": [
+        "CR",
+        "SWTRIGR",
+        "DHR12R1",
+        "DHR12L1",
+        "DHR8R1",
+        "DHR12R2",
+        "DHR12L2",
+        "DHR8R2",
+        "DHR12RD",
+        "DHR12LD",
+        "DHR8RD",
+        "DOR1",
+        "DOR2",
+        "SR"
+      ]
+    },
+    "CEC_TypeDef": {
+      "briefZh": "CEC（消费电子控制，HDMI-CEC 单线低速总线）寄存器组。STM32F10x 只有互联型带 CEC。本型号（LQFP48）未引出相关引脚，仅供查阅。",
+      "membersZh": {
+        "CFGR": "配置寄存器。EOM 消息结束、OWN 自身地址、LBPEGEN/BREGEN 位错误生成、BRESTP 停止位接收、RXTOL 接收容差、SFT 自由时间、RD-TX 周期、LSTN 监听模式。CEC_Init 写这里。",
+        "OAR": "自身地址寄存器。15 位逻辑地址，本机在 CEC 总线上的身份（0x0F 为广播）。",
+        "PRES": "预分频器寄存器。CECPRES，由 PCLK 分出 32.768kHz 的 CEC 位时钟。CEC_Init 写这里。",
+        "ESR": "错误/状态寄存器。TSOM/TEOM、RBUF 接收缓冲占满、RBTF、LBPE/SBPE 位错误、RXACKE 应答错、TXERR/RXERR、TXD 直传。CEC_GetFlagStatus 相关。",
+        "CSR": "控制与状态寄存器。TSOM/TEOM 及其中断使能、RBUFIE、TXEND/TXENDIE，以及发送数据寄存器 TXD。CEC_SendDataByte / CEC_GetFlagStatus 相关。",
+        "TXD": "发送数据寄存器。要发出的字节，写它启动发送。",
+        "RXD": "接收数据寄存器。收到的字节，只读。"
+      },
+      "memberOrder": [
+        "CFGR",
+        "OAR",
+        "PRES",
+        "ESR",
+        "CSR",
+        "TXD",
+        "RXD"
+      ]
+    },
+    "SDIO_TypeDef": {
+      "briefZh": "SDIO（安全数字输入输出）寄存器组。STM32F10x 只有大容量/互联型带 SDIO。本型号（LQFP48）未引出相关引脚，仅供查阅。",
+      "membersZh": {
+        "POWER": "电源控制寄存器。PWRCTRL[1:0]，00 关闭卡供电、11 使能。SDIO_SetPowerState 写这里。",
+        "CLKCR": "时钟控制寄存器。CLKDIV 分频（SDIO_CK = SDIOCLK/(2+CLKDIV)）、CLKEN 时钟使能、PWRSAV、BYPASS、WIDBUS 总线宽度、NEGEDGE、HWFC_EN。SDIO_Init 写这里。",
+        "ARG": "参数寄存器。32 位命令参数，发命令前先写它。SDIO_SendCommand 写这里。",
+        "CMD": "命令寄存器。WAITRESP 响应类型、WAITINT、CMDINDEX 命令号、CPSMEN 使能发送。写它即向卡发出命令。",
+        "RESPCMD": "响应命令寄存器。只读，返回响应中的命令索引，用于核对响应归属。",
+        "RESP1": "响应寄存器 1。短响应全在这里，长响应只存低 32 位。SDIO_GetResponse(SDIO_RESP1)。",
+        "RESP2": "响应寄存器 2，长响应第 2 个字。",
+        "RESP3": "响应寄存器 3，长响应第 3 个字。",
+        "RESP4": "响应寄存器 4，长响应第 4 个字。",
+        "DTIMER": "数据超时寄存器。DATATIME，数据超时时钟周期数。",
+        "DLEN": "数据长度寄存器。DATALENGTH，本次传输字节数（0 表示 2^25）。SDIO_DataConfig 写这里。",
+        "DCTRL": "数据控制寄存器。DTEN 数据通道使能、DTDIR 方向、DTMODE 块/流、DMAEN、DBLOCKSIZE 块大小、RWSTART/RWSTOP/RWMOD、SDIOEN。SDIO_DataConfig / SDIO_DMACmd 写这里。",
+        "DCOUNT": "数据计数寄存器。剩余字节数，传到 0 表示结束。",
+        "STA": "状态寄存器。CCRCFAIL、DCRCFAIL、CTIMEOUT、DTIMEOUT、TXUNDERR、RXOVERR、CMDREND、CMDSENT、DATAEND、STBITERR、DBCKEND、CMDACT、TXACT、RXACT、SDIOIT。SDIO_GetFlagStatus 查这里。",
+        "ICR": "中断清除寄存器。写 1 清除 STA 中对应标志。SDIO_ClearFlag / SDIO_ClearITPendingBit 写这里。",
+        "MASK": "中断屏蔽寄存器。置 1 允许对应中断送到 NVIC。SDIO_ITConfig 写这里。",
+        "RESERVED0": "保留位。用于 32 位地址对齐的填充（对应偏移 0x54–0x57），写它没有作用。",
+        "FIFOCNT": "FIFO 计数寄存器。FIFOCOUNT，当前 FIFO 中待读的数据个数。",
+        "RESERVED1": "保留位。用于 32 位地址对齐的填充（对应偏移 0x5C–0x7F），写它没有作用。",
+        "FIFO": "数据 FIFO 寄存器。地址 0x80–0xFF 是 32 字窗口，按 32 位读写搬运数据。SDIO_ReadData / SDIO_WriteData 读写这里。"
+      },
+      "memberOrder": [
+        "POWER",
+        "CLKCR",
+        "ARG",
+        "CMD",
+        "RESPCMD",
+        "RESP1",
+        "RESP2",
+        "RESP3",
+        "RESP4",
+        "DTIMER",
+        "DLEN",
+        "DCTRL",
+        "DCOUNT",
+        "STA",
+        "ICR",
+        "MASK",
+        "RESERVED0",
+        "FIFOCNT",
+        "RESERVED1",
+        "FIFO"
+      ]
+    },
+    "FSMC_Bank1_TypeDef": {
+      "briefZh": "FSMC Bank1 片选控制寄存器组。BTCR[0..7] 共 4 组片选（NE1–NE4），每组两个寄存器（BCR + BTR）；C8T6 无 FSMC。本型号（LQFP48）未引出相关引脚，仅供查阅。",
+      "membersZh": {
+        "BTCR": "Bank1 片选时序寄存器数组。BTCR[0]/[1] 为 NE1 的 BCR/BTR，[2]/[3] 为 NE2，[4]/[5] 为 NE3，[6]/[7] 为 NE4。BCR 段：MBKEN 使能、MUXEN 地址数据复用、MTYP 存储器类型（SRAM/PSRAM/NOR）、MWID 位宽、FACCEN、BURSTEN；BTR 段：ADDSET 地址建立、ADDHLD、DATAST 数据建立、BUSTURN、CLKDIV、DATLAT、ACCMOD。FSMC_NORSRAMInit 写这里。"
+      },
+      "memberOrder": [
+        "BTCR"
+      ]
+    },
+    "FSMC_Bank1E_TypeDef": {
+      "briefZh": "FSMC Bank1 写时序扩展寄存器组。只有 SRAM/PSRAM 类型使用 BWTR。本型号（LQFP48）未引出相关引脚，仅供查阅。",
+      "membersZh": {
+        "BWTR": "Bank1 写时序寄存器数组。BWTR[0–3] 对应 NE1–NE4，字段含义同 BTR 但用于写操作。FSMC_NORSRAMInit 的 FSMC_WriteTimingStruct 写这里。"
+      },
+      "memberOrder": [
+        "BWTR"
+      ]
+    },
+    "FSMC_Bank2_TypeDef": {
+      "briefZh": "FSMC Bank2（NAND Flash，片选 NE2）寄存器组。本型号（LQFP48）未引出相关引脚，仅供查阅。",
+      "membersZh": {
+        "PCR2": "NAND 控制寄存器。PWAITEN 等待使能、PBKEN 使能、PTYP 位宽、PWID、ECCEN 硬件 ECC、TCLR、TAR、TWR、TRR。FSMC_NANDInit 写这里。",
+        "SR2": "NAND 状态寄存器。FEMPT 空闲、IFEN/ILEN/IREN 中断，FIFO 状态 FIFE，以及 FECCERR/ECC 错误标志。FSMC_GetFlagStatus 查这里。",
+        "PMEM2": "NAND 公共存储区地址。读写它即访问 NAND 数据区。",
+        "PATT2": "NAND 属性区地址。读写它即访问命令/地址寄存器。",
+        "RESERVED0": "保留位。用于 32 位地址对齐的填充（对应偏移 0x68–0x6B），写它没有作用。",
+        "ECCR2": "NAND ECC 结果寄存器。位 31:24 是 ECC 计算值，23:16 是 ECC 读回值，用于硬件 ECC 校验。"
+      },
+      "memberOrder": [
+        "PCR2",
+        "SR2",
+        "PMEM2",
+        "PATT2",
+        "RESERVED0",
+        "ECCR2"
+      ]
+    },
+    "FSMC_Bank3_TypeDef": {
+      "briefZh": "FSMC Bank3（NAND Flash，片选 NE3）寄存器组。本型号（LQFP48）未引出相关引脚，仅供查阅。",
+      "membersZh": {
+        "PCR3": "NAND 控制寄存器（NE3），字段与 PCR2 完全相同。",
+        "SR3": "NAND 状态寄存器（NE3），字段与 SR2 相同。",
+        "PMEM3": "NAND 公共存储区地址（NE3），用法同 PMEM2。",
+        "PATT3": "NAND 属性区地址（NE3），用法同 PATT2。",
+        "RESERVED0": "保留位。用于 32 位地址对齐的填充（对应偏移 0x68–0x6B），写它没有作用。",
+        "ECCR3": "NAND ECC 结果寄存器（NE3），字段与 ECCR2 相同。"
+      },
+      "memberOrder": [
+        "PCR3",
+        "SR3",
+        "PMEM3",
+        "PATT3",
+        "RESERVED0",
+        "ECCR3"
+      ]
+    },
+    "FSMC_Bank4_TypeDef": {
+      "briefZh": "FSMC Bank4（PC 卡，片选 NE4）寄存器组。本型号（LQFP48）未引出相关引脚，仅供查阅。",
+      "membersZh": {
+        "PCR4": "PC 卡控制寄存器。PBKEN 使能、PTYP 位宽、TCLR、TAR 属性延迟、TWR、TRR、TCE 卡使能延迟。",
+        "SR4": "PC 卡通用/属性存储空间状态寄存器。FEMPT 空闲、IFEN/ILEN/IREN 中断来源、FIFE 等。",
+        "PMEM4": "通用存储空间地址。访问 PC 卡常存区数据。",
+        "PATT4": "属性存储空间地址。访问 PC 卡属性区/CIS 数据。",
+        "PIO4": "I/O 空间地址。访问 PC 卡 I/O 空间。"
+      },
+      "memberOrder": [
+        "PCR4",
+        "SR4",
+        "PMEM4",
+        "PATT4",
+        "PIO4"
+      ]
+    }
+  }
+}

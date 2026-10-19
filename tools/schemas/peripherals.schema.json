@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://local/stm32_spl_helper/peripherals.schema.json",
+  "title": "PeripheralBundle",
+  "description": "assets/data/peripherals.json —— 外设列表与函数分组。只存函数 id，函数正文在 functions/<外设>.json。",
+  "type": "object",
+  "required": ["schemaVersion", "peripherals"],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "peripherals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "header", "file", "sections"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9_]+$", "description": "外设标识，如 GPIO" },
+          "name": { "type": "string", "description": "英文名" },
+          "nameZh": { "type": "string", "description": "中文名，如 通用输入输出" },
+          "header": { "type": "string", "description": "头文件名，如 stm32f10x_gpio.h" },
+          "source": { "type": "string", "description": "源文件名，如 stm32f10x_gpio.c" },
+          "file": { "type": "string", "description": "函数数据文件，如 functions/GPIO.json" },
+          "orderIndex": { "type": "integer", "minimum": 1, "description": "首页排序权重，越小越靠前" },
+          "introZh": { "type": "string", "description": "总体中文说明" },
+          "usageOverviewZh": { "type": "string", "description": "使用总览：先做什么后做什么" },
+          "functionCount": { "type": "integer", "minimum": 0 },
+          "symbolCount": { "type": "integer", "minimum": 0 },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "sections": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["id", "title", "functionIds"],
+              "additionalProperties": true,
+              "properties": {
+                "id": { "type": "string", "description": "形如 GPIO#sec1" },
+                "title": { "type": "string", "description": "中文分组标题" },
+                "titleEn": { "type": ["string", "null"], "description": "ST 原文分组注释" },
+                "functionIds": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "该组函数 id，顺序与头文件一致"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

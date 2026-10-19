@@ -1,0 +1,172 @@
+{
+  "_comment": "EXTI（外部中断/事件控制器）的中文补充。库只有 8 个函数，但真正的坑在于 AFIO 时钟、EXTI_Line 与 GPIO 引脚的映射关系、以及中断服务函数里的清标志顺序。",
+  "peripheral": "EXTI",
+  "functions": {
+    "EXTI_DeInit": {
+      "briefZh": "把 EXTI 的全部寄存器恢复到复位默认值（屏蔽所有中断线、清掉触发方式）。",
+      "usageZh": "一般只在调试阶段或做软复位流程时使用。它调用 `RCC_APB2PeriphResetCmd(RCC_APB2Periph_AFIO, ENABLE)` 再 DISABLE，**顺带把整个 AFIO 外设一起复位**，因此所有引脚的复用配置（EXTI 线映射、重映射、GPIO 事件线）都会被清掉。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {},
+      "prerequisites": [
+        "已通过 RCC_APB2PeriphClockCmd 打开 RCC_APB2Periph_AFIO 时钟（未开时钟时写寄存器无效，且不会报错）"
+      ],
+      "registers": ["EXTI_IMR", "EXTI_EMR", "EXTI_RTSR", "EXTI_FTSR", "EXTI_SWIER", "EXTI_PR"],
+      "relatedFunctions": ["EXTI_Init", "GPIO_EXTILineConfig", "RCC_APB2PeriphClockCmd", "RCC_APB2PeriphResetCmd"],
+      "exampleCode": "/* 需要彻底复位 EXTI 时（调试用） */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);\nEXTI_DeInit();\n\n/* 复位后必须重新做引脚映射，否则中断线接不到任何 GPIO */\nGPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource0);",
+      "notesZh": [
+        "它会连带复位整个 AFIO，PA0~PA15 的重映射设置（如 TIM3 部分重映射、USART1 重映射）会被一起清掉，复位后要重新配置",
+        "复位后 EXTI 的所有中断线都不响应任何 GPIO，必须重新调用 SPI 之外的 GPIO_EXTILineConfig 与 EXTI_Init",
+        "EXTI 挂在 APB2 上，函数内部通过 AFIO 复位寄存器操作，没开 AFIO 时钟就等于什么都没做"
+      ]
+    },
+
+    "EXTI_Init": {
+      "briefZh": "按 EXTI_InitTypeDef 的配置初始化一条外部中断线（选择触发边沿、使能中断或事件）。",
+      "usageZh": "这是 EXTI 真正干活的函数，配置流程固定为四步：开 `RCC_APB2Periph_AFIO` 时钟 → `GPIO_Init` 把引脚设成输入 → `GPIO_EXTILineConfig` 把引脚映射到中断线 → `EXTI_Init` 使能中断线，最后再配 `NVIC_Init`。缺任何一步中断都不会来，且不报任何错，只是引脚一直没反应。注意库会自行读取并回写 `EXTI_IMR`/`EXTI_RTSR`/`EXTI_FTSR` 的对应位，同一根线上重复调用会以最后一次为准。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "EXTI_InitStruct": "指向 EXTI_InitTypeDef 结构体的指针，四个字段都要赋值：EXTI_Line（中断线，取 EXTI_Line0~EXTI_Line19，可用 | 组合）、EXTI_Mode（EXTI_Mode_Interrupt 走中断进 CPU，EXTI_Mode_Event 只产生事件脉冲给其它外设，如唤醒 ADC 或 TIM）、EXTI_Trigger（EXTI_Trigger_Rising、EXTI_Trigger_Falling、EXTI_Trigger_Rising_Falling）、EXTI_LineCmd（ENABLE 或 DISABLE）。"
+      },
+      "prerequisites": [
+        "已调用 RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE) 打开 AFIO 时钟",
+        "已用 GPIO_Init 把对应引脚配成 IPU/IPD/IN_FLOATING 等输入模式",
+        "已调用 GPIO_EXTILineConfig 把 GPIO 端口号与引脚号映射到该中断线",
+        "已调用 NVIC_PriorityGroupConfig 设定优先级分组，并准备调用 NVIC_Init 使能对应 IRQ 通道"
+      ],
+      "registers": ["EXTI_IMR", "EXTI_EMR", "EXTI_RTSR", "EXTI_FTSR"],
+      "relatedFunctions": ["EXTI_StructInit", "EXTI_ClearITPendingBit", "GPIO_EXTILineConfig", "NVIC_Init", "GPIO_Init", "RCC_APB2PeriphClockCmd"],
+      "exampleCode": "EXTI_InitTypeDef EXTI_InitStructure;\nGPIO_InitTypeDef GPIO_InitStructure;\nNVIC_InitTypeDef NVIC_InitStructure;\n\n/* 1. 必须开 AFIO 时钟（很多库的 GPIO 例子没开，这里的 EXTI/重映射都要） */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB | RCC_APB2Periph_AFIO, ENABLE);\n\n/* 2. 引脚配成上拉输入（按键按下接地，用 EXTI_Trigger_Falling） */\nGPIO_InitStructure.GPIO_Pin  = GPIO_Pin_0;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;\nGPIO_Init(GPIOB, &GPIO_InitStructure);\n\n/* 3. 把 PB0 映射到 EXTI_Line0 */\nGPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource0);\n\n/* 4. 配中断线：下降沿触发，走中断模式 */\nEXTI_InitStructure.EXTI_Line    = EXTI_Line0;\nEXTI_InitStructure.EXTI_Mode    = EXTI_Mode_Interrupt;\nEXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;\nEXTI_InitStructure.EXTI_LineCmd = ENABLE;\nEXTI_Init(&EXTI_InitStructure);\n\n/* 5. NVIC 使能——不做这步中断永远不来 */\nNVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x02;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x02;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\n/* 6. 中断服务函数：先判标志，再清标志，最后干活 */\nvoid EXTI0_IRQHandler(void)\n{\n  if (EXTI_GetITStatus(EXTI_Line0) != RESET)\n  {\n    EXTI_ClearITPendingBit(EXTI_Line0);   /* 必须在处理前清，否则会重复进 */\n    /* 用户代码 */\n  }\n}",
+      "notesZh": [
+        "EXTI_Line 是线号不是引脚号，EXTI_Line0 同时对应 PA0/PB0/PC0……具体是哪一组由 GPIO_EXTILineConfig 决定，同一时刻一根线只能接一个端口",
+        "EXTI_Mode_Event 不会进 CPU 中断，也没有中断服务函数，只能用来触发 ADC 转换或唤醒停止模式",
+        "忘开 RCC_APB2Periph_AFIO 时 GPIO_EXTILineConfig 与 EXTI_Init 都静默失效，现象就是按键完全没反应、不报错",
+        "只调 EXTI_Init 不调 NVIC_Init，标志位会置位但不会进中断，EXTI_GetFlagStatus 能读到 SET 而中断服务函数永远不执行",
+        "C8T6 的中断向量是共用的：EXTI0_IRQHandler 只能处理 EXTI_Line0 这一根线，而 EXTI9_5_IRQHandler 要同时处理 Line5~Line9、EXTI15_10_IRQHandler 要同时处理 Line10~Line15，服务函数里必须逐条判断具体是哪根线",
+        "EXTI_Trigger_Rising_Falling 双边沿在一个中断里靠读 GPIO 电平区分方向，电平抖动快时容易误判，不适合做按键计数"
+      ]
+    },
+
+    "EXTI_StructInit": {
+      "briefZh": "把 EXTI_InitTypeDef 的四个字段填成复位默认值，避免结构体里有未初始化的野值。",
+      "usageZh": "推荐每次都先 StructInit 再用 `.` 逐个赋值的写法，虽然 ST 的例程经常直接逐字段赋值。默认值是 EXTI_Line 全 0、EXTI_Mode_Interrupt、EXTI_Trigger_Falling、EXTI_LineCmd_DISABLE。最关键的是 LineCmd 默认 DISABLE——如果只改了 Line 和 Trigger 忘了设 LineCmd=ENABLE，中断线是关着的，现象和完全没配置一样。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "EXTI_InitStruct": "指向待初始化的 EXTI_InitTypeDef 结构体的指针。"
+      },
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": ["EXTI_Init"],
+      "exampleCode": "EXTI_InitTypeDef EXTI_InitStructure;\n\nEXTI_StructInit(&EXTI_InitStructure);      /* 先给默认值 */\nEXTI_InitStructure.EXTI_Line    = EXTI_Line13;\nEXTI_InitStructure.EXTI_Mode    = EXTI_Mode_Interrupt;\nEXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;\nEXTI_InitStructure.EXTI_LineCmd = ENABLE;  /* 默认是 DISABLE，别忘 */\nEXTI_Init(&EXTI_InitStructure);",
+      "notesZh": [
+        "默认 EXTI_LineCmd 是 DISABLE，漏写这一句就等于这条线没使能",
+        "函数只写结构体，不碰任何硬件寄存器，不调用也可以正常用",
+        "如果结构体是局部变量又没 StructInit，未赋值的字段是栈上的随机值，EXTI_Line 可能误使能到别的线上"
+      ]
+    },
+
+    "EXTI_GenerateSWInterrupt": {
+      "briefZh": "用软件把指定的 EXTI 中断线标志位置位，等效于该引脚上真的来了一个触发沿。",
+      "usageZh": "用于在没有真实外部信号时验证中断配置是否正确：调一次就应该进一次中断服务函数，能快速区分「中断没配对」还是「外部信号有问题」。另外也常用于在停止模式唤醒测试中模拟唤醒源。写入的位对应 `EXTI_SWIER`，硬件会自动把 `EXTI_PR` 的对应位置位。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "EXTI_Line": "要软件触发的中断线，取 EXTI_Line0 ~ EXTI_Line19，可用 | 组合同时触发多条。"
+      },
+      "prerequisites": [
+        "该中断线已通过 EXTI_Init 使能（EXTI_LineCmd = ENABLE）",
+        "已调用 NVIC_Init 使能对应的 IRQ 通道，否则只置标志不进中断"
+      ],
+      "registers": ["EXTI_SWIER", "EXTI_PR", "EXTI_IMR"],
+      "relatedFunctions": ["EXTI_Init", "EXTI_GetITStatus", "EXTI_ClearITPendingBit", "NVIC_Init"],
+      "exampleCode": "/* 上电自检：手动触发一次 EXTI_Line0，确认中断链路通了 */\nEXTI_GenerateSWInterrupt(EXTI_Line0);\n\n/* 若中断服务函数里的计数器没有自增，问题在 NVIC/EXTI_Init，而不在外部信号 */",
+      "notesZh": [
+        "只对已经 EXTI_Init 使能过的线有效，未使能的线写 SWIER 不会有任何反应",
+        "触发后会置位 EXTI_PR，中断服务函数里必须调 EXTI_ClearITPendingBit 清掉，否则会反复进中断",
+        "它是同步的：函数返回后中断可能还没进（要等当前指令流到中断点），别在它后面立刻判断标志已被清除",
+        "不要用它去触发 EXTI_Line 上配置为 Event 模式的线，事件模式不产生 CPU 中断"
+      ]
+    },
+
+    "EXTI_GetFlagStatus": {
+      "briefZh": "查询指定 EXTI 线的挂起标志是否置位（直接读 EXTI_PR 寄存器，不判断该线是否被使能）。",
+      "usageZh": "主要用于轮询方式处理外部信号，或者在中断服务函数之外确认某一根线是否曾经触发过。它与 `EXTI_GetITStatus` 的区别是：**它只看 EXTI_PR，不看 EXTI_IMR**，所以哪怕这条线根本没使能中断，只要有触发沿也会返回 SET。调试「中断没进但标志有置位」这类问题时，用它和 EXTI_GetITStatus 对比就能定位是屏蔽位的问题还是 NVIC 的问题。",
+      "returnDescZh": "SET 表示该线有未处理的挂起标志；RESET 表示没有。",
+      "paramsZh": {
+        "EXTI_Line": "要查询的中断线，取 EXTI_Line0 ~ EXTI_Line19 之一（多条线用 | 组合时，只要其中任意一条置位就返回 SET）。"
+      },
+      "prerequisites": [
+        "已通过 RCC_APB2PeriphClockCmd 打开 AFIO 时钟"
+      ],
+      "registers": ["EXTI_PR"],
+      "relatedFunctions": ["EXTI_GetITStatus", "EXTI_ClearFlag", "EXTI_Init"],
+      "exampleCode": "/* 轮询方式等待 PB0 上的下降沿，不使用中断 */\nif (EXTI_GetFlagStatus(EXTI_Line0) != RESET)\n{\n  EXTI_ClearFlag(EXTI_Line0);   /* 轮询也必须清标志 */\n  /* 用户代码 */\n}",
+      "notesZh": [
+        "它不看 EXTI_IMR，所以未使能中断的线也可能返回 SET，用之前先确认这是你想要的行为",
+        "读它不会自动清标志，必须手动调 EXTI_ClearFlag 或 EXTI_ClearITPendingBit，否则标志一直挂着",
+        "如果中断服务函数里已经清过，这里再读就是 RESET——排查问题时要注意调用顺序",
+        "多线用 | 组合查询时无法区分具体是哪一根线触发的，需要逐条单独查询"
+      ]
+    },
+
+    "EXTI_ClearFlag": {
+      "briefZh": "清除指定 EXTI 线的挂起标志（写 EXTI_PR 对应位）。",
+      "usageZh": "轮询方式处理外部中断时必须调，等价于中断服务函数里的 `EXTI_ClearITPendingBit`（两者的实现完全一样，都是往 EXTI_PR 写位）。STM32 的 EXTI_PR 是「写 1 清零」语义，写 0 不影响其它位，所以可以安全地按位清除。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "EXTI_Line": "要清除标志的中断线，取 EXTI_Line0 ~ EXTI_Line19，可用 | 组合一次清多条。"
+      },
+      "prerequisites": [],
+      "registers": ["EXTI_PR"],
+      "relatedFunctions": ["EXTI_GetFlagStatus", "EXTI_ClearITPendingBit", "EXTI_GetITStatus"],
+      "exampleCode": "/* 进中断或轮询到标志后立刻清，避免重复触发 */\nEXTI_ClearFlag(EXTI_Line0);\n\n/* 同时清 Line13 与 Line14（可用于 EXTI15_10_IRQHandler 里） */\nEXTI_ClearFlag(EXTI_Line13 | EXTI_Line14);",
+      "notesZh": [
+        "写 1 清零，传 0 的位不受影响，所以 EXTI_Line0 ~ EXTI_Line19 之外的位不会被误清",
+        "忘记清零的直接后果是中断服务函数刚退出就再次进入，程序看起来像「卡死在中断里」，主循环不再执行",
+        "EXTI_ClearFlag 与 EXTI_ClearITPendingBit 功能完全相同，选哪个只是语义习惯问题",
+        "中断服务函数里的推荐顺序是先读状态（EXTI_GetITStatus）、紧接着清标志，再做业务处理；先做耗时业务再清标志会漏掉这期间到来的第二个边沿"
+      ]
+    },
+
+    "EXTI_GetITStatus": {
+      "briefZh": "查询指定 EXTI 线的中断是否被触发（同时检查 EXTI_PR 挂起标志与 EXTI_IMR 中断屏蔽位）。",
+      "usageZh": "中断服务函数里的标准写法。因为 STM32 把多根 EXTI 线复用到一个中断向量上（Line5~Line9 共用 EXTI9_5_IRQHandler，Line10~Line15 共用 EXTI15_10_IRQHandler），服务函数第一件事就必须用它逐条判断到底是哪根线触发的，确认后再清标志。",
+      "returnDescZh": "SET 表示该线既被使能又处于挂起状态，应当处理；RESET 表示该线未使能或没有挂起标志。",
+      "paramsZh": {
+        "EXTI_Line": "要查询的中断线，取 EXTI_Line0 ~ EXTI_Line19 之一。"
+      },
+      "prerequisites": [
+        "该线已通过 EXTI_Init 使能中断，且 NVIC 对应通道已使能"
+      ],
+      "registers": ["EXTI_PR", "EXTI_IMR"],
+      "relatedFunctions": ["EXTI_ClearITPendingBit", "EXTI_GetFlagStatus", "EXTI_Init", "NVIC_Init"],
+      "exampleCode": "/* EXTI9_5 上挂了 Line5~Line9 五根线，必须逐条判断 */\nvoid EXTI9_5_IRQHandler(void)\n{\n  if (EXTI_GetITStatus(EXTI_Line5) != RESET)\n  {\n    EXTI_ClearITPendingBit(EXTI_Line5);\n    /* 处理 PA5/PB5/PC5 上的事件 */\n  }\n  if (EXTI_GetITStatus(EXTI_Line6) != RESET)\n  {\n    EXTI_ClearITPendingBit(EXTI_Line6);\n    /* 处理 */\n  }\n}",
+      "notesZh": [
+        "与 EXTI_GetFlagStatus 的关键区别是它额外检查 EXTI_IMR，所以在中断服务函数里应当用它而不是 GetFlagStatus",
+        "STM32F103 的中断向量只有 EXTI0、EXTI1、EXTI2、EXTI3、EXTI4、EXTI9_5、EXTI15_10 七个，Line5~Line9 必须共用一个服务函数，Line10~Line15 也是",
+        "同一次进入服务函数可能有多根线同时置位，必须写成多个独立的 if（不能用 else if），否则会漏处理",
+        "某根线忘了清标志时，服务函数会立刻被再次进入，表现为程序卡在中断里出不来",
+        "C8T6 是 LQFP48 封装，EXTI_Line5~Line9、Line10~Line15 对应的引脚在 48 脚上只引出了 PB 端口的一部分，配之前先核对 pinout，别配到没引出的 PC 引脚上"
+      ]
+    },
+
+    "EXTI_ClearITPendingBit": {
+      "briefZh": "清除指定 EXTI 线的中断挂起位，让该线可以再次触发中断。",
+      "usageZh": "中断服务函数里处理完事件后必须调用的收尾动作（实现上就是写 EXTI_PR，与 EXTI_ClearFlag 完全相同）。Cortex-M3 的 NVIC 在进入中断时会自动清掉 NVIC 侧的活动位，但 EXTI 的挂起位是独立的外设寄存器，**必须由软件清**，这是标准库外部中断里最常见的坑。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "EXTI_Line": "要清除挂起位的中断线，取 EXTI_Line0 ~ EXTI_Line19，可用 | 组合一次清多条（例如 EXTI_Line13 | EXTI_Line14）。"
+      },
+      "prerequisites": [
+        "已进入对应的中断服务函数（或已确认该线有挂起标志）"
+      ],
+      "registers": ["EXTI_PR"],
+      "relatedFunctions": ["EXTI_GetITStatus", "EXTI_ClearFlag", "EXTI_Init"],
+      "exampleCode": "void EXTI15_10_IRQHandler(void)\n{\n  if (EXTI_GetITStatus(EXTI_Line13) != RESET)\n  {\n    EXTI_ClearITPendingBit(EXTI_Line13);   /* 先清，再干活 */\n    /* 用户代码：例如翻转 LED */\n  }\n}",
+      "notesZh": [
+        "写 1 清零：参数里传 0 的位不受影响，不用担心误清其它线",
+        "必须在中断服务函数返回前清掉，否则退出中断后挂起位仍为 1，CPU 会立刻重新进入同一个服务函数，主循环完全得不到执行",
+        "多根线共用一个向量（EXTI9_5 / EXTI15_10）时，一次进入可能有多根线置位，每根都要单独清，不能只清一根就返回",
+        "清除动作要放在业务代码之前：如果业务代码耗时较长，先清标志能让下一次边沿被正常记录而不是丢失"
+      ]
+    }
+  }
+}

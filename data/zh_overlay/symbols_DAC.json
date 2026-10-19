@@ -1,0 +1,21 @@
+{
+  "_comment": "DAC 结构体成员中文。STM32F103C8T6 没有 DAC 外设，PA4/PA5 只是普通 GPIO，本结构体仅供查阅。",
+  "symbols": {
+    "DAC_InitTypeDef": {
+      "briefZh": "DAC 通道初始化结构体，DAC_Init 用它配置触发源、波形发生器、噪声/三角波参数与输出缓冲；本型号没有 DAC，仅供查阅。",
+      "usageZh": "每个通道各调一次 DAC_Init(DAC_Channel_1/2, &结构体)，之后还要 DAC_Cmd(ENABLE)。顺序：RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC) → 把 PA4/PA5 配成 GPIO_Mode_AIN → 填结构体 → DAC_Init → DAC_Cmd → 用 DAC_SetChannel1Data 写值或开 DMA。注意本型号的 DAC 只在 100 脚以上型号（如 ZET6/VET6）才存在，C8T6 上这段代码没有实际效果，需要模拟输出可用 PWM + RC 滤波。若在别的型号上用，注意 PA4 还是 SPI1_NSS、PA5 是 SPI1_SCK，不能同时用。",
+      "notesZh": [
+        "STM32F103C8T6 的参考手册里 DAC 章节是灰色的（仅大容量产品才有），C8T6 的 PA4/PA5 上没有任何模拟输出能力，本结构体仅供查阅。",
+        "DAC 时钟在 APB1（RCC_APB1Periph_DAC），写成 APB2 会静默不生效。",
+        "只 DAC_Init 不 DAC_Cmd(ENABLE)，通道不工作、输出保持 0V，而且不报错。",
+        "输出引脚必须配成 GPIO_Mode_AIN，否则引脚上的数字输入通路会拖累输出精度。"
+      ],
+      "membersZh": {
+        "DAC_Trigger": "转换触发源，决定 DHR 里的数据什么时候真正送到输出：DAC_Trigger_None 写入后立即转换（手动设电压最简单），DAC_Trigger_Software 需要调 DAC_SoftwareTriggerCmd 才转换，DAC_Trigger_Tx_TRGO 由定时器 TRGO 触发（做固定采样率波形的标准做法，必须先用 TIM_SelectOutputTrigger 配好 TRGO），DAC_Trigger_Ext_IT9 由 EXTI Line9 外部事件触发（常用于外部信号同步的历史场景）。选 None 之外的触发源后，DAC_SetChannel1Data 只是写进 DHR，不等到触发事件输出不变。",
+        "DAC_WaveGeneration": "硬件波形发生器：DAC_WaveGeneration_None 输出你写入的值，DAC_WaveGeneration_Noise 输出 LFSR 伪随机噪声，DAC_WaveGeneration_Triangle 输出三角波。噪声/三角波模式下 DHR 写入会被忽略，实际幅度由 DAC_LFSRUnmask_TriangleAmplitude 控制。",
+        "DAC_LFSRUnmask_TriangleAmplitude": "噪声模式下是 LFSR 的掩码位数（DAC_LFSRUnmask_Bit0 到 DAC_LFSRUnmask_Bits11_0），决定噪声幅度；三角波模式下是最大幅度（DAC_TriangleAmplitude_1 ~ DAC_TriangleAmplitude_4095），幅度越大三角波越接近满摆幅。当 DAC_WaveGeneration_None 时这个字段被硬件忽略，但仍需赋一个合法值，否则可能触发 assert。",
+        "DAC_OutputBuffer": "输出缓冲开关：DAC_OutputBuffer_Enable（默认）输出阻抗低、能直接驱动一定负载，但输出范围被限制在约 0.2V ~ VDDA−0.2V，无法到 0V 和满摆幅；DAC_OutputBuffer_Disable 可输出接近 0 ~ VREF+ 的满摆幅，但驱动能力很弱（几十 kΩ 输出阻抗），必须外接运放跟随才能接负载。"
+      }
+    }
+  }
+}

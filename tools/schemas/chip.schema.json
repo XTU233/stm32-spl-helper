@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://local/stm32_spl_helper/chip.schema.json",
+  "title": "ChipSpec",
+  "description": "assets/data/chips/<chipId>.json —— 芯片能力描述。扩展新芯片只加本文件与对应数据目录，Dart 代码零改动。",
+  "type": "object",
+  "required": ["schemaVersion", "id", "name"],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": { "type": "integer", "minimum": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+$", "examples": ["stm32f103c8t6"] },
+    "name": { "type": "string", "examples": ["STM32F103C8T6"] },
+    "nameZh": { "type": "string" },
+    "package": { "type": "string", "examples": ["LQFP48"] },
+    "core": { "type": "string", "examples": ["ARM Cortex-M3"] },
+    "flashKb": { "type": "integer", "minimum": 0 },
+    "ramKb": { "type": "integer", "minimum": 0 },
+    "maxFreqMhz": { "type": "integer", "minimum": 0 },
+    "voltageRange": { "type": "string" },
+    "dataSheet": { "type": "string", "examples": ["DS5319"] },
+    "pinoutFile": { "type": "string", "description": "相对 assets/data/ 的引脚数据路径" },
+    "supportedPeripherals": { "type": "array", "items": { "type": "string" }, "description": "本型号支持的外设 id；为空表示不限制" },
+    "unsupportedPeripherals": { "type": "array", "items": { "type": "string" }, "description": "本型号没有的外设 id，首页据此折叠或标记" },
+    "unsupportedReasons": { "type": "object", "additionalProperties": { "type": "string" } },
+    "peripheralInstances": {
+      "type": "object",
+      "description": "外设 id → 实例名列表，如 GPIO → [GPIOA, GPIOB, GPIOC]",
+      "additionalProperties": { "type": "array", "items": { "type": "string" } }
+    },
+    "notesZh": { "type": "string" },
+    "ai": { "type": ["object", "null"] }
+  }
+}

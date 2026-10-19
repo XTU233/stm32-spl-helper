@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "stm32f103c8t6",
+  "name": "STM32F103C8T6",
+  "nameZh": "STM32F103C8T6（LQFP48，最小系统板/蓝板常用）",
+  "package": "LQFP48",
+  "core": "ARM Cortex-M3",
+  "flashKb": 64,
+  "ramKb": 20,
+  "maxFreqMhz": 72,
+  "voltageRange": "2.0V ~ 3.6V",
+  "dataSheet": "DS5319",
+  "pinoutFile": "pinout_f103c8t6.json",
+  "supportedPeripherals": [
+    "GPIO", "RCC", "USART", "TIM", "MISC", "EXTI", "SPI", "I2C",
+    "ADC", "DMA", "FLASH", "PWR", "BKP", "IWDG", "WWDG", "RTC",
+    "CRC", "DBGMCU", "CAN"
+  ],
+  "unsupportedPeripherals": ["DAC", "FSMC", "SDIO", "CEC"],
+  "unsupportedReasons": {
+    "DAC": "本型号（LQFP48）没有引出 DAC 引脚，PA4/PA5 是普通 GPIO；需要模拟输出请用 PWM + RC 滤波",
+    "FSMC": "本型号没有引出 FSMC 引脚（需 100 脚以上型号），无法外扩 SRAM/NOR/NAND/LCD 并口屏",
+    "SDIO": "本型号没有引出 SDIO 引脚（SDIO 用 PC8~PC12 + PD2），读 SD 卡只能用 SPI 模式",
+    "CEC": "本型号没有引出 CEC 引脚（PB8 未引出）；CEC 外设本身存在于硅片上，仅 100 脚以上型号可用"
+  },
+  "peripheralInstances": {
+    "GPIO": ["GPIOA", "GPIOB", "GPIOC"],
+    "USART": ["USART1", "USART2", "USART3"],
+    "TIM": ["TIM1", "TIM2", "TIM3", "TIM4"],
+    "SPI": ["SPI1", "SPI2"],
+    "I2C": ["I2C1", "I2C2"],
+    "ADC": ["ADC1", "ADC2"],
+    "DMA": ["DMA1"],
+    "CAN": ["CAN1"],
+    "EXTI": ["EXTI0", "EXTI1", "EXTI2", "EXTI3", "EXTI4", "EXTI9_5", "EXTI15_10"]
+  },
+  "notesZh": "64KB Flash / 20KB RAM，写满前留意 Flash 溢出错误（见编译错误速查）。LQFP48 封装实际引出 PA0~PA15、PB0~PB15、PC13~PC15 共 35 个 IO；SPL 头文件里虽然定义了 GPIOD~GPIOG，但本封装没有引出这些引脚，代码里不要使用。",
+  "ai": null
+}

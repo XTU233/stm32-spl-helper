@@ -1,0 +1,267 @@
+{
+  "_comment": "BKP（备份寄存器）的中文补充：备份域数据保存、入侵检测（Tamper）引脚、RTC 校准与 RTC 输出。重点说明 PWR 时钟 + DBP 访问开关的前置要求，以及写备份寄存器前先清标志的坑。",
+  "peripheral": "BKP",
+  "functions": {
+    "BKP_DeInit": {
+      "briefZh": "把 BKP 备份域寄存器恢复为复位默认值（含备份寄存器内容与 RTC 配置）。",
+      "usageZh": "复位备份域：RTC 分频、闹钟、备份寄存器 DRx、校准值、Tamper 配置全部清零。**注意这个函数写的是 BDCR 的 BDRST 位，会连 RTC 一起复位**。只有在\"恢复出厂设置\"或检测到备份域数据格式不匹配、需要彻底重建 RTC 时才用。调用后可回到按 LSE 重新起振、重新配置 RTC 的流程。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {},
+      "prerequisites": [
+        "已打开 PWR 与 BKP 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE)",
+        "已调用 PWR_BackupAccessCmd(ENABLE) 打开备份域访问"
+      ],
+      "registers": ["RCC_BDCR", "BKP_DR1"],
+      "relatedFunctions": ["PWR_BackupAccessCmd", "RCC_BackupResetCmd", "BKP_WriteBackupRegister"],
+      "exampleCode": "/* 恢复出厂：清空备份域，随后重新配置 RTC */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);\n\nBKP_DeInit();   /* 备份寄存器内容与 RTC 配置全部清零 */\n\n/* 之后要重新选 RTC 时钟源并重新走 RTC 初始化流程 */\nRCC_LSEConfig(RCC_LSE_ON);\nwhile (RCC_GetFlagStatus(RCC_FLAG_LSERDY) == RESET) {}\nRCC_RTCCLKConfig(RCC_RTCCLKSource_LSE);\nRCC_RTCCLKCmd(ENABLE);",
+      "notesZh": [
+        "BKP_DeInit 会连 RTC 一起复位，RTC 的走时、闹钟全部丢失，需要重新初始化",
+        "调用后备份域内保存的\"数据魔数\"被清掉，你的代码通常要靠这个魔数判断是否需要重新初始化——注意判断顺序",
+        "备份域复位不会影响 VBAT 引脚本身，但内容会丢",
+        "必须先 PWR_BackupAccessCmd(ENABLE)，否则 BDRST 位根本写不进去，函数静默失效"
+      ]
+    },
+
+    "BKP_TamperPinLevelConfig": {
+      "briefZh": "设置入侵检测（Tamper）引脚的有效电平是高电平还是低电平。",
+      "usageZh": "TAMPER 引脚（C8T6 上是 PC13）检测到设定的有效电平跳变时，会置位 Tamper 事件标志、可选地清除全部备份寄存器、并可产生中断。用于产品外壳被打开、或者有人试图拆机读取数据时的告警与自毁。默认有效边沿是高电平。注意：**一旦 Tamper 事件发生并且 TAMPIE 打开了清除功能，所有 BKP_DRx 都会被硬件清空**，所以别把必须保留的数据和 Tamper 自毁功能混用。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "BKP_TamperPinLevel": "有效电平：BKP_TamperPinLevel_High（高电平有效，默认）或 BKP_TamperPinLevel_Low（低电平有效）。"
+      },
+      "prerequisites": [
+        "已打开 PWR/BKP 时钟并 PWR_BackupAccessCmd(ENABLE)",
+        "已把 PC13 配置为输入（GPIO_Mode_IN_FLOATING 或带上/下拉），并打开 GPIOC 与 AFIO 时钟"
+      ],
+      "registers": ["BKP_CR"],
+      "relatedFunctions": ["BKP_TamperPinCmd", "BKP_ITConfig", "BKP_GetFlagStatus", "BKP_ClearFlag", "GPIO_Init"],
+      "exampleCode": "/* PC13 作为 Tamper 输入：机械开关，平时低电平，被打开时拉高 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);\nGPIO_InitTypeDef GPIO_InitStructure;\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;   /* 下拉，空闲为低 */\nGPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;\nGPIO_Init(GPIOC, &GPIO_InitStructure);\n\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);\n\n/* 高电平触发为入侵 */\nBKP_TamperPinLevelConfig(BKP_TamperPinLevel_High);\nBKP_TamperPinCmd(ENABLE);",
+      "notesZh": [
+        "PC13 同时也是 RTC 输出（RTC_OUT）的复用引脚，配了 Tamper 就不能再当 RTC 输出用，两者共用 BKP_RTCCR 里的位",
+        "PC13 是 C8T6 上少数几个驱动能力弱的引脚，作输出时只能驱动小电流，作输入没问题",
+        "Tamper 事件发生后备份寄存器会被硬件清零（取决于 TAMPIE 的配置），别指望事件后还能读回旧数据",
+        "外部电路没有上拉/下拉时引脚浮空会随机误触发，务必加电阻或启用内部上下拉",
+        "有效电平配置和外部硬件电路的极性必须一致，反了会导致上电即报警"
+      ]
+    },
+
+    "BKP_RTCOutputConfig": {
+      "briefZh": "配置 RTC 时钟输出（RTC_OUT）信号源与输出模式，从 TAMPER 引脚（PC13）输出。",
+      "usageZh": "可以把 RTC 的 512Hz 内部信号、秒脉冲、闹钟脉冲或闹钟时输出的 1Hz 信号从 PC13 引出，用于校准外部设备、驱动 LED 秒闪、给外部芯片提供时钟。**注意 PC13 与 Tamper 引脚复用**：一旦用本函数配置了 RTC 输出，PC13 就不能再作为入侵检测输入。另外输出能力很弱，只能驱动高阻负载。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "BKP_RTCOutputSource": "输出源：BKP_RTCOutputSource_None（不输出）、BKP_RTCOutputSource_CalibClock（输出 RTC 时钟的 64 分频，即 512Hz）、BKP_RTCOutputSource_Alarm（闹钟脉冲）、BKP_RTCOutputSource_Second（秒脉冲，1Hz）。"
+      },
+      "prerequisites": [
+        "已打开 PWR/BKP 时钟并 PWR_BackupAccessCmd(ENABLE)",
+        "RTC 已在运行（RCC_RTCCLKCmd(ENABLE)），否则没有可输出的信号",
+        "PC13 已在 GPIO 上配置为复用推挽输出（GPIO_Mode_AF_PP），并打开 GPIOC 与 AFIO 时钟"
+      ],
+      "registers": ["BKP_RTCCR"],
+      "relatedFunctions": ["BKP_TamperPinCmd", "RCC_RTCCLKConfig", "BKP_SetRTCCalibrationValue", "GPIO_Init"],
+      "exampleCode": "/* 从 PC13 输出 RTC 秒脉冲，用于驱动 LED 秒闪 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC | RCC_APB2Periph_AFIO, ENABLE);\nGPIO_InitTypeDef GPIO_InitStructure;\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;   /* 复用推挽 */\nGPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;\nGPIO_Init(GPIOC, &GPIO_InitStructure);\n\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);\n\nBKP_RTCOutputConfig(BKP_RTCOutputSource_Second);   /* 1Hz 秒脉冲 */",
+      "notesZh": [
+        "PC13 与 TAMPER 引脚是同一个物理引脚，配置了 RTC 输出后入侵检测功能就不能用了",
+        "PC13 的驱动能力很弱（数据手册上 sink/source 电流只有 3mA 量级），不能直接驱动 LED 大电流，建议加三极管或缓冲器",
+        "要输出秒脉冲/闹钟脉冲，RTC 必须已经使能并且在走时；RTC 没跑起来时 PC13 上什么波形都没有",
+        "512Hz 输出（CalibClock）常用来配合 BKP_SetRTCCalibrationValue 测量和校准 RTC 走时精度",
+        "改回不输出要显式调用 BKP_RTCOutputConfig(BKP_RTCOutputSource_None)，否则 PC13 一直被 RTC 占用"
+      ]
+    },
+
+    "BKP_TamperPinCmd": {
+      "briefZh": "使能或关闭入侵检测（Tamper）引脚功能。",
+      "usageZh": "打开后 PC13 开始监测入侵事件，检测到有效电平跳变就置位 Tamper 标志（BKP_GetFlagStatus 可查），并且如果同时用 BKP_ITConfig 打开了中断，会触发 TAMPER_IRQHandler。若 Tamper 事件发生，备份寄存器的清除行为由硬件按键配置执行——**所以使能之前先确认备份寄存器里没有需要长期保存的数据**，或者干脆把重要数据另存一份校验副本到别的 DR 里。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "NewState": "ENABLE 使能 Tamper 检测，DISABLE 关闭（PC13 释放回普通 GPIO 功能）。"
+      },
+      "prerequisites": [
+        "已打开 PWR/BKP 时钟并 PWR_BackupAccessCmd(ENABLE)",
+        "已用 BKP_TamperPinLevelConfig 设定有效电平",
+        "PC13 已配置为输入模式，并打开 GPIOC 时钟"
+      ],
+      "registers": ["BKP_CR", "BKP_CSR"],
+      "relatedFunctions": ["BKP_TamperPinLevelConfig", "BKP_ITConfig", "BKP_GetFlagStatus", "BKP_ClearFlag", "BKP_GetITStatus"],
+      "exampleCode": "/* Tamper 检测 + 中断告警 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);\n\nBKP_TamperPinLevelConfig(BKP_TamperPinLevel_High);\nBKP_ClearFlag();                     /* 先清掉可能残留的旧事件标志 */\nBKP_TamperPinCmd(ENABLE);\nBKP_ITConfig(ENABLE);\n\n/* NVIC 里使能 TAMPER_IRQn，中断服务函数名 TAMPER_IRQHandler */",
+      "notesZh": [
+        "使能前务必先 BKP_ClearFlag()，否则上一次残留的 Tamper 事件会被当成新入侵",
+        "Tamper 事件会清除备份寄存器内容，如果 DRx 里放着\"设备已初始化\"魔数，事件后程序会误以为没初始化过，需要代码里额外区分",
+        "PC13 与 RTC_OUT 复用，用 BKP_RTCOutputConfig 之后 Tamper 就失效了，二者只能选一个",
+        "Tamper 引脚没有内部滤波，机械开关抖动会产生多次事件；必要时在外部加 RC 滤波，不要指望软件去抖",
+        "C8T6 只有 PC13 这一个 Tamper 引脚"
+      ]
+    },
+
+    "BKP_ITConfig": {
+      "briefZh": "使能或关闭入侵检测（Tamper）引脚中断。",
+      "usageZh": "打开 TAMPIE 位，让 Tamper 事件产生中断而不是只置标志。配合 NVIC 的 TAMPER_IRQn 通道使用，中断服务函数名固定为 TAMPER_IRQHandler。适合需要在入侵发生时立刻响应（记录时间、擦除密钥、报警）的场合。如果只是轮询判断，可以不调用它。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "NewState": "ENABLE 使能 Tamper 中断，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已打开 PWR/BKP 时钟并 PWR_BackupAccessCmd(ENABLE)",
+        "已调用 BKP_TamperPinCmd(ENABLE) 使能 Tamper 检测",
+        "已 NVIC_Init 使能 TAMPER_IRQn 通道，且启动文件里有 TAMPER_IRQHandler"
+      ],
+      "registers": ["BKP_CSR"],
+      "relatedFunctions": ["BKP_TamperPinCmd", "BKP_GetITStatus", "BKP_ClearITPendingBit", "NVIC_Init"],
+      "exampleCode": "/* NVIC 使能 Tamper 中断通道 */\nNVIC_InitTypeDef NVIC_InitStructure;\nNVIC_InitStructure.NVIC_IRQChannel = TAMPER_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x02;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x00;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\nBKP_ClearITPendingBit();\nBKP_ITConfig(ENABLE);\n\n/* 中断服务函数名必须与启动文件一致 */\nvoid TAMPER_IRQHandler(void)\n{\n  if (BKP_GetITStatus() != RESET)\n  {\n    BKP_ClearITPendingBit();   /* 不清会反复进中断 */\n    /* 告警处理：记录、擦密钥、点亮指示灯 */\n  }\n}",
+      "notesZh": [
+        "只调 BKP_ITConfig 而没在 NVIC 里使能 TAMPER_IRQn，中断永远不会进——这是最常见的漏配",
+        "中断服务函数里必须 BKP_ClearITPendingBit()，否则中断会一直重复触发，程序看起来像死循环",
+        "Tamper 中断使能后，中断标志和事件标志（BKP_GetFlagStatus）是两套，都要各自清",
+        "备份域相关寄存器访问较慢，中断里不要做耗时操作"
+      ]
+    },
+
+    "BKP_GetITStatus": {
+      "briefZh": "查询入侵检测（Tamper）中断是否已经发生。",
+      "usageZh": "读取 TAMPIF 位（Tamper 中断标志）。在 TAMPER_IRQHandler 里用来确认确实是 Tamper 引起的中断，再决定是否处理。它是事件标志 TEF 之外的另一套标志，两者都要单独清。也可以在轮询式实现里直接查。",
+      "returnDescZh": "返回 ITStatus：SET 表示 Tamper 中断已发生，RESET 表示未发生。",
+      "paramsZh": {},
+      "prerequisites": [
+        "已打开 PWR/BKP 时钟并 PWR_BackupAccessCmd(ENABLE)",
+        "已使能 Tamper 检测与 Tamper 中断"
+      ],
+      "registers": ["BKP_CSR"],
+      "relatedFunctions": ["BKP_ITConfig", "BKP_ClearITPendingBit", "BKP_GetFlagStatus"],
+      "exampleCode": "void TAMPER_IRQHandler(void)\n{\n  if (BKP_GetITStatus() != RESET)\n  {\n    BKP_ClearITPendingBit();\n    /* 确认是 Tamper 中断后的处理 */\n  }\n}",
+      "notesZh": [
+        "查完必须 BKP_ClearITPendingBit()，否则标志常置、中断反复触发",
+        "BKP_GetITStatus（中断标志 TAMPIF）与 BKP_GetFlagStatus（事件标志 TEF）是两个独立的位，别只清一个",
+        "不打开 PWR 时钟时读回的是 0，会误以为从未发生入侵"
+      ]
+    },
+
+    "BKP_ClearITPendingBit": {
+      "briefZh": "清除入侵检测（Tamper）中断挂起标志。",
+      "usageZh": "在 TAMPER_IRQHandler 中处理完之后调用，清掉 TAMPIF 位。与 BKP_ClearFlag（清事件标志 TEF）配套使用，两个标志互不影响，都要清。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {},
+      "prerequisites": [
+        "已打开 PWR/BKP 时钟并 PWR_BackupAccessCmd(ENABLE)"
+      ],
+      "registers": ["BKP_CSR"],
+      "relatedFunctions": ["BKP_GetITStatus", "BKP_ClearFlag", "BKP_ITConfig"],
+      "exampleCode": "void TAMPER_IRQHandler(void)\n{\n  if (BKP_GetITStatus() != RESET)\n  {\n    BKP_ClearITPendingBit();   /* 清中断标志 */\n    BKP_ClearFlag();           /* 事件标志也清掉，避免下次上电误判 */\n    /* 业务处理 */\n  }\n}",
+      "notesZh": [
+        "漏清的典型现象：程序一进中断就出不来，主循环完全停摆",
+        "只清中断标志不清事件标志，下次读 BKP_GetFlagStatus 仍会看到旧入侵记录",
+        "必须在处理完业务之后再清，或者先清再处理都行，但不要在清之前做可能长时间阻塞的操作"
+      ]
+    },
+
+    "BKP_SetRTCCalibrationValue": {
+      "briefZh": "设置 RTC 时钟校准值，微调 RTC 走时快慢。",
+      "usageZh": "用于补偿 LSE 晶振的频偏。校准原理是每 2^20 个 RTC 时钟周期里，按校准值增加或减少若干个周期：值在 0~0x7F 表示放慢，值在 0x80~0xFF 表示加快（SPL 的参数是 uint8_t，实际写的是低 7 位加符号位）。**必须在 RTC 处于配置模式（已 RTC_EnterConfigMode）时调用**，改完要退出配置模式并 RTC_WaitForLastTask。典型做法是从 PC13 输出 512Hz（BKP_RTCOutputConfig(BKP_RTCOutputSource_CalibClock)），用频率计测偏差后反推校准值。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CalibrationValue": "校准值，0~0x7F。官方要求取值范围 0~0x7F；数值越大走时越慢（每 2^20 周期扣掉的时钟数越多）。0 表示不校准。"
+      },
+      "prerequisites": [
+        "已打开 PWR/BKP 时钟并 PWR_BackupAccessCmd(ENABLE)",
+        "RTC 已使能并在运行",
+        "已调用 RTC_EnterConfigMode 进入配置模式"
+      ],
+      "registers": ["BKP_RTCCR", "RTC_CRL"],
+      "relatedFunctions": ["RTC_EnterConfigMode", "RTC_ExitConfigMode", "RTC_WaitForLastTask", "BKP_RTCOutputConfig"],
+      "exampleCode": "/* 把 RTC 调慢约 20ppm：每 2^20 个周期减去 21 个周期 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);\n\nRTC_WaitForLastTask();\nRTC_EnterConfigMode();          /* 必须在配置模式下改校准值 */\nBKP_SetRTCCalibrationValue(21); /* 0~0x7F，越大越慢 */\nRTC_ExitConfigMode();\nRTC_WaitForLastTask();\n\n/* 想精确测量：从 PC13 输出 512Hz 用频率计比对 */\nBKP_RTCOutputConfig(BKP_RTCOutputSource_CalibClock);",
+      "notesZh": [
+        "不在配置模式下调用，写入不会生效（RTC 寄存器在非配置模式被写保护）",
+        "校准只影响 RTC 计数，不影响 RTC 输出引脚的 512Hz 原始信号之外的其它分频",
+        "校准值过大会明显改变走时，调参时每次改 1~2 并长时间观察，不要一次跳很大",
+        "LSE 晶振的频偏还随温度变化，固定校准值只能补偿常温下的平均值",
+        "写入前后都要 RTC_WaitForLastTask()，否则可能出现写入丢失或读到旧值"
+      ]
+    },
+
+    "BKP_WriteBackupRegister": {
+      "briefZh": "向指定的备份寄存器（BKP_DRx）写入 16 位数据。",
+      "usageZh": "备份寄存器由 VBAT 供电，主电源掉电后内容仍然保持，用来保存\"设备是否已初始化\"、\"运行时长累计\"、\"校准参数\"等跨掉电数据。**写之前必须先 PWR_BackupAccessCmd(ENABLE)**，且**建议先 BKP_ClearFlag()**——因为如果 Tamper 事件标志处于置位状态，某些情况下写操作会被硬件拒绝（写进去读回来还是旧值）。写完后可以用 BKP_ReadBackupRegister 回读校验。C8T6 的备份域有 10 个 16 位备份寄存器（BKP_DR1~BKP_DR10），而库里定义到 BKP_DR42，实际可用数量要以芯片为准。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "BKP_DR": "备份寄存器编号，取值 BKP_DR1 ~ BKP_DR42。STM32F103C8T6 实际只有 BKP_DR1 ~ BKP_DR10 可用（小容量产品 10 个备份寄存器）。",
+        "Data": "要写入的 16 位数据（uint16_t），任意值。"
+      },
+      "prerequisites": [
+        "已打开 PWR 与 BKP 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE)",
+        "已调用 PWR_BackupAccessCmd(ENABLE) 打开备份域访问",
+        "建议先调用 BKP_ClearFlag() 清除 Tamper 事件标志，避免写入被拒绝"
+      ],
+      "registers": ["BKP_DR1", "PWR_CR"],
+      "relatedFunctions": ["BKP_ReadBackupRegister", "PWR_BackupAccessCmd", "BKP_ClearFlag", "BKP_DeInit"],
+      "exampleCode": "#define MAGIC_INIT  0xA55Au\n\n/* 上电初始化：判断备份域数据是否有效 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);   /* 关键：不开这个开关写不进去 */\nBKP_ClearFlag();               /* 关键：Tamper 标志置位时写操作可能被拒绝 */\n\nif (BKP_ReadBackupRegister(BKP_DR1) != MAGIC_INIT)\n{\n  /* 首次上电或备份域已丢失：初始化 */\n  BKP_WriteBackupRegister(BKP_DR1, MAGIC_INIT);\n  BKP_WriteBackupRegister(BKP_DR2, 0x0000);   /* 例如累计运行次数 */\n}\nelse\n{\n  /* 备份域数据有效，可以取出之前保存的参数 */\n  uint16_t counter = BKP_ReadBackupRegister(BKP_DR2);\n}",
+      "notesZh": [
+        "漏掉 PWR_BackupAccessCmd(ENABLE) 是最常见的错误：函数正常返回，但读回来还是旧值，没有任何报错",
+        "Tamper 事件标志置位时（尤其在开了 Tamper 功能后）某些情况下写入会被硬件拒绝，所以写之前先 BKP_ClearFlag()",
+        "只开 BKP 时钟没开 PWR 时钟，DBP 位写不进去，同样静默失败",
+        "STM32F103C8T6 只有 10 个备份寄存器（BKP_DR1~BKP_DR10），写 BKP_DR11 及以后在 C8T6 上无效；库里定义到 42 是给大容量型号的",
+        "写备份寄存器后会有一小段同步延迟，连续写多个寄存器时若发现后面的值丢失，可在两次写之间加少量延时",
+        "VBAT 没接电池或电容时，主电源掉电即内容丢失，看起来像\"写不进去\"",
+        "备份寄存器是 16 位的，32 位数据要拆成两个寄存器存"
+      ]
+    },
+
+    "BKP_ReadBackupRegister": {
+      "briefZh": "读取指定备份寄存器（BKP_DRx）的内容。",
+      "usageZh": "读出之前用 BKP_WriteBackupRegister 保存的跨掉电数据。**读操作同样要求 PWR_BackupAccessCmd(ENABLE) 已经打开**（虽然不少情况下读能成功，但保证时序一致更稳妥）。最经典的用法是用一个\"魔数\"判断备份域内容是否可信：上电时读 BKP_DR1，等于魔数说明备份域有效，不等于则说明是第一次上电或 VBAT 掉过电，需要重新初始化。",
+      "returnDescZh": "返回指定备份寄存器的 16 位内容（uint16_t）。若备份域被复位或 VBAT 掉电，返回 0 或随机值。",
+      "paramsZh": {
+        "BKP_DR": "备份寄存器编号，取值 BKP_DR1 ~ BKP_DR42。STM32F103C8T6 实际只有 BKP_DR1 ~ BKP_DR10 有效。"
+      },
+      "prerequisites": [
+        "已打开 PWR 与 BKP 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE)",
+        "已调用 PWR_BackupAccessCmd(ENABLE)"
+      ],
+      "registers": ["BKP_DR1"],
+      "relatedFunctions": ["BKP_WriteBackupRegister", "PWR_BackupAccessCmd", "PWR_GetFlagStatus"],
+      "exampleCode": "RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);\n\n/* 用魔数判断备份域数据是否可信 */\nif (BKP_ReadBackupRegister(BKP_DR1) == 0xA55A)\n{\n  /* 备份域有效：取回上次保存的运行时长 */\n  uint32_t seconds = ((uint32_t)BKP_ReadBackupRegister(BKP_DR3) << 16)\n                   | BKP_ReadBackupRegister(BKP_DR4);\n}\nelse\n{\n  /* 首次上电或 VBAT 掉电，重新初始化 */\n}",
+      "notesZh": [
+        "上电时读到的值若为 0，通常是 VBAT 没有供电或备份域被 BKP_DeInit/RCC_BackupResetCmd 复位过",
+        "读一个越界的编号（C8T6 上 BKP_DR11 以后）拿不到任何有效数据，可能读到 0 或总线上的固定值",
+        "读之前最好也用 BKP_GetFlagStatus 看一下 Tamper 事件，发生过入侵说明数据可能已被清除",
+        "备份寄存器只有 16 位，32 位数据要拼两个寄存器，注意大小端拼接顺序写读要一致"
+      ]
+    },
+
+    "BKP_GetFlagStatus": {
+      "briefZh": "查询入侵检测（Tamper）事件标志是否已置位。",
+      "usageZh": "读 TEF 位，判断自上次清除以来是否发生过入侵事件。常用于上电自检：如果发现 Tamper 事件，说明机壳被打开过，可以据此拒绝启动、擦除敏感数据或上报服务器。注意这与中断标志 TAMPIF 是两套标志，用 BKP_GetITStatus 查中断标志。",
+      "returnDescZh": "返回 FlagStatus：SET 表示发生过 Tamper 事件，RESET 表示未发生。",
+      "paramsZh": {},
+      "prerequisites": [
+        "已打开 PWR/BKP 时钟并 PWR_BackupAccessCmd(ENABLE)",
+        "已调用 BKP_TamperPinCmd(ENABLE) 使能 Tamper 检测"
+      ],
+      "registers": ["BKP_CSR"],
+      "relatedFunctions": ["BKP_ClearFlag", "BKP_GetITStatus", "BKP_TamperPinCmd"],
+      "exampleCode": "RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);\n\n/* 上电自检：是否被拆过机 */\nif (BKP_GetFlagStatus() != RESET)\n{\n  BKP_ClearFlag();          /* 清掉，否则每次上电都会报警 */\n  /* 例如：擦除密钥、记录一次入侵、点亮告警灯 */\n}",
+      "notesZh": [
+        "查完必须 BKP_ClearFlag()，否则标志一直保持，每次上电都判断为\"发生过入侵\"",
+        "事件标志 TEF 与中断标志 TAMPIF 是两个独立的位，清了其中一个另一个还在，会互相干扰判断",
+        "VBAT 掉电会连带丢失该标志，不能把入侵记录只存在标志位里，重要记录要写进别的 BKP_DR",
+        "Tamper 事件同时可能已把备份寄存器内容清掉，所以看到标志置位时不要信任 DRx 里的数据"
+      ]
+    },
+
+    "BKP_ClearFlag": {
+      "briefZh": "清除入侵检测（Tamper）事件挂起标志。",
+      "usageZh": "清掉 TEF 位。两个典型使用时机：一是**写备份寄存器之前**先清，避免因 Tamper 标志置位导致写入被硬件拒绝；二是读事件标志判断完之后清，避免重复报警。它与清中断标志的 BKP_ClearITPendingBit 是两个不同的位，需要分别调用。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {},
+      "prerequisites": [
+        "已打开 PWR/BKP 时钟并 PWR_BackupAccessCmd(ENABLE)"
+      ],
+      "registers": ["BKP_CSR"],
+      "relatedFunctions": ["BKP_GetFlagStatus", "BKP_ClearITPendingBit", "BKP_WriteBackupRegister"],
+      "exampleCode": "RCC_APB1PeriphClockCmd(RCC_APB1Periph_PWR | RCC_APB1Periph_BKP, ENABLE);\nPWR_BackupAccessCmd(ENABLE);\n\n/* 推荐顺序：先清标志，再写备份寄存器 */\nBKP_ClearFlag();\nBKP_WriteBackupRegister(BKP_DR1, 0xA55A);\nBKP_WriteBackupRegister(BKP_DR2, 0x1234);",
+      "notesZh": [
+        "写 BKP_DR 之前先 BKP_ClearFlag() 是很多工程师踩过坑之后的固定动作：Tamper 标志置位时写入可能不生效",
+        "只清事件标志不清中断标志，TAMPER 中断还会继续来",
+        "不要在 Tamper 中断服务函数之外随手上电就清，否则会丢掉真实的入侵记录；应该先判断再清"
+      ]
+    }
+  }
+}

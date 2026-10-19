@@ -1,0 +1,305 @@
+{
+  "_comment": "CEC（HDMI 消费电子控制）的中文补充。重点是 CEC 时钟源特殊（必须选 HSE/1.5 或内部源）、必须先 CEC_DeInit 再配时钟、以及 C8T6（LQFP48）根本没有引出 CEC 引脚这一硬约束。",
+  "peripheral": "CEC",
+  "functions": {
+    "CEC_DeInit": {
+      "briefZh": "把 CEC 外设寄存器恢复为复位默认值（同时会关闭 CEC 时钟）。",
+      "usageZh": "CEC 初始化的**第一步**，必须最先调用。原因是 CEC 的时钟选择位在 RCC_APB1ENR 之外的独立控制寄存器里，只有 CEC_DeInit（内部走 RCC_APB1PeriphResetCmd）才能把它彻底复位，避免上一次运行或复位残留的时钟配置干扰。调完再开 CEC 时钟、配时钟源、才能进 CEC_Init。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {},
+      "prerequisites": [
+        "无（这是整个 CEC 初始化流程的第一步）"
+      ],
+      "registers": ["RCC_APB1ENR", "RCC_APB1RSTR", "CEC_CFGR"],
+      "relatedFunctions": ["RCC_APB1PeriphClockCmd", "CEC_Init"],
+      "exampleCode": "/* CEC 初始化第一步：先 DeInit，确保时钟与寄存器都是干净状态 */\nCEC_DeInit();\n\n/* 第二步才开 CEC 时钟 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_CEC, ENABLE);",
+      "notesZh": [
+        "跳过 CEC_DeInit 直接 CEC_Init，在某些复位路径下 CEC 会保持上一次的时钟源配置，导致通信时序全错",
+        "CEC 挂 APB1（36MHz），时钟使能要用 RCC_APB1PeriphClockCmd 而不是 APB2",
+        "C8T6 上这一步不会报错，但后续没有任何引脚可以真正用起来"
+      ]
+    },
+
+    "CEC_Init": {
+      "briefZh": "按 CEC_InitTypeDef 初始化 CEC 外设（位定时错误模式与位周期错误模式）。",
+      "usageZh": "CEC 通信的核心配置。CEC_InitTypeDef 只有两个字段：CEC_BitTimingMode 与 CEC_BitPeriodMode，用于设置错误检测的严格程度。**标准模式（CEC_BitTimingStdMode / CEC_BitPeriodStdMode）符合 HDMI-CEC 规范，兼容性最好；容错模式（CEC_BitTimingErrFreeMode / CEC_BitPeriodFlexibleMode）放宽时序判据，用于对端设备时序不标准的情况。**\n\n关键前提：**调用前必须先通过 RCC 配好 CEC 时钟源**。CEC 的位时序依赖这个时钟，STM32F103 的 CEC 时钟可选 HSE/1.5（例如 8MHz 晶振 → 5.33MHz）或内部源，若 CEC_CFGR 的时钟源位没配对，通信一定失败。\n\n**硬件约束**：CEC 外设只在 STM32F100 Value line 与互联型（F105/107）上存在。STM32F103C8T6 既没有 CEC 外设，LQFP48 封装上也没有引出 CEC 引脚，本函数在 C8T6 工程里编译会因 stm32f10x_cec.h 的型号宏条件而失败或无效。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CEC_InitStruct": "指向 CEC_InitTypeDef 的指针，两个字段：CEC_BitTimingMode（CEC_BitTimingStdMode 标准位定时错误模式，或 CEC_BitTimingErrFreeMode 宽松模式）、CEC_BitPeriodMode（CEC_BitPeriodStdMode 标准位周期模式，或 CEC_BitPeriodFlexibleMode 灵活模式）。"
+      },
+      "prerequisites": [
+        "已调用 CEC_DeInit",
+        "已用 RCC_APB1PeriphClockCmd(RCC_APB1Periph_CEC, ENABLE) 开 CEC 时钟",
+        "已通过 RCC 配置 CEC 时钟源（HSE/1.5 或内部源），未配置时 CEC 时序不可能正确",
+        "目标型号确实带 CEC 外设（F100 Value line / F105 / F107），C8T6 不支持"
+      ],
+      "registers": ["CEC_CFGR"],
+      "relatedFunctions": ["CEC_DeInit", "CEC_Cmd", "CEC_SetPrescaler", "RCC_APB1PeriphClockCmd"],
+      "exampleCode": "CEC_InitTypeDef CEC_InitStructure;\n\nCEC_DeInit();\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_CEC, ENABLE);\n\n/* 注意：这里还必须在 RCC 侧把 CEC 时钟源配好（HSE/1.5 或内部源） */\n\nCEC_InitStructure.CEC_BitTimingMode = CEC_BitTimingStdMode;\nCEC_InitStructure.CEC_BitPeriodMode = CEC_BitPeriodStdMode;\nCEC_Init(&CEC_InitStructure);\n\nCEC_Cmd(ENABLE);",
+      "notesZh": [
+        "CEC 时钟源不配置（或配成与 HSE 频率不匹配的值）会导致通信完全失败，且没有任何报错——这是 CEC 最难查的坑",
+        "CEC 外设只在 STM32F100 Value line 与互联型 F105/F107 上存在；STM32F103C8T6 上没有这个外设",
+        "即便换到带 CEC 的型号，还要确认封装是否引出了 CEC 引脚；C8T6 的 LQFP48 上没有",
+        "结构体两个字段都要显式赋值，局部变量不初始化会用栈上的随机值决定错误检测严格程度",
+        "CEC_Init 只配置，不会使能外设，必须再调 CEC_Cmd(ENABLE)"
+      ]
+    },
+
+    "CEC_Cmd": {
+      "briefZh": "使能或关闭 CEC 外设。",
+      "usageZh": "CEC_Init 之后必须调用 CEC_Cmd(ENABLE) 才能真正收发。关闭时调用 CEC_Cmd(DISABLE)，外设停止工作以省电。**顺序不能反**：先 CEC_Init 再 CEC_Cmd。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "NewState": "ENABLE 使能 CEC，DISABLE 关闭 CEC。"
+      },
+      "prerequisites": [
+        "已调用 CEC_Init 完成参数配置",
+        "CEC 时钟已使能"
+      ],
+      "registers": ["CEC_CFGR"],
+      "relatedFunctions": ["CEC_Init", "CEC_ITConfig", "CEC_SendDataByte"],
+      "exampleCode": "CEC_Init(&CEC_InitStructure);\nCEC_Cmd(ENABLE);          /* 不调这句，后面的收发全是空操作 */",
+      "notesZh": [
+        "只 CEC_Init 不 CEC_Cmd，所有收发函数调用后什么都不会发生，也不报错",
+        "CEC 挂 APB1，使能前必须先开 RCC_APB1Periph_CEC 时钟"
+      ]
+    },
+
+    "CEC_EndOfMessageCmd": {
+      "briefZh": "设置发送时是否附加 EOM（End Of Message，报文结束）位。",
+      "usageZh": "CEC 一帧由「起始位 + 头块 + 若干数据块 + EOM」组成。发送最后一个数据块之前调用 CEC_EndOfMessageCmd(ENABLE)，硬件就会在这个字节发完后置 EOM，向总线宣告报文结束。发送中间的数据块时要保证它是 DISABLE 状态。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "NewState": "ENABLE 表示这是一个报文的最后一个字节（带 EOM 位发出），DISABLE 表示后面还有数据。"
+      },
+      "prerequisites": [
+        "CEC 已使能（CEC_Cmd(ENABLE)）",
+        "已调用 CEC_StartOfMessage 开始一次发送"
+      ],
+      "registers": ["CEC_CFGR", "CEC_TXD"],
+      "relatedFunctions": ["CEC_StartOfMessage", "CEC_SendDataByte", "CEC_GetFlagStatus"],
+      "exampleCode": "CEC_StartOfMessage();                 /* 起始位 */\nCEC_SendDataByte(0x40);              /* 头块：自身地址 + 目标地址 */\nCEC_EndOfMessageCmd(DISABLE);\nCEC_SendDataByte(0x0D);              /* 数据块 1 */\n\nCEC_EndOfMessageCmd(ENABLE);         /* 最后一个字节，置 EOM */\nCEC_SendDataByte(0x00);              /* 数据块 2（末块） */\n\n/* 等发送完成标志 */\nwhile (CEC_GetFlagStatus(CEC_FLAG_TBTRF) == RESET);",
+      "notesZh": [
+        "忘了在最后一字节前置 ENABLE，报文在总线上永远不会结束，对端会一直等后续字节直到超时",
+        "EOM 是「下一个发送的字节带 EOM 位」，所以必须在发送该字节**之前**设置",
+        "中间字节也必须显式 CEC_EndOfMessageCmd(DISABLE)，否则上一轮遗留的 ENABLE 状态会让报文提前结束",
+        "置 EOM 后建议用 CEC_FLAG_TBTRF 等发送完成再继续，否则下一个字节会覆盖 TXD 寄存器"
+      ]
+    },
+
+    "CEC_ITConfig": {
+      "briefZh": "使能或关闭 CEC 中断。",
+      "usageZh": "CEC 的中断是「一个总开关」：本函数只控制 CEC_CSR 的全局中断使能，**具体是哪个事件触发要靠 CEC_GetITStatus(CEC_IT_xxx) 在中断里判断**。接收场景必须开中断，否则容易丢字节。开完之后还要用 NVIC_Init 使能 CEC_IRQn，只调 CEC_ITConfig 中断不会进。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "NewState": "ENABLE 使能 CEC 全局中断，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "CEC 已使能（CEC_Cmd(ENABLE)）",
+        "已用 NVIC_Init 使能 CEC_IRQn 中断通道",
+        "中断服务函数名与启动文件一致（CEC_IRQHandler）"
+      ],
+      "registers": ["CEC_CSR"],
+      "relatedFunctions": ["CEC_GetITStatus", "CEC_ClearITPendingBit", "NVIC_Init", "CEC_ReceiveDataByte"],
+      "exampleCode": "NVIC_InitTypeDef NVIC_InitStructure;\n\nCEC_ITConfig(ENABLE);                       /* 开 CEC 中断总开关 */\n\nNVIC_InitStructure.NVIC_IRQChannel = CEC_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\nvoid CEC_IRQHandler(void)\n{\n  if (CEC_GetITStatus(CEC_IT_RBTF) != RESET)\n  {\n    uint8_t b = CEC_ReceiveDataByte();\n    CEC_ClearITPendingBit(CEC_IT_RBTF);\n  }\n}",
+      "notesZh": [
+        "只 CEC_ITConfig 不 NVIC_Init，中断永远不会触发且不报错",
+        "它只开总开关，不开任何具体事件；接收中断还需要靠 CEC_IT_RBTF 之类的来源判断",
+        "中断里不清挂起位会反复进中断",
+        "接收时建议把错误中断 CEC_IT_RERR 一并开着，否则总线异常时只会静默丢数据"
+      ]
+    },
+
+    "CEC_GetITStatus": {
+      "briefZh": "查询指定的 CEC 中断源是否已发生。",
+      "usageZh": "中断服务函数里的分支判断。CEC 的可查询中断源有四个：CEC_IT_RBTF（收到一个数据块）、CEC_IT_RERR（接收错误）、CEC_IT_TBTRF（一个数据块发送完成）、CEC_IT_TERR（发送错误）。**如果开着总中断但不逐个判断来源，进中断后会不知道该读还是该发。**",
+      "returnDescZh": "SET 表示该中断已发生，RESET 表示未发生。",
+      "paramsZh": {
+        "CEC_IT": "要查询的中断源：CEC_IT_RBTF（接收字节完成）、CEC_IT_RERR（接收错误）、CEC_IT_TBTRF（发送字节完成）、CEC_IT_TERR（发送错误）。"
+      },
+      "prerequisites": [
+        "已 CEC_ITConfig(ENABLE) 且已 NVIC_Init 使能 CEC_IRQn"
+      ],
+      "registers": ["CEC_CSR"],
+      "relatedFunctions": ["CEC_ITConfig", "CEC_ClearITPendingBit", "CEC_ReceiveDataByte", "CEC_GetFlagStatus"],
+      "exampleCode": "void CEC_IRQHandler(void)\n{\n  if (CEC_GetITStatus(CEC_IT_RBTF) != RESET)\n  {\n    /* 收到一个数据块 */\n    rx_buf[rx_len++] = CEC_ReceiveDataByte();\n    CEC_ClearITPendingBit(CEC_IT_RBTF);\n  }\n\n  if (CEC_GetITStatus(CEC_IT_RERR) != RESET)\n  {\n    /* 接收错误：丢弃本帧重新同步 */\n    rx_len = 0;\n    CEC_ClearITPendingBit(CEC_IT_RERR);\n  }\n}",
+      "notesZh": [
+        "参数类型是 uint8_t，只能传单个中断源，不能用 | 组合（组合请用 CEC_ClearITPendingBit）",
+        "必须先 CEC_ITConfig(ENABLE)，否则事件发生了也返回 RESET",
+        "收到错误中断时应当清空接收缓冲重新同步，否则后续字节会错位",
+        "判断完务必 CEC_ClearITPendingBit，否则同一个中断会持续触发"
+      ]
+    },
+
+    "CEC_ClearITPendingBit": {
+      "briefZh": "清除 CEC 的中断挂起位。",
+      "usageZh": "中断处理完成后必须调用。与 CEC_GetITStatus 不同，本函数**支持用 | 一次清除多个挂起位**，例如 CEC_IT_RBTF | CEC_IT_RERR。不清会反复进中断。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CEC_IT": "要清除的中断挂起位：CEC_IT_RBTF、CEC_IT_RERR、CEC_IT_TBTRF、CEC_IT_TERR。可用 | 组合一次清多个。"
+      },
+      "prerequisites": [
+        "已 CEC_ITConfig(ENABLE) 且已进入中断服务函数"
+      ],
+      "registers": ["CEC_CSR"],
+      "relatedFunctions": ["CEC_GetITStatus", "CEC_ITConfig", "CEC_ClearFlag"],
+      "exampleCode": "void CEC_IRQHandler(void)\n{\n  if (CEC_GetITStatus(CEC_IT_RBTF) != RESET)\n  {\n    rx_buf[rx_len++] = CEC_ReceiveDataByte();\n    CEC_ClearITPendingBit(CEC_IT_RBTF);\n  }\n\n  /* 一次性清掉两个错误挂起位 */\n  CEC_ClearITPendingBit(CEC_IT_RERR | CEC_IT_TERR);\n}",
+      "notesZh": [
+        "参数类型是 uint16_t，比 CEC_GetITStatus 的 uint8_t 宽，可以用 | 组合",
+        "清之前最好先读一次错误原因（CEC_GetFlagStatus），清掉就查不到了",
+        "中断里忘记清挂起位会让程序反复进中断，主循环得不到执行"
+      ]
+    },
+
+    "CEC_OwnAddressConfig": {
+      "briefZh": "设置 CEC 设备的自身逻辑地址（Own Address）。",
+      "usageZh": "CEC 总线上的每台设备都有唯一逻辑地址（0~15），例如 0 是 TV、4 是播放设备、14 是音频系统。收到的报文头块里的目标地址等于本机地址时才是发给自己的。**必须在 CEC 使能前配置**，运行期改动会打乱总线上的地址协商。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CEC_OwnAddress": "本机 CEC 逻辑地址，取值 0~15（实际有效范围 0~14，15 为广播）。常用值：0=TV、1=Recording Device、4=Playback Device、5=Audio System。"
+      },
+      "prerequisites": [
+        "已调用 CEC_Init",
+        "建议在 CEC_Cmd(ENABLE) 之前设置"
+      ],
+      "registers": ["CEC_OAR"],
+      "relatedFunctions": ["CEC_Init", "CEC_Cmd", "CEC_ReceiveDataByte"],
+      "exampleCode": "/* 把本机配置成「播放设备」，逻辑地址 4 */\nCEC_OwnAddressConfig(4);\nCEC_Cmd(ENABLE);",
+      "notesZh": [
+        "地址超过 15 会被硬件截断（OAR 只保留低 4 位），函数不报错但实际地址和你写的不一样",
+        "地址 15 是广播地址，作为自身地址使用会导致无法区分定向报文",
+        "运行期改自身地址会让对端设备的路由表失效，协议上应当重新进行地址协商",
+        "多台同类型设备上电时需要在总线上做地址冲突检测，本函数只是写入，不做协商"
+      ]
+    },
+
+    "CEC_SetPrescaler": {
+      "briefZh": "设置 CEC 的时钟预分频值（决定位时序）。",
+      "usageZh": "CEC 的位周期必须满足规范（标称 2.4ms/位，容差很窄），预分频值把 CEC 时钟分频成 CEC 的位时间基准。**计算公式与 STM32 参考手册的 CEC 章节一致：预分频值取决于 CEC 时钟源频率与目标位时序。** 只有在 CEC 时钟源频率不是典型值、或需要微调时序时才会手动设置；多数情况下按手册的推荐表填即可。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CEC_Prescaler": "CEC 预分频值，写入 CEC_PRES 寄存器。有效范围 0~0x3FFF（14 位），实际取值必须按「CEC 时钟频率 / 目标位速率」计算得到。"
+      },
+      "prerequisites": [
+        "已配置 CEC 时钟源（HSE/1.5 或内部源），否则算出来的值没有意义",
+        "建议在 CEC_Cmd(ENABLE) 之前调用"
+      ],
+      "registers": ["CEC_PRES", "CEC_CFGR"],
+      "relatedFunctions": ["CEC_Init", "CEC_Cmd"],
+      "exampleCode": "/* CEC 时钟源与目标位时序决定预分频值，务必按参考手册的公式计算 */\n/* 例：CEC 时钟 = HSE/1.5 = 8MHz/1.5 ≈ 5.33MHz */\nCEC_SetPrescaler(0x0000);   /* 占位：请按手册算出真实值再填 */\n\nCEC_Cmd(ENABLE);",
+      "notesZh": [
+        "预分频值算错的表现是「偶尔能通、大量重传」，因为 CEC 位周期容差只有几个百分点",
+        "CEC 时钟源不是 HSE/1.5 时（比如用内部源），必须重新按实际频率计算，不能照抄别人的例程",
+        "它写的是 14 位寄存器，超过 0x3FFF 会被截断",
+        "CEC 外设只存在于 F100 Value line 与 F105/F107，C8T6 上没有该外设"
+      ]
+    },
+
+    "CEC_SendDataByte": {
+      "briefZh": "通过 CEC 发送一个数据字节。",
+      "usageZh": "CEC 发送的基本动作，**一个字节一次**。发送流程：CEC_StartOfMessage 发起始位 → CEC_SendDataByte 逐字节发送（头块 + 数据块）→ 最后一个字节前调 CEC_EndOfMessageCmd(ENABLE) → 用 CEC_GetFlagStatus(CEC_FLAG_TBTRF) 等每个字节发完再写下一个。\n\n每次写入前必须确认 TXD 已空，直接连发会覆盖前一个字节。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "Data": "要发送的字节，0x00~0xFF。头块的高 4 位是发起者地址、低 4 位是目标地址；数据块按 CEC 各设备类型的操作码定义。"
+      },
+      "prerequisites": [
+        "CEC 已使能（CEC_Cmd(ENABLE)）",
+        "已调用 CEC_StartOfMessage 开始一次报文",
+        "前一个字节已发送完成（CEC_FLAG_TBTRF 置位或 CEC_FLAG_TBTFE 指示发送寄存器空）"
+      ],
+      "registers": ["CEC_TXD", "CEC_CSR"],
+      "relatedFunctions": ["CEC_StartOfMessage", "CEC_EndOfMessageCmd", "CEC_GetFlagStatus", "CEC_ClearFlag"],
+      "exampleCode": "/* 发送一个完整 CEC 报文：头块 + 2 个数据块 */\nCEC_StartOfMessage();\n\nCEC_SendDataByte(0x40);                      /* 头块：本机地址 4 → 目标 0(TV) */\nwhile (CEC_GetFlagStatus(CEC_FLAG_TBTFE) == RESET);  /* 等发送寄存器空 */\nCEC_ClearFlag(CEC_FLAG_TBTRF);\n\nCEC_EndOfMessageCmd(DISABLE);\nCEC_SendDataByte(0x0D);                      /* 数据块：例如「图像查看开」 */\nwhile (CEC_GetFlagStatus(CEC_FLAG_TBTFE) == RESET);\nCEC_ClearFlag(CEC_FLAG_TBTRF);\n\nCEC_EndOfMessageCmd(ENABLE);                 /* 最后一字节带 EOM */\nCEC_SendDataByte(0x00);\nwhile (CEC_GetFlagStatus(CEC_FLAG_TBTFE) == RESET);\nCEC_ClearFlag(CEC_FLAG_TBTRF);",
+      "notesZh": [
+        "不等 TBTFE 就连续写 TXD 会覆盖上一个字节，总线上发出重复或错误的块",
+        "每个字节发完后 TBTRF 标志要清，否则下一次判断会立刻通过，等于没有等待",
+        "忘记 CEC_StartOfMessage 时硬件不会自动补起始位，对端收到的是一串无意义的位流",
+        "CEC 总线是单线开漏结构，位周期 2.4ms 左右，一个 3 字节报文要 10ms 以上，不要放在紧循环里",
+        "该外设仅存在于 F100 Value line 与 F105/F107；C8T6 没有 CEC 外设也没有引出引脚"
+      ]
+    },
+
+    "CEC_ReceiveDataByte": {
+      "briefZh": "读取 CEC 最近接收到的一个数据字节。",
+      "usageZh": "接收流程：等到 CEC_FLAG_RBTF 置位（收到一个数据块）→ 调本函数读出字节 → CEC_ClearFlag(CEC_FLAG_RBTF) 清标志 → 继续等下一个字节，直到收到带 EOM 的字节（CEC_FLAG_REOM）。**必须在清标志之前读**，否则会丢失该字节。",
+      "returnDescZh": "最近接收到的数据字节（0x00~0xFF）。",
+      "paramsZh": {},
+      "prerequisites": [
+        "CEC 已使能",
+        "CEC_FLAG_RBTF 已置位（表示接收缓冲里有新字节），否则读到的是旧数据"
+      ],
+      "registers": ["CEC_RXD", "CEC_CSR"],
+      "relatedFunctions": ["CEC_GetFlagStatus", "CEC_ClearFlag", "CEC_ITConfig", "CEC_GetITStatus"],
+      "exampleCode": "uint8_t rx[16];\nuint8_t n = 0;\n\n/* 轮询接收一帧 */\nwhile (CEC_GetFlagStatus(CEC_FLAG_REOM) == RESET)   /* 未收到报文结束 */\n{\n  if (CEC_GetFlagStatus(CEC_FLAG_RBTF) != RESET)\n  {\n    rx[n++] = CEC_ReceiveDataByte();   /* 先读 */\n    CEC_ClearFlag(CEC_FLAG_RBTF);      /* 再清标志 */\n  }\n\n  if (CEC_GetFlagStatus(CEC_FLAG_RERR) != RESET)\n  {\n    CEC_ClearFlag(CEC_FLAG_RERR);\n    n = 0;                             /* 接收错误，整帧作废 */\n  }\n}",
+      "notesZh": [
+        "先清标志再读数据会读到已经作废的内容，务必「先读后清」",
+        "F103 的 CEC 只有一个字节的接收缓冲，不尽快读走会被下一个字节覆盖",
+        "收到 CEC_FLAG_REOM 表示本帧结束，此时不要再继续等字节",
+        "CEC_FLAG_RERR 表示接收错误（位定时或位周期超差），应当丢弃整帧并重新同步",
+        "该外设仅存在于 F100 Value line 与 F105/F107；C8T6 无 CEC 外设"
+      ]
+    },
+
+    "CEC_StartOfMessage": {
+      "briefZh": "发起一个 CEC 报文的起始位（Start Bit）。",
+      "usageZh": "每次发送新报文的第一件事。CEC 的起始位是特殊的、比普通位长得多的低电平脉冲，用于把总线上所有设备同步到本次传输。**不调用它直接 CEC_SendDataByte，对端无法识别帧边界。** 只在发送端使用；接收端靠硬件自动识别起始位。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {},
+      "prerequisites": [
+        "CEC 已使能（CEC_Cmd(ENABLE)）",
+        "总线处于空闲状态（上一次发送已完成）"
+      ],
+      "registers": ["CEC_CSR", "CEC_TXD"],
+      "relatedFunctions": ["CEC_SendDataByte", "CEC_EndOfMessageCmd", "CEC_GetFlagStatus"],
+      "exampleCode": "/* 每次新报文都以 StartOfMessage 开头 */\nCEC_StartOfMessage();\nCEC_SendDataByte(0x40);   /* 头块 */\n/* ... 后续数据块 ... */\nCEC_EndOfMessageCmd(ENABLE);\nCEC_SendDataByte(0x00);",
+      "notesZh": [
+        "上一个报文还没发完就调它，会在总线上产生冲突，触发发送错误（CEC_FLAG_TERR）",
+        "它只是发起始位，不发送任何数据，必须紧接着调用 CEC_SendDataByte 发头块",
+        "发送失败后重新开始必须再调一次本函数，不能从中断处继续",
+        "该外设仅存在于 F100 Value line 与 F105/F107；C8T6 无 CEC 外设"
+      ]
+    },
+
+    "CEC_GetFlagStatus": {
+      "briefZh": "查询指定的 CEC 标志位状态。",
+      "usageZh": "CEC 收发的主要轮询手段。它有静态标志与错误标志两类：CSR 里的 CEC_FLAG_TBTRF/TERR/REOM/RBTF/RERR/RSOM 反映收发进度，ESR 里的 CEC_FLAG_BTE/BPE/ACKE 反映具体错误原因。**调试 CEC 通信不上时，CEC_FLAG_ACKE 是最有价值的：它表示末字节没收到应答，通常意味着总线上没有对端或地址不对。**",
+      "returnDescZh": "SET 表示标志已置位，RESET 表示未置位。部分标志读后需手动清除（见 CEC_ClearFlag）。",
+      "paramsZh": {
+        "CEC_FLAG": "要查询的标志：CEC_FLAG_TBTRF（发送字节完成）、CEC_FLAG_TERR（发送错误）、CEC_FLAG_TBTFE（发送缓冲空）、CEC_FLAG_REOM（收到报文结束位）、CEC_FLAG_RBTF（收到一个字节）、CEC_FLAG_RERR（接收错误）、CEC_FLAG_RSOM（收到起始位）、CEC_FLAG_RBTFE（接收缓冲非空）、CEC_FLAG_BTE（位定时错误）、CEC_FLAG_BPE（位周期错误）、CEC_FLAG_ACKE（应答错误）、CEC_FLAG_LINE（CEC 线状态）、CEC_FLAG_SBE（起始位错误）。"
+      },
+      "prerequisites": [
+        "CEC 已使能且在收发过程中"
+      ],
+      "registers": ["CEC_CSR", "CEC_ESR"],
+      "relatedFunctions": ["CEC_ClearFlag", "CEC_SendDataByte", "CEC_ReceiveDataByte", "CEC_GetITStatus"],
+      "exampleCode": "/* 发送一帧后检查是否被应答 */\nwhile (CEC_GetFlagStatus(CEC_FLAG_TBTFE) == RESET);\nCEC_ClearFlag(CEC_FLAG_TBTRF);\nCEC_ClearFlag(CEC_FLAG_TERR);\n\nif (CEC_GetFlagStatus(CEC_FLAG_ACKE) != RESET)\n{\n  /* 末字节没被应答：地址不对，或总线上没有这个设备 */\n  CEC_ClearFlag(CEC_FLAG_ACKE);\n}",
+      "notesZh": [
+        "标志查出来不清，下一次判断会立刻为真，等于没有等待",
+        "CEC_FLAG_ACKE 是应答错误，属于「通信上了但没人理」；CEC_FLAG_BTE/BPE 属于「时序本身就不对」，要回头查时钟源与预分频",
+        "CEC_FLAG_LINE 反映总线当前电平，排查硬件接线时很有用",
+        "该外设仅存在于 F100 Value line 与 F105/F107；C8T6 无 CEC 外设也无对应引脚"
+      ]
+    },
+
+    "CEC_ClearFlag": {
+      "briefZh": "清除 CEC 的挂起标志。",
+      "usageZh": "收发过程中清标志用。**支持用 | 一次清多个**（例如 CEC_FLAG_TBTRF | CEC_FLAG_TERR）。发送侧通常在等 TBTFE 之后清 TBTRF；接收侧在读完数据后清 RBTF。错误标志不清会导致后续判断一直被误判为出错。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "CEC_FLAG": "要清除的标志：CEC_FLAG_TBTRF、CEC_FLAG_TERR、CEC_FLAG_REOM、CEC_FLAG_RBTF、CEC_FLAG_RERR、CEC_FLAG_BTE、CEC_FLAG_BPE、CEC_FLAG_ACKE、CEC_FLAG_SBE 等。可用 | 组合。"
+      },
+      "prerequisites": [
+        "对应标志已置位，且数据已读走（接收场景）"
+      ],
+      "registers": ["CEC_CSR", "CEC_ESR"],
+      "relatedFunctions": ["CEC_GetFlagStatus", "CEC_ClearITPendingBit", "CEC_ReceiveDataByte"],
+      "exampleCode": "/* 接收完一个字节：先读数据，再清标志 */\nif (CEC_GetFlagStatus(CEC_FLAG_RBTF) != RESET)\n{\n  rx[n++] = CEC_ReceiveDataByte();\n  CEC_ClearFlag(CEC_FLAG_RBTF);\n}\n\n/* 一次清掉全部错误标志，准备下一次通信 */\nCEC_ClearFlag(CEC_FLAG_TERR | CEC_FLAG_RERR | CEC_FLAG_BTE | CEC_FLAG_BPE | CEC_FLAG_ACKE);",
+      "notesZh": [
+        "接收标志必须在读出数据之后清，反了会丢字节",
+        "只清 CSR 的收发标志而漏清 ESR 的错误标志（BTE/BPE/ACKE），错误状态会一直残留",
+        "CEC_FLAG_LINE 是只读状态位，清它没有意义",
+        "该外设仅存在于 F100 Value line 与 F105/F107；C8T6 无 CEC 外设"
+      ]
+    }
+  }
+}

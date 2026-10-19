@@ -1,0 +1,539 @@
+{
+  "_comment": "SPI/I2S（串行外设接口）的中文补充。这 23 个函数里很多是 I2S 专用或 CRC 专用，C8T6 上实际常用的是 SPI_Init/SPI_Cmd/收发/标志查询这一小撮。重点写清了主从模式、NSS 管理、时钟极性相位匹配与 SPI1(APB2)/SPI2(APB1) 的速率差异。",
+  "peripheral": "SPI",
+  "functions": {
+    "SPI_I2S_DeInit": {
+      "briefZh": "把 SPIx/I2Sx 外设的寄存器恢复为复位默认值。",
+      "usageZh": "重新配置 SPI 参数前先复位，或同一块板子上切换 SPI 从设备时使用。函数内部通过 `RCC_APB1PeriphResetCmd`/`RCC_APB2PeriphResetCmd` 复位对应的 SPI 外设，**同时会复位该 SPI 的 I2S 部分**，被复位后 SPI 的 CR1/CR2 清零即处于关闭状态。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3。C8T6 上只有 SPI1（APB2，最快 36MHz）与 SPI2（APB1，最快 18MHz）；SPI3 属于大容量型号，C8T6 上没有。"
+      },
+      "prerequisites": [
+        "已通过 RCC_APB2PeriphClockCmd（SPI1）或 RCC_APB1PeriphClockCmd（SPI2）打开对应 SPI 时钟"
+      ],
+      "registers": ["SPI_CR1", "SPI_CR2", "SPI_SR", "SPI_DR", "SPI_CRCPR", "SPI_RXCRCR", "SPI_TXCRCR", "SPI_I2SCFGR", "SPI_I2SPR"],
+      "relatedFunctions": ["SPI_Init", "SPI_Cmd", "RCC_APB2PeriphClockCmd", "RCC_APB1PeriphClockCmd", "RCC_APB2PeriphResetCmd"],
+      "exampleCode": "/* 切换从设备时先复位再重配 */\nSPI_I2S_DeInit(SPI1);\nSPI_Init(SPI1, &SPI_InitStructure);\nSPI_Cmd(SPI1, ENABLE);",
+      "notesZh": [
+        "复位后 SPI 处于关闭状态，必须重新 SPI_Init 并 SPI_Cmd(ENABLE)，否则收发全是 0 且 SR 里的标志一直不对",
+        "复位会清掉 CR2 里的 DMA 使能位，如果用 DMA 收发，复位后必须重新调 SPI_I2S_DMACmd",
+        "没开 SPI 时钟就调用它，函数内部的复位操作实际作用不到该外设上，看起来「复位了但没效果」",
+        "C8T6 上传 SPI3 无意义，SPI3 的引脚（PB3/PB4/PB5 或 PC10~PC12）在 48 脚封装上大部分与 JTAG 引脚复用"
+      ]
+    },
+
+    "SPI_Init": {
+      "briefZh": "按 SPI_InitTypeDef 配置 SPIx 的工作模式（主/从、全双工/半双工、数据宽度、时钟极性相位、波特率分频、位序、CRC）。",
+      "usageZh": "SPI 配置的核心函数，必须有 SPI 时钟、引脚已配好复用功能才有效。典型主机（Master）配置是 8 位、CPOL=Low、CPHA=1Edge（即 Mode 0）、NSS 软件管理、预分频 8 或 16。与从设备通信的四个关键参数必须**完全匹配**：数据宽度、CPOL/CPHA、位序（MSB/LSB first）、以及从设备的实际时序需求；任何一个不匹配的表现都是读回全 0x00 或全 0xFF。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3。C8T6 上实际可用 SPI1 与 SPI2。",
+        "SPI_InitStruct": "指向 SPI_InitTypeDef 结构体的指针，字段包括：SPI_Direction（SPI_Direction_2Lines_FullDuplex 双线全双工最常用、SPI_Direction_2Lines_RxOnly 只收、SPI_Direction_1Line_Rx / SPI_Direction_1Line_Tx 单线半双工）、SPI_Mode（SPI_Mode_Master / SPI_Mode_Slave）、SPI_DataSize（SPI_DataSize_16b 或 SPI_DataSize_8b）、SPI_CPOL（SPI_CPOL_Low / SPI_CPOL_High）、SPI_CPHA（SPI_CPHA_1Edge / SPI_CPHA_2Edge）、SPI_NSS（SPI_NSS_Hard 硬件 NSS / SPI_NSS_Soft 软件 NSS）、SPI_BaudRatePrescaler（SPI_BaudRatePrescaler_2/4/8/16/32/64/128/256）、SPI_FirstBit（SPI_FirstBit_MSB / SPI_FirstBit_LSB）、SPI_CRCPolynomial（CRC 多项式，不用 CRC 时随便填一个如 7）。"
+      },
+      "prerequisites": [
+        "已打开 SPI 时钟：SPI1 用 RCC_APB2PeriphClockCmd(RCC_APB2Periph_SPI1, ENABLE)，SPI2 用 RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE)",
+        "已用 GPIO_Init 把 SCK/MISO/MOSI 配成 GPIO_Mode_AF_PP（复用推挽输出），NSS 软件管理时配成普通推挽输出或输入",
+        "主机模式下若用硬件 NSS，NSS 引脚必须拉高，否则会触发 MODF 模式错误"
+      ],
+      "registers": ["SPI_CR1", "SPI_CRCPR"],
+      "relatedFunctions": ["SPI_StructInit", "SPI_Cmd", "SPI_I2S_SendData", "SPI_I2S_ReceiveData", "SPI_I2S_GetFlagStatus", "SPI_NSSInternalSoftwareConfig", "GPIO_Init"],
+      "exampleCode": "SPI_InitTypeDef SPI_InitStructure;\nGPIO_InitTypeDef GPIO_InitStructure;\n\n/* SPI1 在 APB2，SPI2 在 APB1，两个时钟函数不一样 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_SPI1, ENABLE);\n\n/* SCK=PA5, MISO=PA6, MOSI=PA7 必须配成复用推挽 */\nGPIO_InitStructure.GPIO_Pin   = GPIO_Pin_5 | GPIO_Pin_6 | GPIO_Pin_7;\nGPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;\nGPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;\nGPIO_Init(GPIOA, &GPIO_InitStructure);\n\n/* 软件 NSS：片选自己用一个普通 GPIO 控制，这里配成推挽输出 */\nGPIO_InitStructure.GPIO_Pin  = GPIO_Pin_4;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;\nGPIO_Init(GPIOA, &GPIO_InitStructure);\nGPIO_SetBits(GPIOA, GPIO_Pin_4);\n\nSPI_StructInit(&SPI_InitStructure);\nSPI_InitStructure.SPI_Direction         = SPI_Direction_2Lines_FullDuplex;\nSPI_InitStructure.SPI_Mode              = SPI_Mode_Master;\nSPI_InitStructure.SPI_DataSize          = SPI_DataSize_8b;\nSPI_InitStructure.SPI_CPOL              = SPI_CPOL_Low;    /* Mode 0 */\nSPI_InitStructure.SPI_CPHA              = SPI_CPHA_1Edge;   /* Mode 0 */\nSPI_InitStructure.SPI_NSS               = SPI_NSS_Soft;\nSPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_8; /* 72/8 = 9MHz */\nSPI_InitStructure.SPI_FirstBit          = SPI_FirstBit_MSB;\nSPI_InitStructure.SPI_CRCPolynomial     = 7;\nSPI_Init(SPI1, &SPI_InitStructure);\n\nSPI_Cmd(SPI1, ENABLE);   /* 不使能则收发毫无反应 */",
+      "notesZh": [
+        "SPI1 挂 APB2（72MHz），SPI2 挂 APB1（36MHz），同样的 SPI_BaudRatePrescaler_2 在 SPI1 上是 36MHz 而 SPI2 只有 18MHz，别以为同一个分频值得到同样速率",
+        "片选 NSS 用 GPIO_NSS_Soft 后必须自己用普通 GPIO 拉片选，STM32 不会自动产生 CS 信号；忘拉片的典型现象是从设备不响应、读回全 0xFF",
+        "SCK/MISO/MOSI 必须配成 GPIO_Mode_AF_PP；配成 Out_PP 时时钟和数据都出不来（引脚被 GPIO 输出寄存器占住）",
+        "CPOL/CPHA 配错的现象是数据整体错位，典型表现为读回全 0x00 或 0xFF；Mode 0（CPOL_Low + CPHA_1Edge）是最常见的组合",
+        "SPI_Init 会先关闭 SPE 位再写寄存器，所以可以在运行时重新调用改变参数，但会丢失正在进行的传输",
+        "主机模式下 NSS 用 SPI_NSS_Hard 而引脚被拉低时会触发 MODF 模式错误，SPE 位被硬件清除且 SR 的 MODF 置位，SPI 直接停止工作",
+        "C8T6 的 SPI1 引脚是 PA5/PA6/PA7（重映射后是 PB3/PB4/PB5，但 PB3/PB4 与 JTAG 的 JTDO/NJTRST 复用，要用得先关 JTAG）"
+      ]
+    },
+
+    "I2S_Init": {
+      "briefZh": "把 SPIx 配置成 I2S 模式，自动计算最接近目标采样率的分频系数。",
+      "usageZh": "只在驱动 I2S 音频器件（如 WM8978、VS1053 的 I2S 接口）时使用，用于播放或录音音频流。注意 I2S 与 SPI **共用同一个外设**，SPI2 配成 I2S 后就不能再当 SPI 用；而且必须先开 SPI 时钟，再在 SPI_Init 之外单独调 I2S_Init。该函数会读取当前的 RCC 配置（PLL 倍频、PLL3 是否使能）来反推 I2S 时钟，因此**RCC 时钟树必须已经配置完成**。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择配成 I2S 的 SPI 外设，只能是 SPI2 或 SPI3。C8T6 上只有 SPI2 可以用，SPI3 无引脚引出。",
+        "I2S_InitStruct": "指向 I2S_InitTypeDef 结构体的指针，字段包括：I2S_Mode（I2S_Mode_MasterTx / MasterRx / SlaveTx / SlaveRx）、I2S_Standard（I2S_Standard_Phillips / MSB / LSB / PCM 短帧 / PCM 长帧）、I2S_DataFormat（I2S_DataFormat_16b / 16bExtended / 24b / 32b）、I2S_MCLKOutput（I2S_MCLKOutput_Enable 输出 MCLK 给外部 codec / Disable）、I2S_AudioFreq（目标采样率，如 I2S_AudioFreq_44k、I2S_AudioFreq_8k、I2S_AudioFreq_Default）、I2S_CPOL（I2S_CPOL_Low / High）。"
+      },
+      "prerequisites": [
+        "已打开 SPI2 时钟：RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE)",
+        "RCC 时钟树已配置完成（I2S_Init 要读 RCC 的 PLL 配置来算分频，SysClock 未配置时算出的采样率是错的）",
+        "已用 GPIO_Init 配置 I2S 引脚：SPI2 的 I2S 引脚为 PB12(WS)、PB13(CK)、PB15(SD)、PC6(MCK)",
+        "需要 MCLK 时确认 PC6 没有被其它外设占用"
+      ],
+      "registers": ["SPI_I2SCFGR", "SPI_I2SPR", "SPI_CR2"],
+      "relatedFunctions": ["I2S_Cmd", "I2S_StructInit", "SPI_I2S_SendData", "SPI_I2S_ReceiveData", "RCC_GetClocksFreq"],
+      "exampleCode": "I2S_InitTypeDef I2S_InitStructure;\n\n/* 注意时钟函数：SPI2/I2S2 在 APB1 上 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);\n\n/* PB12=WS PB13=CK PB15=SD PC6=MCK，全部配成复用推挽 */\nGPIO_InitStructure.GPIO_Pin   = GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_15;\nGPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;\nGPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF_PP;\nGPIO_Init(GPIOB, &GPIO_InitStructure);\n\nI2S_StructInit(&I2S_InitStructure);\nI2S_InitStructure.I2S_Mode         = I2S_Mode_MasterTx;\nI2S_InitStructure.I2S_Standard     = I2S_Standard_Phillips;\nI2S_InitStructure.I2S_DataFormat   = I2S_DataFormat_16b;\nI2S_InitStructure.I2S_MCLKOutput   = I2S_MCLKOutput_Enable;\nI2S_InitStructure.I2S_AudioFreq    = I2S_AudioFreq_44k;\nI2S_InitStructure.I2S_CPOL         = I2S_CPOL_Low;\nI2S_Init(SPI2, &I2S_InitStructure);\n\nI2S_Cmd(SPI2, ENABLE);",
+      "notesZh": [
+        "C8T6 只有 SPI2 能当 I2S 用（I2S2），I2S3 对应的 SPI3 没有引脚引出",
+        "如果算出的分频值超过 511，函数会**静默地**改用默认值 0x02，实际采样率会严重偏离目标值，且不会有任何提示——高频采样率下要自己核对 I2SPR",
+        "I2S 与 SPI 共用外设，配置了 I2S 就不能再用 SPI_Init 把它当 SPI 使；两者只能选一个",
+        "必须先开 SPI2 的时钟，I2S_Init 内部依赖 RCC_GetClocksFreq 读取的 PLL 参数，时钟树没配好时算出的分频是错的",
+        "调用前需要先使能 PLL3（RCC_PLL3Config + RCC_PLL3Cmd）才能得到准确的 I2S 时钟，库里没做这件事",
+        "I2S 模式下 SPI_SSOutputCmd 等 NSS 相关函数无意义，别混用"
+      ]
+    },
+
+    "SPI_StructInit": {
+      "briefZh": "把 SPI_InitTypeDef 各字段填成库的默认值。",
+      "usageZh": "推荐在 SPI_Init 之前调用，避免局部结构体里的野值。默认值是：2 线全双工、从机模式（SPI_Mode_Slave）、8 位数据、CPOL_Low、CPHA_1Edge、软件 NSS、预分频 2、MSB 先行、CRC 多项式 7。注意**默认是从机模式**，做主机时必须显式改成 SPI_Mode_Master。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPI_InitStruct": "指向待初始化的 SPI_InitTypeDef 结构体的指针。"
+      },
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": ["SPI_Init"],
+      "exampleCode": "SPI_InitTypeDef SPI_InitStructure;\n\nSPI_StructInit(&SPI_InitStructure);          /* 先拿默认值 */\nSPI_InitStructure.SPI_Mode = SPI_Mode_Master; /* 默认是从机，主机必须改 */\nSPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_8;\nSPI_Init(SPI1, &SPI_InitStructure);",
+      "notesZh": [
+        "默认 SPI_Mode 是 SPI_Mode_Slave，忘记改的后果是主机不发时钟、程序卡在等 RXNE 标志的 while 循环里",
+        "默认 SPI_BaudRatePrescaler 是 _2，SPI1 上就是 36MHz，很多 SPI Flash 最高只支持 50MHz 但信号质量差，通常要改成 _8 或 _16",
+        "函数不碰硬件寄存器，纯软件操作",
+        "默认 SPI_NSS 是 SPI_NSS_Hard，做主机时通常要改成 SPI_NSS_Soft 自己控制片选"
+      ]
+    },
+
+    "I2S_StructInit": {
+      "briefZh": "把 I2S_InitTypeDef 各字段填成库的默认值。",
+      "usageZh": "在 I2S_Init 之前调用，保证不用的字段（如 MCLK 输出）有确定的值。默认值是：从机发送（I2S_Mode_SlaveTx）、Phillips 标准、16 位数据、MCLK 输出关闭、采样率默认值、CPOL_Low。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "I2S_InitStruct": "指向待初始化的 I2S_InitTypeDef 结构体的指针。"
+      },
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": ["I2S_Init", "I2S_Cmd"],
+      "exampleCode": "I2S_InitTypeDef I2S_InitStructure;\n\nI2S_StructInit(&I2S_InitStructure);\nI2S_InitStructure.I2S_Mode       = I2S_Mode_MasterTx;   /* 默认 SlaveTx，主机要改 */\nI2S_InitStructure.I2S_AudioFreq  = I2S_AudioFreq_44k;\nI2S_InitStructure.I2S_MCLKOutput = I2S_MCLKOutput_Enable;\nI2S_Init(SPI2, &I2S_InitStructure);",
+      "notesZh": [
+        "默认是从机发送模式，做主机播放必须先改成 I2S_Mode_MasterTx",
+        "I2S_MCLKOutput 默认关闭，外部 codec 需要主时钟时才改成 Enable，否则 codec 不工作",
+        "C8T6 只有 SPI2 能配 I2S，这个结构体在其它 SPI 上用不了"
+      ]
+    },
+
+    "SPI_Cmd": {
+      "briefZh": "使能或关闭 SPIx 外设（置位/清除 CR1 的 SPE 位）。",
+      "usageZh": "SPI_Init 之后必须调一次 `SPI_Cmd(SPIx, ENABLE)` 才能真正开始工作——很多人以为 SPI_Init 就够了，结果收发毫无反应。另外在需要临时停止传输（例如切换从设备、改波特率）时用 DISABLE。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3。",
+        "NewState": "ENABLE 使能 SPI，DISABLE 关闭 SPI。"
+      },
+      "prerequisites": [
+        "已调用 SPI_Init 配置好工作模式",
+        "已打开对应的 RCC APB1/APB2 SPI 时钟"
+      ],
+      "registers": ["SPI_CR1"],
+      "relatedFunctions": ["SPI_Init", "SPI_I2S_DMACmd", "SPI_I2S_SendData", "SPI_I2S_GetFlagStatus"],
+      "exampleCode": "SPI_Cmd(SPI1, ENABLE);\n\n/* 发送一个字节并等待完成 */\nSPI_I2S_SendData(SPI1, 0x9F);\nwhile (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET) { }\nwhile (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET) { }",
+      "notesZh": [
+        "只调 SPI_Init 不调 SPI_Cmd(ENABLE)，SPI 停在关闭状态，SR 里的 TXE 也不会置位，程序会卡在等标志的死循环里",
+        "SPI_Cmd(DISABLE) 会中止正在进行的传输，且清除 SPE 后 SR 里的部分标志状态会变，重新使能后要先清一次 DR",
+        "清 MODF 模式错误需要「先读 SR 再写 CR1」，SPI_Cmd(ENABLE) 正好提供了这个写 CR1 的动作",
+        "同一块芯片上 SPI1 与 SPI2 互相独立，要分别使能"
+      ]
+    },
+
+    "I2S_Cmd": {
+      "briefZh": "使能或关闭处于 I2S 模式的 SPIx 外设。",
+      "usageZh": "I2S_Init 之后必须调用一次 ENABLE 才会输出时钟和数据。功能上与 SPI_Cmd 完全一样，都是置位 CR1 的 SPE 位；分开成两个函数只是因为 SPI 与 I2S 的语义不同。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "被配置成 I2S 模式的 SPI 外设，只能取 SPI2 或 SPI3。C8T6 上只能用 SPI2。",
+        "NewState": "ENABLE 使能 I2S，DISABLE 关闭 I2S。"
+      },
+      "prerequisites": [
+        "已调用 I2S_Init 完成 I2S 配置",
+        "已打开 SPI2 的 APB1 时钟"
+      ],
+      "registers": ["SPI_CR1", "SPI_I2SCFGR"],
+      "relatedFunctions": ["I2S_Init", "SPI_Cmd", "SPI_I2S_SendData"],
+      "exampleCode": "I2S_Cmd(SPI2, ENABLE);\n\n/* 之后用 SPI_I2S_SendData 推音频数据，注意 I2S 下这个函数名仍是 SPI_ 前缀 */\nSPI_I2S_SendData(SPI2, pcmSample);",
+      "notesZh": [
+        "与 SPI_Cmd 实现相同，在 I2S 模式下用哪个都能工作，但按语义应当用 I2S_Cmd",
+        "I2S2 挂在 APB1，时钟必须用 RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE) 打开",
+        "关闭再使能会打断音频流，外部 codec 可能需要重新同步",
+        "C8T6 上没有 I2S3 可用"
+      ]
+    },
+
+    "SPI_I2S_DMACmd": {
+      "briefZh": "使能或关闭 SPI/I2S 的 DMA 请求（发送请求与接收请求可分别控制）。",
+      "usageZh": "做高速大数据量传输（SPI Flash 整页读写、屏幕刷图、SD 卡、I2S 音频流）时的标准做法：先用 `DMA_Init` 配好 DMA 通道，再用本函数把 SPI 的 TX/RX DMA 请求接到 DMA 控制器上，最后 `DMA_Cmd` 使能通道。SPI1 的 TX 用 DMA1_Channel3、RX 用 DMA1_Channel2，这是固定映射，改不了。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3（I2S 模式下取 SPI2 或 SPI3）。",
+        "SPI_I2S_DMAReq": "要控制的 DMA 请求，取 SPI_I2S_DMAReq_Tx（发送请求）或 SPI_I2S_DMAReq_Rx（接收请求），两者可用 | 组合。单向传输时只用其中一个。",
+        "NewState": "ENABLE 使能选中的 DMA 请求，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已调用 DMA_Init 配置好对应的 DMA 通道（外设地址填 &SPIx->DR，方向与数据宽度已设对）",
+        "已打开 DMA1 的 AHB 时钟：RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE)",
+        "已调用 SPI_Cmd(SPIx, ENABLE) 使能 SPI"
+      ],
+      "registers": ["SPI_CR2"],
+      "relatedFunctions": ["DMA_Init", "DMA_Cmd", "SPI_Cmd", "SPI_I2S_GetFlagStatus", "DMA_GetFlagStatus", "DMA_ClearFlag"],
+      "exampleCode": "DMA_InitTypeDef DMA_InitStructure;\n\nRCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);\n\n/* SPI1_TX 固定映射到 DMA1_Channel3 */\nDMA_DeInit(DMA1_Channel3);\nDMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&SPI1->DR;\nDMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)txBuf;\nDMA_InitStructure.DMA_DIR                = DMA_DIR_PeripheralDST;   /* 内存 -> 外设 */\nDMA_InitStructure.DMA_BufferSize         = 512;\nDMA_InitStructure.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;\nDMA_InitStructure.DMA_MemoryInc          = DMA_MemoryInc_Enable;\nDMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;\nDMA_InitStructure.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;\nDMA_InitStructure.DMA_Mode               = DMA_Mode_Normal;\nDMA_InitStructure.DMA_Priority           = DMA_Priority_High;\nDMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;\nDMA_Init(DMA1_Channel3, &DMA_InitStructure);\n\nSPI_I2S_DMACmd(SPI1, SPI_I2S_DMAReq_Tx, ENABLE);\nDMA_Cmd(DMA1_Channel3, ENABLE);",
+      "notesZh": [
+        "TX 和 RX 同时使能时必须用两个不同的 DMA 通道（SPI1: TX=DMA1_Channel3，RX=DMA1_Channel2），一个通道不能同时收发",
+        "DMA_PeripheralBaseAddr 要填 &SPIx->DR，不是 SPI 的基地址，填错会写到 CR1 上把 SPI 配置搞乱",
+        "传输结束后 DMA 通道不会自动关闭，若是 DMA_Mode_Normal，必须重新 DMA_SetCurrDataCounter 再 DMA_Cmd(ENABLE)；DMA_Mode_Circular 才会自动重填",
+        "传输完成标志（如 DMA1_FLAG_TC3）不清的话，下一轮判断会立刻又成立，看起来像「传输已经完成」其实根本没开始",
+        "使能了 DMA 请求但 DMA 通道没使能，SPI 的 TXE/ RXNE 依旧工作，此时用轮询读 DR 也能读到数据，容易掩盖配置错误",
+        "C8T6 只有 DMA1 的 7 个通道可靠可用，DMA2 虽在参考手册里存在，但 C8T6 上 DMA2 的请求源对应的外设（如 SPI3、SDIO、ADC3）多数没有引出"
+      ]
+    },
+
+    "SPI_I2S_ITConfig": {
+      "briefZh": "使能或关闭 SPI/I2S 的某个中断源（TXE、RXNE、ERR、CRCERR 等）。",
+      "usageZh": "做中断方式（或配合 DMA + 中断）收发时使用。使能中断只是让 SR 的标志能产生中断请求，**还必须调用 NVIC_Init 使能 SPI1_IRQn / SPI2_IRQn**，否则中断永远不进。SPI1 和 SPI2 各有独立的中断向量。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3（I2S 模式下取 SPI2 或 SPI3）。",
+        "SPI_I2S_IT": "要控制的中断源，取 SPI_I2S_IT_TXE（发送缓冲区空）、SPI_I2S_IT_RXNE（接收缓冲区非空）、SPI_I2S_IT_ERR（错误中断，包含 MODF/OVR/CRCERR）、SPI_I2S_IT_OVR（溢出）、SPI_I2S_IT_CRCERR（CRC 错误）。一次只能填一个值。",
+        "NewState": "ENABLE 使能该中断源，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已调用 SPI_Init 与 SPI_Cmd(SPIx, ENABLE)",
+        "已调用 NVIC_PriorityGroupConfig 设定分组，并调用 NVIC_Init 使能 SPI1_IRQn 或 SPI2_IRQn",
+        "中断服务函数名必须与启动文件一致：SPI1_IRQHandler / SPI2_IRQHandler"
+      ],
+      "registers": ["SPI_CR2", "SPI_SR"],
+      "relatedFunctions": ["SPI_I2S_GetITStatus", "SPI_I2S_ClearITPendingBit", "NVIC_Init", "SPI_I2S_SendData", "SPI_I2S_ReceiveData"],
+      "exampleCode": "SPI_I2S_ITConfig(SPI1, SPI_I2S_IT_RXNE, ENABLE);\n\nNVIC_InitStructure.NVIC_IRQChannel = SPI1_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x02;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x02;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\nvoid SPI1_IRQHandler(void)\n{\n  if (SPI_I2S_GetITStatus(SPI1, SPI_I2S_IT_RXNE) != RESET)\n  {\n    /* 读 DR 顺带清 RXNE 标志，不需要再调 ClearITPendingBit */\n    rxByte = SPI_I2S_ReceiveData(SPI1);\n  }\n}",
+      "notesZh": [
+        "开中断后忘了 NVIC_Init，标志会置位但中断不触发，且没有任何报错",
+        "TXE 中断在使能 SPI 后会立刻触发（发送缓冲区本来就是空的），如果收尾时忘了关 TXE 中断，会陷入反复进中断的死循环；标准做法是「要发的发完了就 SPI_I2S_ITConfig(SPIx, SPI_I2S_IT_TXE, DISABLE)」",
+        "RXNE 和 TXE 的标志靠读写 SPI_DR 自动清除，不需要调用 SPI_I2S_ClearITPendingBit（那个函数只管 CRCERR）",
+        "使能 SPI_I2S_IT_ERR 后，MODF/OVR 也会进同一个中断，服务函数里要用 SPI_I2S_GetITStatus 逐项判断",
+        "SPI1 在 APB2、SPI2 在 APB1，两者中断向量独立，优先级可分别设置"
+      ]
+    },
+
+    "SPI_I2S_GetITStatus": {
+      "briefZh": "查询指定 SPI/I2S 中断源是否处于挂起状态（同时检查 SR 标志与 CR2 中断使能位）。",
+      "usageZh": "SPI 中断服务函数里的标准开头，用来确认到底是哪个中断源触发的。因为它同时检查了标志位与使能位，比直接看 SPI_I2S_GetFlagStatus 更准确。",
+      "returnDescZh": "SET 表示该中断源已被使能且处于挂起状态；RESET 表示未使能或没有挂起。",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3（I2S 模式下取 SPI2 或 SPI3）。",
+        "SPI_I2S_IT": "要查询的中断源，取 SPI_I2S_IT_TXE、SPI_I2S_IT_RXNE、SPI_I2S_IT_ERR、SPI_I2S_IT_OVR、SPI_I2S_IT_CRCERR 之一。"
+      },
+      "prerequisites": [
+        "已在中断服务函数内调用（或已通过 SPI_I2S_ITConfig 使能该中断源）"
+      ],
+      "registers": ["SPI_SR", "SPI_CR2"],
+      "relatedFunctions": ["SPI_I2S_ITConfig", "SPI_I2S_ClearITPendingBit", "SPI_I2S_GetFlagStatus", "SPI_I2S_ReceiveData"],
+      "exampleCode": "void SPI2_IRQHandler(void)\n{\n  if (SPI_I2S_GetITStatus(SPI2, SPI_I2S_IT_RXNE) != RESET)\n  {\n    rxBuf[rxIdx++] = SPI_I2S_ReceiveData(SPI2);   /* 读 DR 自动清 RXNE */\n  }\n  if (SPI_I2S_GetITStatus(SPI2, SPI_I2S_IT_TXE) != RESET)\n  {\n    if (txIdx < txLen)\n      SPI_I2S_SendData(SPI2, txBuf[txIdx++]);\n    else\n      SPI_I2S_ITConfig(SPI2, SPI_I2S_IT_TXE, DISABLE);  /* 发完关 TXE，否则死循环 */\n  }\n}",
+      "notesZh": [
+        "查 RXNE/TXE 时读 SPI_SR 不会清标志，可以安全地在中断里多次调用",
+        "TXE 中断使能后会立刻触发，服务函数里必须有「数据发完就关 TXE 中断」的出口，否则会锁死在中断里",
+        "这个函数对 OVR/MODF 标志有清除副作用（读 SR），如果同一服务函数里要判断多个源，注意顺序",
+        "查询 CRCERR 时必须已经使能了 SPI_I2S_IT_CRCERR，否则永远返回 RESET"
+      ]
+    },
+
+    "SPI_I2S_ClearITPendingBit": {
+      "briefZh": "清除 SPI 的 CRCERR（CRC 校验错误）中断挂起位。",
+      "usageZh": "只有 CRCERR 一个标志能靠它清除，且只在使能了 CRC 计算（SPI_CalculateCRC）时才可能出现该错误。其它标志（RXNE/TXE/OVR/MODF）都不能用它清，必须按硬件规定的方式处理，这是这个函数最容易踩的坑。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3。",
+        "SPI_I2S_IT": "要清除的中断挂起位，只能填 SPI_I2S_IT_CRCERR；填其它值函数不会清除任何标志。"
+      },
+      "prerequisites": [
+        "已通过 SPI_CalculateCRC 使能 CRC 计算并发生 CRC 错误"
+      ],
+      "registers": ["SPI_SR"],
+      "relatedFunctions": ["SPI_CalculateCRC", "SPI_GetCRC", "SPI_I2S_ClearFlag", "SPI_I2S_GetITStatus"],
+      "exampleCode": "/* 只清 CRCERR，其它标志请按下面的方式处理 */\nif (SPI_I2S_GetITStatus(SPI1, SPI_I2S_IT_CRCERR) != RESET)\n{\n  SPI_I2S_ClearITPendingBit(SPI1, SPI_I2S_IT_CRCERR);\n}\n\n/* OVR 标志：先读 DR 再读 SR */\n(void)SPI_I2S_ReceiveData(SPI1);\n(void)SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_OVR);\n\n/* MODF 标志：先读 SR 再写 CR1（SPI_Cmd 提供了写 CR1 的动作） */\n(void)SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_MODF);\nSPI_Cmd(SPI1, ENABLE);",
+      "notesZh": [
+        "它只清 CRCERR，传别的标志进去不会清任何东西，也不报错——这是最常见的误用",
+        "OVR 标志的清除序列是「读 SPI_DR（SPI_I2S_ReceiveData）后读 SPI_SR（SPI_I2S_GetFlagStatus）」",
+        "MODF 标志的清除序列是「读/写 SPI_SR 后写 SPI_CR1 使能 SPI」，只读不写清不掉",
+        "UDR（下溢）标志只存在于 I2S 模式，靠读 SPI_SR 清除",
+        "不用 CRC 的普通 SPI 通信根本不会产生 CRCERR，这个函数在多数工程里用不上"
+      ]
+    },
+
+    "SPI_I2S_SendData": {
+      "briefZh": "把一帧数据写入 SPIx/I2Sx 的发送寄存器（写 SPI_DR）。",
+      "usageZh": "SPI 发送的唯一入口。注意它**只负责写 DR，不等待也不阻塞**：数据被放进发送缓冲区就返回了。如果调用时 TXE=0（缓冲区还满着），写入的数据会被**静默丢弃**。所以标准写法永远是「等 TXE 置位 → 写 DR → 需要时等 BSY 清零」。接收数据用同一个函数名体系的 SPI_I2S_ReceiveData。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3（I2S 模式下取 SPI2 或 SPI3）。",
+        "Data": "要发送的数据，16 位参数。SPI_DataSize_8b 时只用低 8 位；SPI_DataSize_16b 时用全部 16 位。"
+      },
+      "prerequisites": [
+        "已调用 SPI_Init 与 SPI_Cmd(SPIx, ENABLE)",
+        "主机模式下片选（软件 NSS 时是自己控制的 GPIO）已拉低"
+      ],
+      "registers": ["SPI_DR", "SPI_SR"],
+      "relatedFunctions": ["SPI_I2S_ReceiveData", "SPI_I2S_GetFlagStatus", "SPI_I2S_DMACmd", "SPI_DataSizeConfig"],
+      "exampleCode": "/* 主机全双工：发一个字节同时收回一个字节 */\nuint8_t SPI1_ReadWriteByte(uint8_t txData)\n{\n  /* 1. 等发送缓冲区空 */\n  while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET) { }\n\n  /* 2. 写入要发的数据 */\n  SPI_I2S_SendData(SPI1, txData);\n\n  /* 3. 等接收缓冲区非空（全双工下收一个字节就等于发一个字节完成） */\n  while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET) { }\n\n  /* 4. 读回数据兼清 RXNE */\n  return (uint8_t)SPI_I2S_ReceiveData(SPI1);\n}\n\n/* 只写不读的场景（如驱动只写屏幕）：收尾要等 BSY 清零 */\nSPI_I2S_SendData(SPI1, 0xA5);\nwhile (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET) { }",
+      "notesZh": [
+        "不判断 TXE 就直接调用会丢数据，且不会有任何报错——表现是发送的数据少了一部分或设备偶尔工作异常",
+        "SPI_DataSize_8b 时只写低 8 位，写 16 位值的高 8 位会被忽略；SPI_DataSize_16b 时一次要发 16 位",
+        "SPI 是全双工：每次发送都同时收到一帧，不用的话也要把 RXNE 读走（调 SPI_I2S_ReceiveData），否则 OVR 溢出置位且后续接收全部错乱",
+        "只发送不接收时，收尾必须等 BSY 清零再拉高片选，否则最后几个位还没移出就结束片选，从设备收到的是残帧",
+        "在从机模式下，这个函数必须在主机时钟到来之前把数据写进 DR；写晚了会发不出去",
+        "SPI1 在 APB2（72MHz），预分频 2 就是 36MHz；SPI2 在 APB1（36MHz），同样分频只有 18MHz"
+      ]
+    },
+
+    "SPI_TransmitCRC": {
+      "briefZh": "手动发送一次 CRC 值（把 TXCRCR 的内容发到总线上）。",
+      "usageZh": "仅在启用了硬件 CRC 校验的 SPI 通信（如某些 SPI Flash 的 CRC 模式）时使用，用于在一次传输结束后主动送出计算好的 CRC 字节。普通 SPI 通信完全用不到。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3。"
+      },
+      "prerequisites": [
+        "已通过 SPI_CalculateCRC(SPIx, ENABLE) 使能 CRC 计算",
+        "已通过 SPI_Init 的 SPI_CRCPolynomial 字段设置好 CRC 多项式",
+        "SPI 已使能且当前没有正在进行的传输（TXE 为 1、BSY 为 0）"
+      ],
+      "registers": ["SPI_CR1", "SPI_TXCRCR", "SPI_DR"],
+      "relatedFunctions": ["SPI_CalculateCRC", "SPI_GetCRC", "SPI_GetCRCPolynomial"],
+      "exampleCode": "/* 使能 CRC 计算，发完数据后手动发 CRC */\nSPI_CalculateCRC(SPI1, ENABLE);\n\n/* ... 发送数据帧 ... */\nwhile (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET) { }\n\nSPI_TransmitCRC(SPI1);   /* 把 TXCRCR 的 CRC 值送上总线 */",
+      "notesZh": [
+        "只在使能了 CRC 时才有意义；没使能 CRC 时调用它发出的内容没有实际校验含义",
+        "发送 CRC 时总线会多出一帧数据，从设备必须也预期收到这一帧，否则协议对不上",
+        "调用前要确保前一次传输已经结束（BSY=0），否则 CRC 字节会插在数据帧中间",
+        "用错了多项式（SPI_CRCPolynomial）算出的 CRC 一定对不上，且硬件不会报错，只会让对端校验失败"
+      ]
+    },
+
+    "SPI_I2S_ReceiveData": {
+      "briefZh": "读回 SPIx/I2Sx 最近一次收到的数据（读 SPI_DR）。",
+      "usageZh": "SPI 接收的唯一入口。调用它有两个作用：**返回接收缓冲区里的数据，同时清除 RXNE 标志**。所以标准流程是「等 RXNE 置位 → 调本函数读走」，不需要也不能另外调用清标志的函数。全双工下即使只想发送，也必须把收到的数据读走，否则下一次接收会 OVR 溢出。",
+      "returnDescZh": "返回接收到的数据（16 位）。SPI_DataSize_8b 时有效数据在低 8 位。",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3（I2S 模式下取 SPI2 或 SPI3）。"
+      },
+      "prerequisites": [
+        "已调用 SPI_Init 与 SPI_Cmd(SPIx, ENABLE)",
+        "调用前应确认 RXNE 已置位（用 SPI_I2S_GetFlagStatus 或 SPI_I2S_GetITStatus）"
+      ],
+      "registers": ["SPI_DR", "SPI_SR"],
+      "relatedFunctions": ["SPI_I2S_SendData", "SPI_I2S_GetFlagStatus", "SPI_I2S_GetITStatus", "SPI_I2S_DMACmd"],
+      "exampleCode": "/* 从 SPI Flash 读一个字节（主机发 0xFF 产生时钟） */\nuint8_t SPI1_ReadByte(void)\n{\n  while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET) { }\n  SPI_I2S_SendData(SPI1, 0xFF);\n\n  while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET) { }\n  return (uint8_t)SPI_I2S_ReceiveData(SPI1);   /* 读 DR 同时清 RXNE */\n}",
+      "notesZh": [
+        "读 SPI_DR 会同时清除 RXNE 标志，所以中断服务函数里读一次就够了，别重复调用",
+        "RXNE 没置位时读回来的是上一次的旧数据，且 RXNE 会被清掉，导致真正的数据被丢掉",
+        "全双工下不把收到的数据读走会触发 OVR（溢出）标志，之后接收的数据全部作废",
+        "SPI_DataSize_8b 时返回值的高 8 位是垃圾值，必须强制转换或与 0xFF 相与",
+        "在中断里读 DR 与在主循环里读 DR 不能同时进行，两边抢同一个寄存器会造成丢数据"
+      ]
+    },
+
+    "SPI_NSSInternalSoftwareConfig": {
+      "briefZh": "在软件 NSS 模式下，用软件设置内部 NSS 引脚的电平（高或低）。",
+      "usageZh": "多主机场景（软件 NSS）下用来模拟 NSS 的电平：内部 NSS 拉低会让 SPI 进入从机状态，拉高则回到主机状态，硬件据此判断是否发生模式错误。做普通单主机通信时一般用不到，因为主机自己控制外部片选 GPIO 就够了。**必须先配成 SPI_NSS_Soft 才有意义**，硬件 NSS 模式下这个设置会被引脚电平覆盖。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3。",
+        "SPI_NSSInternalSoft": "内部 NSS 状态，取 SPI_NSSInternalSoft_Set（内部 NSS 拉高，保持主机身份）或 SPI_NSSInternalSoft_Reset（内部 NSS 拉低，进入从机状态）。"
+      },
+      "prerequisites": [
+        "已在 SPI_Init 里把 SPI_NSS 配成 SPI_NSS_Soft",
+        "已调用 SPI_Cmd(SPIx, ENABLE)（SSM 与 SSI 位在 SPE=1 时才被硬件采纳部分行为）"
+      ],
+      "registers": ["SPI_CR1"],
+      "relatedFunctions": ["SPI_Init", "SPI_SSOutputCmd", "SPI_Cmd", "GPIO_EXTILineConfig"],
+      "exampleCode": "/* 软件 NSS 且保持主机身份（多主机系统里没被选中时用这个） */\nSPI_InitStructure.SPI_NSS = SPI_NSS_Soft;\nSPI_Init(SPI1, &SPI_InitStructure);\nSPI_Cmd(SPI1, ENABLE);\n\nSPI_NSSInternalSoftwareConfig(SPI1, SPI_NSSInternalSoft_Set);",
+      "notesZh": [
+        "只有 SPI_NSS_Soft（CR1 的 SSM=1）时才有意义；硬件 NSS 模式下内部 NSS 由引脚电平决定，写它无效",
+        "内部 NSS 拉低（Reset）且 SPI 处于主机模式时会触发 MODF 模式错误，SPE 被硬件清 0，SPI 停止工作",
+        "它控制的是芯片内部逻辑的 NSS 电平，不会影响任何引脚输出；想让 NSS 引脚真正输出信号要用 SPI_SSOutputCmd",
+        "做单主机 + 外部片选 GPIO 时，即使 NSS 配成 Soft，也建议保持默认（内部 NSS 为高），不要随意拉低"
+      ]
+    },
+
+    "SPI_SSOutputCmd": {
+      "briefZh": "使能或关闭 SPI 的 NSS 引脚输出（让 NSS 引脚自动产生片选信号）。",
+      "usageZh": "只在「一个 SPI 主机带多个 SPI 从机、且从机共用同一根片选」这类特殊拓扑下才有用（NSS 脉冲模式）。绝大多数工程用的是「主机 + 每个从机一根独立 GPIO 片选」，这时该功能应当保持关闭，否则 NSS 引脚会输出电平并与外部电路冲突。**使能 NSS 输出要求 SPI 处于主机模式且 NSS 是硬件管理**。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3。",
+        "NewState": "ENABLE 使能 NSS 引脚输出，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "SPI_Init 中 SPI_NSS 设为 SPI_NSS_Hard",
+        "SPI 工作在主机模式（SPI_Mode_Master）",
+        "NSS 引脚（SPI1 是 PA4）已配置为复用推挽 GPIO_Mode_AF_PP"
+      ],
+      "registers": ["SPI_CR2", "SPI_CR1"],
+      "relatedFunctions": ["SPI_Init", "SPI_NSSInternalSoftwareConfig", "SPI_Cmd"],
+      "exampleCode": "/* 只有主机 + 硬件 NSS 时才这么用，普通工程请用 GPIO 手动片选 */\nSPI_InitStructure.SPI_Mode = SPI_Mode_Master;\nSPI_InitStructure.SPI_NSS  = SPI_NSS_Hard;\nSPI_Init(SPI1, &SPI_InitStructure);\nSPI_SSOutputCmd(SPI1, ENABLE);\nSPI_Cmd(SPI1, ENABLE);",
+      "notesZh": [
+        "从机模式下使能 SSOE 无意义，硬件只允许主机输出 NSS",
+        "普通工程（软件 NSS + 独立 GPIO 片选）千万不要使能它，否则 PA4 会同时被 SPI 外设和你的 GPIO 驱动，出现片选电平打架",
+        "使能后 NSS 引脚在整个传输期间由硬件拉低，无法在多从机之间切换——一个 SPI 带多个外设时用不了它",
+        "错配的常见现象是从设备收到数据但片选一直是低电平，多个从机同时驱动 MISO"
+      ]
+    },
+
+    "SPI_DataSizeConfig": {
+      "briefZh": "重新设置 SPI 的数据帧长度（8 位或 16 位）。",
+      "usageZh": "运行时需要在 8 位与 16 位之间切换时使用（例如先发 8 位命令再发 16 位数据）。**它只能在 SPI 关闭（SPE=0）时调用**——SPI_DataSizeConfig 内部会先清 SPE 再改 DFF 位，所以运行中调用会中止正在进行的传输。改完之后必须重新 SPI_Cmd(ENABLE)。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3。",
+        "SPI_DataSize": "数据帧长度，取 SPI_DataSize_16b 或 SPI_DataSize_8b。"
+      },
+      "prerequisites": [
+        "SPI 当前没有正在进行的传输",
+        "如果 SPI 正在使能，调用后必须重新 SPI_Cmd(SPIx, ENABLE)"
+      ],
+      "registers": ["SPI_CR1", "SPI_SR"],
+      "relatedFunctions": ["SPI_Init", "SPI_Cmd", "SPI_I2S_SendData", "SPI_I2S_ReceiveData"],
+      "exampleCode": "/* 8 位发命令，再切 16 位发数据（如某些 LCD / ADC） */\nSPI_I2S_SendData(SPI1, 0x02);\nwhile (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET) { }\n\nSPI_Cmd(SPI1, DISABLE);                      /* 必须先关 SPI */\nSPI_DataSizeConfig(SPI1, SPI_DataSize_16b);\nSPI_Cmd(SPI1, ENABLE);                       /* 重开才能生效 */\n\nSPI_I2S_SendData(SPI1, 0x1234);",
+      "notesZh": [
+        "函数内部会先关 SPE，因此运行中调用会打断正在进行的传输，必须等 BSY=0 再调",
+        "修改数据长度后如果忘了 SPI_Cmd(ENABLE)，SPI 会一直停在关闭状态，后续收发全无反应",
+        "数据长度会直接影响收发：8 位时写 DR 只要低 8 位有效，16 位时一次收发 16 位，混用会错位",
+        "这个参数在 SPI_Init 里也有（SPI_DataSize），只有需要运行时动态切换才单独调用它"
+      ]
+    },
+
+    "SPI_BiDirectionalLineConfig": {
+      "briefZh": "在单线双向（半双工）模式下，选择当前是发送方向还是接收方向。",
+      "usageZh": "只在 SPI_Direction 配成 SPI_Direction_1Line_Tx 或 SPI_Direction_1Line_Rx 的**半双工**模式下才起作用。此时 MOSI 引脚被复用成双向数据线，需要靠这个函数在收发之间切换方向。全双工模式下调用它没有任何效果。常用于引脚紧张的场景（比全双工省一根线），C8T6 做从机时偶尔这么用。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3。",
+        "SPI_Direction": "半双工下的传输方向，取 SPI_Direction_Tx（本端发送）或 SPI_Direction_Rx（本端接收）。"
+      },
+      "prerequisites": [
+        "SPI_Init 中 SPI_Direction 已配成 SPI_Direction_1Line_Tx 或 SPI_Direction_1Line_Rx",
+        "SPI 已使能（SPI_Cmd(SPIx, ENABLE)）"
+      ],
+      "registers": ["SPI_CR1"],
+      "relatedFunctions": ["SPI_Init", "SPI_Cmd", "SPI_I2S_SendData", "SPI_I2S_ReceiveData"],
+      "exampleCode": "/* 单线半双工：先发命令，再切接收 */\nSPI_InitStructure.SPI_Direction = SPI_Direction_1Line_Tx;\nSPI_Init(SPI1, &SPI_InitStructure);\nSPI_Cmd(SPI1, ENABLE);\n\nSPI_I2S_SendData(SPI1, 0x9F);                     /* 发读 ID 命令 */\nwhile (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET) { }\n\nSPI_BiDirectionalLineConfig(SPI1, SPI_Direction_Rx);  /* 切到接收 */\nwhile (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET) { }\nid = SPI_I2S_ReceiveData(SPI1);",
+      "notesZh": [
+        "只对单线半双工模式有效；全双工（SPI_Direction_2Lines_FullDuplex）下调用它什么也不会发生",
+        "切换方向前要等 BSY 清零，否则最后几个位还没移出就换了方向，数据会残缺",
+        "半双工模式下 MISO 引脚不参与通信，只能接 MOSI 一根数据线，接线与全双工不同",
+        "方向切换没有硬件握手，切换时机全由软件把握，时序紧的外设建议还是用全双工"
+      ]
+    },
+
+    "SPI_CalculateCRC": {
+      "briefZh": "使能或关闭 SPI 传输过程中的硬件 CRC 值计算。",
+      "usageZh": "需要硬件 CRC 校验的 SPI 协议（部分 SPI Flash 的 CRC 模式、某些高可靠传感器）才用。使能后，SPI 硬件会自动对每个收发的字节更新 TXCRCR/RXCRCR 寄存器，可随时用 SPI_GetCRC 读取。普通 SPI 通信不用开，开了反而多一份配置负担。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3。",
+        "NewState": "ENABLE 开始计算 CRC，DISABLE 停止计算。"
+      },
+      "prerequisites": [
+        "已在 SPI_Init 里通过 SPI_CRCPolynomial 设置好 CRC 多项式（不设置时默认值可能不是你需要的）",
+        "SPI 当前没有正在进行的传输"
+      ],
+      "registers": ["SPI_CR1", "SPI_CRCPR", "SPI_TXCRCR", "SPI_RXCRCR"],
+      "relatedFunctions": ["SPI_GetCRC", "SPI_GetCRCPolynomial", "SPI_TransmitCRC", "SPI_I2S_GetFlagStatus"],
+      "exampleCode": "/* 使能 CRC 计算，读出接收侧的 CRC 与本地比对 */\nSPI_CalculateCRC(SPI1, ENABLE);\n\n/* ... 收发数据 ... */\n\nuint16_t rxCrc = SPI_GetCRC(SPI1, SPI_CRC_Rx);\nif (rxCrc != expectedCrc) { /* 校验失败 */ }",
+      "notesZh": [
+        "使能 CRC 计算后，硬件会额外维护 RXCRCR，但这不会自动比对——校验逻辑要自己写",
+        "只有在 SPI 关闭（SPE=0）时设置才可靠，运行中调用会打断传输",
+        "CRC 多项式在 SPI_Init 时设置，中途改变会使之前累积的 CRC 值作废",
+        "使能了 CRC 计算但没处理 CRCERR 中断时，CRC 错会静默累积，只表现为数据偶尔不对",
+        "不用 CRC 的普通 SPI 通信（绝大多数工程）不要开它"
+      ]
+    },
+
+    "SPI_GetCRC": {
+      "briefZh": "读取发送侧或接收侧的 CRC 寄存器当前值。",
+      "usageZh": "配合 SPI_CalculateCRC 使用，在一次传输结束后读出硬件算好的 CRC，用于和预期值比对或发给对端校验。需要传一个参数指定读发送侧还是接收侧。",
+      "returnDescZh": "返回所选 CRC 寄存器的值（16 位）。发送侧返回 TXCRCR 的内容，接收侧返回 RXCRCR 的内容。",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3。",
+        "SPI_CRC": "要读取的 CRC 寄存器，取 SPI_CRC_Tx（发送 CRC，TXCRCR）或 SPI_CRC_Rx（接收 CRC，RXCRCR）。"
+      },
+      "prerequisites": [
+        "已通过 SPI_CalculateCRC(SPIx, ENABLE) 使能 CRC 计算",
+        "已至少完成一次数据传输，否则读到的 CRC 初值没有意义"
+      ],
+      "registers": ["SPI_TXCRCR", "SPI_RXCRCR"],
+      "relatedFunctions": ["SPI_CalculateCRC", "SPI_GetCRCPolynomial", "SPI_TransmitCRC"],
+      "exampleCode": "uint16_t txCrc = SPI_GetCRC(SPI1, SPI_CRC_Tx);\nuint16_t rxCrc = SPI_GetCRC(SPI1, SPI_CRC_Rx);\n\nif (rxCrc != txCrc) { /* CRC 不匹配，数据在传输中被破坏 */ }",
+      "notesZh": [
+        "没使能 CRC 计算（SPI_CalculateCRC 没开）时读到的值没有意义",
+        "CRC 只对已通过 SPI 发送/接收的字节累积，与内存里的缓冲区内容无关，别指望用它校验整个数组",
+        "读这个函数不会清 CRC 寄存器，需要清零要重新 SPI_CalculateCRC(ENABLE/DISABLE) 切换一次",
+        "发送侧与接收侧的 CRC 天然可能不同（对端算法或初始值不同），比对逻辑要按协议约定来"
+      ]
+    },
+
+    "SPI_GetCRCPolynomial": {
+      "briefZh": "读取当前配置的 CRC 多项式寄存器的值。",
+      "usageZh": "调试 CRC 校验不通过时用来确认多项式到底配上没有。SPI 的多项式在 SPI_Init 的 SPI_CRCPolynomial 字段里设置，只能是奇数。",
+      "returnDescZh": "返回 CRC 多项式寄存器（SPI_CRCPR）的当前值（16 位）。",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3。"
+      },
+      "prerequisites": [
+        "已调用 SPI_Init（SPI_CRCPolynomial 字段即为多项式）"
+      ],
+      "registers": ["SPI_CRCPR"],
+      "relatedFunctions": ["SPI_GetCRC", "SPI_CalculateCRC", "SPI_Init"],
+      "exampleCode": "/* 确认多项式是否真的写进去了 */\nif (SPI_GetCRCPolynomial(SPI1) != 7)\n{\n  /* 配置没生效，检查 SPI_Init 的 SPI_CRCPolynomial 字段 */\n}",
+      "notesZh": [
+        "多项式必须是奇数，写偶数时硬件行为不符合预期，且不会有任何报错",
+        "这个值只在 SPI_Init 时写入，运行中改多项式会使之前累积的 CRC 全部作废",
+        "不用 CRC 的工程通常把 SPI_CRCPolynomial 随便写个 7 就行，读出来肯定是 7",
+        "它读的是配置值，不是计算结果；要拿计算结果请用 SPI_GetCRC"
+      ]
+    },
+
+    "SPI_I2S_GetFlagStatus": {
+      "briefZh": "查询 SPI/I2S 的状态标志（TXE、RXNE、BSY、OVR、MODF、CRCERR 等）。",
+      "usageZh": "轮询方式收发数据的核心函数，几乎每个 SPI 驱动里都会反复调用它。标准收发模板是「等 TXE 为 1 才能写 DR」「等 RXNE 为 1 才能读 DR」「结束片选前等 BSY 为 0」。注意查询顺序：**先等 TXE 再等 RXNE 最后等 BSY**，顺序颠倒会读到旧数据或提前结束片选。",
+      "returnDescZh": "SET 表示该标志已置位，RESET 表示未置位。",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3（I2S 模式下取 SPI2 或 SPI3）。",
+        "SPI_I2S_FLAG": "要查询的标志，取 SPI_I2S_FLAG_TXE（发送缓冲区空，可写 DR）、SPI_I2S_FLAG_RXNE（接收缓冲区非空，可读 DR）、SPI_I2S_FLAG_BSY（总线忙，正在传输）、SPI_I2S_FLAG_OVR（接收溢出）、SPI_I2S_FLAG_MODF（模式错误）、SPI_I2S_FLAG_CRCERR（CRC 错误）、SPI_I2S_FLAG_CHSIDE（I2S 声道）、SPI_I2S_FLAG_TIFRFE（TI 帧格式错误）。一次只能填一个值。"
+      },
+      "prerequisites": [
+        "已调用 SPI_Init 与 SPI_Cmd(SPIx, ENABLE)，否则标志位不会正常变化"
+      ],
+      "registers": ["SPI_SR"],
+      "relatedFunctions": ["SPI_I2S_SendData", "SPI_I2S_ReceiveData", "SPI_I2S_GetITStatus", "SPI_I2S_ClearFlag", "SPI_I2S_ClearITPendingBit"],
+      "exampleCode": "/* 通用收发一个字节 */\nuint8_t SPI1_SwapByte(uint8_t tx)\n{\n  while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET) { }\n  SPI_I2S_SendData(SPI1, tx);\n  while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET) { }\n  return (uint8_t)SPI_I2S_ReceiveData(SPI1);\n}\n\n/* 一帧发完再拉高片选 */\nwhile (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET) { }\nGPIO_SetBits(GPIOA, GPIO_Pin_4);",
+      "notesZh": [
+        "SPI 关闭（SPE=0）时 TXE 等标志的状态与使能后不同，用它做延时判断会得到错误结论，务必先 SPI_Cmd(ENABLE)",
+        "判 BSY 必须在 TXE 和 RXNE 都成立之后；只判 TXE 就结束片选，最后一位数据还在移位寄存器里，从设备会收到残帧",
+        "这个函数查 OVR/MODF 时有清除副作用（读 SPI_SR），在中断与主循环里同时查询同一个标志要小心顺序",
+        "TXE 在上电或使能 SPI 后就是 1，所以「等 TXE」永远不会超时；真正表示「数据已发完」的是 BSY",
+        "没在等 RXNE 就直接读 DR 会读到上次的残留值，且清掉 RXNE 导致真正的数据被丢弃",
+        "SPI1 的中断标志要配 SPI1_IRQn，SPI2 配 SPI2_IRQn，两者独立"
+      ]
+    },
+
+    "SPI_I2S_ClearFlag": {
+      "briefZh": "清除 SPI 的 CRCERR（CRC 错误）标志。",
+      "usageZh": "与 SPI_I2S_ClearITPendingBit 功能相同的标志版接口，同样**只能清 CRCERR**。其它标志必须按硬件规定的方式清除，直接调用它无效也不报错，这是这个函数最常见的误用点。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "SPIx": "选择 SPI 外设，取 SPI1、SPI2 或 SPI3。",
+        "SPI_I2S_FLAG": "要清除的标志，只能填 SPI_I2S_FLAG_CRCERR；填其它标志不会清除任何东西。"
+      },
+      "prerequisites": [
+        "已通过 SPI_CalculateCRC 使能 CRC 计算并发生 CRC 错误"
+      ],
+      "registers": ["SPI_SR"],
+      "relatedFunctions": ["SPI_I2S_GetFlagStatus", "SPI_I2S_ClearITPendingBit", "SPI_CalculateCRC"],
+      "exampleCode": "if (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_CRCERR) != RESET)\n{\n  SPI_I2S_ClearFlag(SPI1, SPI_I2S_FLAG_CRCERR);\n}\n\n/* OVR 标志：读 DR 再读 SR */\n(void)SPI_I2S_ReceiveData(SPI1);\n(void)SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_OVR);",
+      "notesZh": [
+        "只能清 CRCERR，传 SPI_I2S_FLAG_OVR 之类进去是无效的，也不会报错",
+        "OVR 的标志清除序列：先读 SPI_DR（SPI_I2S_ReceiveData）再读 SPI_SR（SPI_I2S_GetFlagStatus）",
+        "MODF 的标志清除序列：先读 SPI_SR 再写 SPI_CR1（用 SPI_Cmd(SPIx, ENABLE) 完成写 CR1 的动作）",
+        "不清 OVR 的话，后续接收会持续处于溢出状态，读回的数据全部不可信"
+      ]
+    }
+  }
+}

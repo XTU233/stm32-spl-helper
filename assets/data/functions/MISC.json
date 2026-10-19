@@ -1,0 +1,310 @@
+{
+  "schemaVersion": 1,
+  "peripheral": "MISC",
+  "functions": [
+    {
+      "id": "NVIC_PriorityGroupConfig",
+      "name": "NVIC_PriorityGroupConfig",
+      "peripheral": "MISC",
+      "sectionId": "MISC#sec1",
+      "prototype": "void NVIC_PriorityGroupConfig(uint32_t NVIC_PriorityGroup);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NVIC_PriorityGroup",
+          "type": "uint32_t",
+          "descEn": "specifies the priority grouping bits length. This parameter can be one of the following values:",
+          "descZh": "分组方式，取值 NVIC_PriorityGroup_0 ~ NVIC_PriorityGroup_4。常用 NVIC_PriorityGroup_2。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the priority grouping: pre-emption priority and subpriority.",
+      "briefZh": "设置 NVIC 中断优先级分组方式（抢占优先级与响应优先级各占几位）。",
+      "usageZh": "决定整个系统的中断嵌套行为，**全工程只应在 main 开头调用一次**。STM32F103 的优先级寄存器是 4 位，分组决定这 4 位怎么切给抢占优先级和响应优先级。最常用的是 NVIC_PriorityGroup_2（2 位抢占 + 2 位响应），此时抢占优先级 0~3、响应优先级 0~3。",
+      "prerequisites": [
+        "应在配置任何中断之前调用，通常放在 main 的第一行"
+      ],
+      "registers": [
+        "SCB_AIRCR"
+      ],
+      "relatedFunctions": [
+        "NVIC_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "重复调用会打乱已配置中断的优先级，导致行为异常——这是很隐蔽的 bug",
+        "分组 0 表示全是响应优先级（无抢占，不能嵌套）；分组 4 表示全是抢占优先级",
+        "抢占优先级高的可以打断正在执行的低抢占优先级中断；响应优先级只在同时挂起时决定谁先执行，不能嵌套",
+        "Cortex-M3 只有 4 位优先级，所以分组 2 时抢占和响应各只有 2 位，取值 0~3，别按 0~15 写"
+      ],
+      "exampleCode": "int main(void)\n{\n  /* 必须最先调用，且全工程只调一次 */\n  NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);\n\n  /* 之后再初始化各种中断 */\n  NVIC_Init(&NVIC_InitStructure);\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "NVIC",
+        "NVIC_Init",
+        "NVIC_PriorityGroup_0",
+        "NVIC_PriorityGroup_2",
+        "NVIC_PriorityGroup_4"
+      ],
+      "headerLine": 195,
+      "sourceLine": 96,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "NVIC_Init",
+      "name": "NVIC_Init",
+      "peripheral": "MISC",
+      "sectionId": "MISC#sec2",
+      "prototype": "void NVIC_Init(NVIC_InitTypeDef* NVIC_InitStruct);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NVIC_InitStruct",
+          "type": "NVIC_InitTypeDef*",
+          "descEn": "pointer to a NVIC_InitTypeDef structure that contains the configuration information for the specified NVIC peripheral.",
+          "descZh": "指向 NVIC_InitTypeDef 结构体的指针，四个字段都要赋值：NVIC_IRQChannel（中断通道，如 TIM2_IRQn）、NVIC_IRQChannelPreemptionPriority（抢占优先级）、NVIC_IRQChannelSubPriority（响应优先级）、NVIC_IRQChannelCmd（ENABLE 使能）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Initializes the NVIC peripheral according to the specified parameters in the NVIC_InitStruct.",
+      "briefZh": "按结构体参数初始化一个 NVIC 中断通道（使能中断、设置优先级）。",
+      "usageZh": "开启任何一个外设中断的必需步骤。只调用外设的 XXX_ITConfig 而不调用 NVIC_Init，中断永远不会触发，且不会有任何报错——这是新手最常见的坑。注意要先 NVIC_PriorityGroupConfig 定好分组，否则这里填的优先级含义不确定。",
+      "prerequisites": [
+        "已调用 NVIC_PriorityGroupConfig 设定分组方式",
+        "已调用外设的 XXX_ITConfig 使能具体中断源",
+        "中断服务函数名与启动文件向量表一致（如 TIM2_IRQHandler）"
+      ],
+      "registers": [
+        "NVIC_ISER",
+        "NVIC_IPR"
+      ],
+      "relatedFunctions": [
+        "NVIC_PriorityGroupConfig",
+        "TIM_ITConfig",
+        "USART_ITConfig",
+        "EXTI_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "只开 ITConfig 不调 NVIC_Init，中断不会触发，且不报错",
+        "优先级数值必须落在当前分组允许的范围内（分组 2 时是 0~3），超范围会被硬件截断，行为难预料",
+        "NVIC_IRQChannel 用 xxx_IRQn 枚举（如 TIM2_IRQn），不是中断号数字",
+        "中断服务函数里必须清中断标志，否则会反复进中断",
+        "同一个中断通道重复 NVIC_Init 会覆盖之前配置"
+      ],
+      "exampleCode": "NVIC_InitTypeDef NVIC_InitStructure;\n\n/* 1. 先定分组（全工程一次） */\nNVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);\n\n/* 2. 使能具体中断源 */\nTIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);\n\n/* 3. 配置 NVIC 通道 */\nNVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x01;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x01;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\n/* 4. 中断服务函数（名字必须与启动文件一致） */\nvoid TIM2_IRQHandler(void)\n{\n  if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)\n  {\n    TIM_ClearITPendingBit(TIM2, TIM_IT_Update);\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "NVIC",
+        "NVIC_InitTypeDef",
+        "NVIC_PriorityGroupConfig",
+        "NVIC_PriorityGroup_2",
+        "RESET",
+        "TIM2",
+        "TIM_ClearITPendingBit",
+        "TIM_GetITStatus",
+        "TIM_ITConfig",
+        "TIM_IT_Update"
+      ],
+      "headerLine": 197,
+      "sourceLine": 112,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "NVIC_SetVectorTable",
+      "name": "NVIC_SetVectorTable",
+      "peripheral": "MISC",
+      "sectionId": "MISC#sec3",
+      "prototype": "void NVIC_SetVectorTable(uint32_t NVIC_VectTab, uint32_t Offset);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "NVIC_VectTab",
+          "type": "uint32_t",
+          "descEn": "specifies if the vector table is in RAM or FLASH memory. This parameter can be one of the following values:",
+          "descZh": "向量表所在区域，NVIC_VectTab_FLASH（0x08000000）或 NVIC_VectTab_RAM（0x20000000）。"
+        },
+        {
+          "name": "Offset",
+          "type": "uint32_t",
+          "descEn": "Vector Table base offset field. This value must be a multiple of 0x200.",
+          "descZh": "相对于该区域基址的偏移量。若 APP 从 0x08004000 开始，则填 0x4000。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Sets the vector table location and Offset.",
+      "briefZh": "设置中断向量表的基地址与偏移。",
+      "usageZh": "只在需要把程序搬到 Flash 其它位置（如 Bootloader + APP 结构）或搬到 SRAM 运行时才用。普通工程不需要调用，启动文件的默认设置已正确。",
+      "prerequisites": [
+        "需要在链接脚本里把 APP 的起始地址与向量表偏移配置一致",
+        "必须在 main 里、任何中断发生之前调用"
+      ],
+      "registers": [
+        "SCB_VTOR"
+      ],
+      "relatedFunctions": [
+        "NVIC_SystemLPConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "偏移量必须是 0x200 的整数倍（向量表对齐要求）",
+        "改了这个必须同步改链接脚本与 Keil 的 Target ROM 起始地址，三处不一致会直接 HardFault",
+        "普通工程不要动它，改了反而出问题"
+      ],
+      "exampleCode": "/* Bootloader + APP 结构：APP 从 0x08004000 开始 */\nNVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x4000);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "NVIC_VectTab_FLASH",
+        "NVIC_VectTab_RAM"
+      ],
+      "headerLine": 198,
+      "sourceLine": 156,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "NVIC_SystemLPConfig",
+      "name": "NVIC_SystemLPConfig",
+      "peripheral": "MISC",
+      "sectionId": "MISC#sec1",
+      "prototype": "void NVIC_SystemLPConfig(uint8_t LowPowerMode, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "LowPowerMode",
+          "type": "uint8_t",
+          "descEn": "Specifies the new mode for the system to enter low power mode. This parameter can be one of the following values:",
+          "descZh": "NVIC_LP_SEVONPEND、NVIC_LP_SLEEPDEEP（深度睡眠，停止模式下必须开）、NVIC_LP_SLEEPONEXIT。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of LP condition. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 开启该低功耗行为，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Selects the condition for the system to enter low power mode.",
+      "briefZh": "配置内核的低功耗行为（睡眠模式下的唤醒方式与深度睡眠）。",
+      "usageZh": "配合 PWR 模块做低功耗时使用。可选择用 WFI（等中断）还是 WFE（等事件）唤醒，以及是否进入深度睡眠。",
+      "prerequisites": [
+        "进入停止模式前必须使能 NVIC_LP_SLEEPDEEP",
+        "需配合 PWR 模块的 PWR_EnterSTOPMode 等函数使用"
+      ],
+      "registers": [
+        "SCB_SCR"
+      ],
+      "relatedFunctions": [
+        "PWR_EnterSTOPMode",
+        "PWR_EnterSTANDBYMode"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "停止模式（STOP）必须开 SLEEPDEEP，否则只是普通的睡眠模式，功耗降不下来",
+        "退出停止模式后系统时钟会切回 HSI，需要重新配置时钟"
+      ],
+      "exampleCode": "/* 进入停止模式前使能深度睡眠 */\nNVIC_SystemLPConfig(NVIC_LP_SLEEPDEEP, ENABLE);\nPWR_EnterSTOPMode(PWR_Regulator_ON, PWR_STOPEntry_WFI);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "NVIC_LP_SEVONPEND",
+        "NVIC_LP_SLEEPDEEP",
+        "NVIC_LP_SLEEPONEXIT",
+        "PWR",
+        "PWR_EnterSTOPMode",
+        "PWR_Regulator_ON",
+        "PWR_STOPEntry_WFI"
+      ],
+      "headerLine": 199,
+      "sourceLine": 175,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "SysTick_CLKSourceConfig",
+      "name": "SysTick_CLKSourceConfig",
+      "peripheral": "MISC",
+      "sectionId": "MISC#sec1",
+      "prototype": "void SysTick_CLKSourceConfig(uint32_t SysTick_CLKSource);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "SysTick_CLKSource",
+          "type": "uint32_t",
+          "descEn": "specifies the SysTick clock source. This parameter can be one of the following values:",
+          "descZh": "SysTick_CLKSource_HCLK（不分频，72MHz）或 SysTick_CLKSource_HCLK_Div8（8 分频，9MHz）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the SysTick clock source.",
+      "briefZh": "选择 SysTick 的时钟源（内核时钟或内核时钟的 8 分频）。",
+      "usageZh": "用 SysTick 做延时或系统节拍时使用。选 HCLK（72MHz）可获得更细的延时精度；选 HCLK/8（9MHz）可让重装值更大、支持更长的延时。",
+      "prerequisites": [],
+      "registers": [
+        "SysTick_CTRL"
+      ],
+      "relatedFunctions": [
+        "NVIC_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "SysTick 是 24 位递减计数器，最大 0xFFFFFF。72MHz 下最长延时约 233ms，要延更久得循环多次",
+        "HAL 库会接管 SysTick 做 1ms 节拍；用标准库手写延时函数时注意不要与其它库冲突",
+        "Cortex-M3 的 SysTick 属于内核外设，不需要开 RCC 时钟"
+      ],
+      "exampleCode": "/* 用 72MHz 内核时钟做延时基准 */\nSysTick_CLKSourceConfig(SysTick_CLKSource_HCLK);\n\n/* SysTick 是 24 位计数器，72MHz 下最大延时约 233ms */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "RCC",
+        "SysTick",
+        "SysTick_CLKSource_HCLK",
+        "SysTick_CLKSource_HCLK_Div8"
+      ],
+      "headerLine": 200,
+      "sourceLine": 199,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    }
+  ]
+}

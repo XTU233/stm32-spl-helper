@@ -1,0 +1,2122 @@
+{
+  "schemaVersion": 1,
+  "peripheral": "FLASH",
+  "functions": [
+    {
+      "id": "FLASH_SetLatency",
+      "name": "FLASH_SetLatency",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec1",
+      "prototype": "void FLASH_SetLatency(uint32_t FLASH_Latency);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FLASH_Latency",
+          "type": "uint32_t",
+          "descEn": "specifies the FLASH Latency value. This parameter can be one of the following values:",
+          "descZh": "等待周期数，取值 FLASH_Latency_0、FLASH_Latency_1、FLASH_Latency_2。72MHz 必须用 FLASH_Latency_2，48MHz 用 1，24MHz 以下用 0。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Sets the code latency value.",
+      "briefZh": "设置 Flash 访问等待周期（Latency），让 CPU 能在高主频下正确读取 Flash。",
+      "usageZh": "**SystemInit 里已经根据主频调好了，普通应用不要动它**。F103 的 Flash 在 24MHz 以下需要 0 等待周期，24~48MHz 需要 1 个，48~72MHz 需要 2 个。C8T6 跑 72MHz 时必须是 FLASH_Latency_2。如果你自己改了主频（比如降到 48MHz 或升到 72MHz）而没同步改等待周期，CPU 会取到错误指令，表现为随机死机或 HardFault。",
+      "prerequisites": [
+        "必须在 RCC 切换系统时钟到目标主频**之前**设置好等待周期"
+      ],
+      "registers": [
+        "FLASH_ACR"
+      ],
+      "relatedFunctions": [
+        "FLASH_PrefetchBufferCmd",
+        "FLASH_HalfCycleAccessCmd",
+        "RCC_HCLKConfig"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "**等待周期与主频必须匹配**：72MHz 用 Latency_0 会取到错误指令，表现为随机 HardFault，且很难定位",
+        "必须在切换时钟之前调用。先切到 72MHz 再设等待周期，中间那几毫秒已经在跑错指令了",
+        "C8T6 出厂默认用内部 HSI 8MHz，SystemInit 会按 72MHz 配好 Latency_2；如果你把主频降下来追求低功耗，可以改成 Latency_0/1 进一步降功耗"
+      ],
+      "exampleCode": "/* 跑 72MHz 的标准配置（SystemInit 已做，这里是说明） */\nFLASH_PrefetchBufferCmd(FLASH_PrefetchBuffer_Enable);\nFLASH_SetLatency(FLASH_Latency_2);        /* 48~72MHz 必须 2 个等待周期 */\n\n/* 然后才能把 PLL 切到 72MHz */\nRCC_PLLConfig(RCC_PLLSource_HSE_Div1, RCC_PLLMul_9);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_Latency_0",
+        "FLASH_Latency_1",
+        "FLASH_Latency_2",
+        "FLASH_PrefetchBufferCmd",
+        "FLASH_PrefetchBuffer_Enable",
+        "RCC",
+        "RCC_PLLConfig",
+        "RCC_PLLMul_9",
+        "RCC_PLLSource_HSE_Div1"
+      ],
+      "headerLine": 368,
+      "sourceLine": 254,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_HalfCycleAccessCmd",
+      "name": "FLASH_HalfCycleAccessCmd",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec2",
+      "prototype": "void FLASH_HalfCycleAccessCmd(uint32_t FLASH_HalfCycleAccess);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FLASH_HalfCycleAccess",
+          "type": "uint32_t",
+          "descEn": "specifies the FLASH Half cycle Access mode. This parameter can be one of the following values:",
+          "descZh": "FLASH_HalfCycleAccess_Enable 开启半周期访问（省电但慢），FLASH_HalfCycleAccess_Disable 关闭（默认，全速访问）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the Half cycle flash access.",
+      "briefZh": "使能或关闭 Flash 半周期访问模式。",
+      "usageZh": "**只在低主频（低于 8MHz）且不用 PLL 时才需要**，用于降低功耗。半周期访问能减少读取 Flash 的功耗，但吞吐率减半。正常跑 72MHz 的工程绝对不要开，开了会因为访问速度跟不上而取到错误数据。默认是 DISABLE。",
+      "prerequisites": [
+        "只在系统主频低于 8MHz 时才有意义"
+      ],
+      "registers": [
+        "FLASH_ACR"
+      ],
+      "relatedFunctions": [
+        "FLASH_SetLatency",
+        "FLASH_PrefetchBufferCmd"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "**72MHz 下开启半周期访问会导致程序跑飞**，因为 Flash 来不及提供指令",
+        "只在低主频低功耗场景有意义，普通应用保持 Disable 即可",
+        "开启半周期访问后即使设置了等待周期也不保证正确性"
+      ],
+      "exampleCode": "/* 低功耗低速场景才用；正常工程保持默认关闭 */\nFLASH_HalfCycleAccessCmd(FLASH_HalfCycleAccess_Disable);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "FLASH",
+        "FLASH_HalfCycleAccess_Disable",
+        "FLASH_HalfCycleAccess_Enable"
+      ],
+      "headerLine": 369,
+      "sourceLine": 281,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_PrefetchBufferCmd",
+      "name": "FLASH_PrefetchBufferCmd",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec2",
+      "prototype": "void FLASH_PrefetchBufferCmd(uint32_t FLASH_PrefetchBuffer);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FLASH_PrefetchBuffer",
+          "type": "uint32_t",
+          "descEn": "specifies the Prefetch buffer status. This parameter can be one of the following values:",
+          "descZh": "FLASH_PrefetchBuffer_Enable 使能预取（72MHz 必须），FLASH_PrefetchBuffer_Disable 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the Prefetch Buffer.",
+      "briefZh": "使能或关闭 Flash 预取缓冲区。",
+      "usageZh": "**72MHz 下必须使能**。预取缓冲会在 CPU 读 Flash 的同时提前取下一组指令，显著提升取指效率；SystemInit 已经默认开启。关闭它会让 72MHz 下的代码执行效率大幅下降（尤其在循环里），但不会取错数据。",
+      "prerequisites": [
+        "应在切换系统时钟到高主频之前设置，与 FLASH_SetLatency 一起"
+      ],
+      "registers": [
+        "FLASH_ACR"
+      ],
+      "relatedFunctions": [
+        "FLASH_SetLatency",
+        "FLASH_GetPrefetchBufferStatus",
+        "FLASH_HalfCycleAccessCmd"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "72MHz 下关闭预取会让程序变慢，但功能仍正常（与等待周期配错的性质不同）",
+        "关闭预取后可以用 FLASH_GetPrefetchBufferStatus 读出状态确认",
+        "写 Flash（擦除/编程）期间 Flash 总线会被占用，与预取缓冲无关，不要靠开关它来解决写失败问题"
+      ],
+      "exampleCode": "/* SystemInit 里的标准写法：先预取，再设等待周期，最后切 PLL */\nFLASH_PrefetchBufferCmd(FLASH_PrefetchBuffer_Enable);\nFLASH_SetLatency(FLASH_Latency_2);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH_GetPrefetchBufferStatus",
+        "FLASH_Latency_2",
+        "FLASH_PrefetchBuffer_Disable",
+        "FLASH_PrefetchBuffer_Enable",
+        "FLASH_SetLatency"
+      ],
+      "headerLine": 370,
+      "sourceLine": 300,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_Unlock",
+      "name": "FLASH_Unlock",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "void FLASH_Unlock(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Unlocks the FLASH Program Erase Controller.",
+      "briefZh": "解锁 Flash 编程擦除控制器（写入 KEY1/KEY2 序列使 FPEC 可用）。",
+      "usageZh": "**任何擦除或写入操作之前必须调用**，否则所有 FLASH_ErasePage / FLASH_ProgramWord 都会返回 FLASH_ERROR_WRP，写不进去任何数据。标准流程是：FLASH_Unlock → FLASH_ClearFlag → 擦除 → 写 → FLASH_Lock。\n\n在非 XL 型号（含 C8T6）上，它等价于 FLASH_UnlockBank1。写选项字节（读保护/写保护）需要额外解锁 OPTWRE，库函数内部会处理。",
+      "prerequisites": [
+        "系统时钟稳定（Flash 编程依赖正确的等待周期配置）",
+        "确认目标地址确实是一块不再使用的 Flash 页，**擦除会清掉整页 1KB**"
+      ],
+      "registers": [
+        "FLASH_KEYR",
+        "FLASH_CR"
+      ],
+      "relatedFunctions": [
+        "FLASH_Lock",
+        "FLASH_ClearFlag",
+        "FLASH_ErasePage",
+        "FLASH_ProgramWord"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices. - For STM32F10X_XL devices this function unlocks Bank1 and Bank2. - For all other devices it unlocks Bank1 and it is equivalent to FLASH_UnlockBank1 function.."
+      ],
+      "notesZh": [
+        "**忘记 FLASH_Unlock 是最常见的错误**：写入静默失败，FLASH_ProgramHalfWord 返回 FLASH_ERROR_WRP，但如果不检查返回值就完全看不出来",
+        "**必须先擦除再写**。Flash 只能把 1 写成 0，不能把 0 写回 1。往没擦除的地址写会得到 旧值 & 新值 的错误结果",
+        "写完建议调用 FLASH_Lock 上锁，避免程序跑飞时误写 Flash",
+        "擦除是按页进行的（C8T6 中容量页大小 1KB），**擦一页会清掉该页全部 1024 字节**，不能只擦几个字节",
+        "解锁后如果一直不写，Flash 处于可写状态，此时若发生野指针写操作会直接破坏代码区",
+        "STM32F103C8T6 只有 64KB Flash（0x08000000~0x0800FFFF），用 0x0800FC00 之后的地址要先确认不会与代码重叠"
+      ],
+      "exampleCode": "/* 写入 Flash 的完整流程（以 C8T6 为例，页大小 1KB） */\n#define FLASH_SAVE_ADDR  0x0800FC00   /* 最后一页，避开程序区 */\n\nuint16_t data = 0x1234;\n\nFLASH_Unlock();                          /* 1. 解锁 */\nFLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);  /* 2. 清标志 */\n\nFLASH_Status st = FLASH_ErasePage(FLASH_SAVE_ADDR);   /* 3. 先擦除整页 */\nif (st == FLASH_COMPLETE)\n{\n  st = FLASH_ProgramHalfWord(FLASH_SAVE_ADDR, data);  /* 4. 再写 */\n}\n\nFLASH_Lock();                            /* 5. 用完立刻上锁 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_COMPLETE",
+        "FLASH_ClearFlag",
+        "FLASH_ERROR_WRP",
+        "FLASH_ErasePage",
+        "FLASH_FLAG_EOP",
+        "FLASH_FLAG_PGERR",
+        "FLASH_FLAG_WRPRTERR",
+        "FLASH_Lock",
+        "FLASH_ProgramHalfWord",
+        "FLASH_ProgramWord",
+        "FLASH_Status",
+        "FLASH_UnlockBank1"
+      ],
+      "headerLine": 371,
+      "sourceLine": 319,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_Lock",
+      "name": "FLASH_Lock",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "void FLASH_Lock(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Locks the FLASH Program Erase Controller.",
+      "briefZh": "锁定 Flash 编程擦除控制器。",
+      "usageZh": "写完 Flash 后立刻调用，防止误操作。上锁后所有擦写操作都会被拒绝并返回 FLASH_ERROR_WRP。如果程序里有多个写 Flash 的地方，每次写完都应该锁上，不要一直保持解锁状态。",
+      "prerequisites": [
+        "当前的擦除/编程操作已经完成"
+      ],
+      "registers": [
+        "FLASH_CR"
+      ],
+      "relatedFunctions": [
+        "FLASH_Unlock",
+        "FLASH_LockBank1",
+        "FLASH_ProgramHalfWord"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices. - For STM32F10X_XL devices this function Locks Bank1 and Bank2. - For all other devices it Locks Bank1 and it is equivalent to FLASH_LockBank1 function."
+      ],
+      "notesZh": [
+        "上锁后再调用擦写函数会返回 FLASH_ERROR_WRP，检查返回值就能发现这个问题",
+        "不要为了省事全程不解锁，掉电或跑飞时被破坏的风险很高",
+        "在非 XL 型号上等价于 FLASH_LockBank1"
+      ],
+      "exampleCode": "FLASH_Unlock();\nFLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);\nFLASH_ErasePage(FLASH_SAVE_ADDR);\nFLASH_ProgramHalfWord(FLASH_SAVE_ADDR, data);\nFLASH_Lock();      /* 用完立即上锁 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_ClearFlag",
+        "FLASH_ERROR_WRP",
+        "FLASH_ErasePage",
+        "FLASH_FLAG_EOP",
+        "FLASH_FLAG_PGERR",
+        "FLASH_FLAG_WRPRTERR",
+        "FLASH_LockBank1",
+        "FLASH_ProgramHalfWord",
+        "FLASH_Unlock"
+      ],
+      "headerLine": 372,
+      "sourceLine": 372,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_ErasePage",
+      "name": "FLASH_ErasePage",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "FLASH_Status FLASH_ErasePage(uint32_t Page_Address);",
+      "returnType": "FLASH_Status",
+      "params": [
+        {
+          "name": "Page_Address",
+          "type": "uint32_t",
+          "descEn": "The page address to be erased.",
+          "descZh": "要擦除的页地址。**C8T6 是中容量型号，页大小 1KB**，所以地址应对齐到 0x400 边界，如 0x0800FC00、0x0800F800。大容量型号页大小是 2KB，换算方式不同。传非对齐地址硬件会擦除它所在的整页。"
+        }
+      ],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_BUSY, FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status 枚举：FLASH_COMPLETE 表示成功；FLASH_BUSY 表示上一次操作还没结束；FLASH_ERROR_PG 表示编程错误；FLASH_ERROR_WRP 表示写保护（通常是忘了 FLASH_Unlock）；FLASH_TIMEOUT 表示超时。",
+      "briefEn": "Erases a specified FLASH page.",
+      "briefZh": "擦除指定的一个 Flash 页（中容量型号一页 1KB，全部置为 0xFF）。",
+      "usageZh": "**写入数据前的必需步骤**。Flash 只能把比特从 1 改成 0，所以任何写入前目标区域必须处于全 0xFF 状态。擦除粒度是一整页，会把该页 1024 字节全部清掉，所以数据布局要按页规划（例如每页存一条记录，或页内自己做磨损均衡）。页地址必须按页边界对齐。",
+      "prerequisites": [
+        "已调用 FLASH_Unlock()",
+        "已调用 FLASH_ClearFlag 清除上一次操作的标志",
+        "确认该页不在程序代码区（C8T6 只有 64KB，程序稍大就会与数据区冲突）"
+      ],
+      "registers": [
+        "FLASH_CR",
+        "FLASH_AR",
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_Unlock",
+        "FLASH_ProgramHalfWord",
+        "FLASH_ProgramWord",
+        "FLASH_EraseAllPages",
+        "FLASH_WaitForLastOperation"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "**必须先 FLASH_Unlock**，否则直接返回 FLASH_ERROR_WRP，数据一个字节都写不进去",
+        "**整页擦除**：C8T6 每页 1KB，擦一次那 1KB 全变 0xFF。把多个变量塞在同一页时，改一个就会擦掉全部，需要先把整页读到 RAM、改完再整页写回",
+        "擦除耗时较长（典型几十毫秒，C8T6 约 20~40ms），**擦除期间 CPU 从 Flash 取指会被暂停**，中断响应会延迟。不要在擦除时做实时性要求高的事",
+        "C8T6 只有 64KB Flash，地址范围 0x08000000~0x0800FFFF。用 0x08010000 以上的地址是非法的（属于保留区），操作会失败",
+        "页地址最好按 0x400 对齐（中容量），不对齐虽然能擦但会擦掉相邻数据，排查困难",
+        "Flash 擦写寿命约 1 万次，频繁写同一页要做磨损均衡或加缓存，不要每秒写一次"
+      ],
+      "exampleCode": "/* 擦除第 64 页（C8T6 共 64 页，每页 1KB） */\n#define PAGE64_ADDR  0x0800FC00   /* 0x08000000 + 63*1024 */\n\nFLASH_Unlock();\nFLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);\n\nFLASH_Status status = FLASH_ErasePage(PAGE64_ADDR);\nif (status != FLASH_COMPLETE)\n{\n  /* 擦除失败：多为忘记 Unlock 或该页被写保护 */\n}\n\nFLASH_Lock();",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_BUSY",
+        "FLASH_COMPLETE",
+        "FLASH_ClearFlag",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_FLAG_EOP",
+        "FLASH_FLAG_PGERR",
+        "FLASH_FLAG_WRPRTERR",
+        "FLASH_Lock",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_Unlock"
+      ],
+      "headerLine": 373,
+      "sourceLine": 419,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_EraseAllPages",
+      "name": "FLASH_EraseAllPages",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "FLASH_Status FLASH_EraseAllPages(void);",
+      "returnType": "FLASH_Status",
+      "params": [],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE 成功；FLASH_ERROR_PG 编程错误；FLASH_ERROR_WRP 写保护；FLASH_TIMEOUT 超时。",
+      "briefEn": "Erases all FLASH pages.",
+      "briefZh": "擦除全部 Flash 页（整片擦除）。",
+      "usageZh": "**极度危险**：它会把包括你自己程序在内的整个 Flash 清空，调用后 CPU 下一条取指就可能拿到 0xFF，程序立即跑飞，只有复位重启（且没有可执行代码）也没用。只有做 Bootloader/量产烧录工具时才会用到，普通用户程序**绝对不要调用**。",
+      "prerequisites": [
+        "已调用 FLASH_Unlock()",
+        "已确认调用后能从外部恢复（例如有 Bootloader 在 RAM 中运行，或可通过 SWD 重新烧录）"
+      ],
+      "registers": [
+        "FLASH_CR",
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_ErasePage",
+        "FLASH_Unlock",
+        "FLASH_EraseAllBank1Pages"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "**会清空整个 Flash 包括程序本身**，调用后程序基本立即失效，只适合 Bootloader 场景",
+        "非 XL 型号上等价于 FLASH_EraseAllBank1Pages",
+        "在 C8T6 上就是擦掉全部 64KB",
+        "执行期间中断向量表也被清掉，任何中断都会跳到 0xFFFFFFFF 导致 HardFault",
+        "如果只是为了恢复出厂，用 SWD 全片擦除比在程序里调用更安全"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_COMPLETE",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_EraseAllBank1Pages",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_Unlock"
+      ],
+      "headerLine": 374,
+      "sourceLine": 492,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_EraseOptionBytes",
+      "name": "FLASH_EraseOptionBytes",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "FLASH_Status FLASH_EraseOptionBytes(void);",
+      "returnType": "FLASH_Status",
+      "params": [],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE 成功；FLASH_ERROR_PG、FLASH_ERROR_WRP、FLASH_TIMEOUT 表示失败。",
+      "briefEn": "Erases the FLASH option bytes.",
+      "briefZh": "擦除 Flash 选项字节（除读保护位 RDP 之外的所有选项字节）。",
+      "usageZh": "修改用户选项字节（看门狗模式、停止/待机复位行为）或写保护配置前需要先擦除旧值。**它不会擦掉读保护位 RDP**，这是官方明确说明的。擦除后选项字节变为 0xFF，写保护被解除。",
+      "prerequisites": [
+        "已调用 FLASH_Unlock() 解锁（库内部会额外解锁选项字节的 OPTWRE）",
+        "清楚当前选项字节的值，擦除后需要重新写回"
+      ],
+      "registers": [
+        "FLASH_CR",
+        "FLASH_OPTCR",
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_UserOptionByteConfig",
+        "FLASH_EnableWriteProtection",
+        "FLASH_ReadOutProtection",
+        "FLASH_GetUserOptionByte"
+      ],
+      "remarks": [
+        "This functions erases all option bytes except the Read protection (RDP).",
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "**不会擦除读保护位 RDP**。要关闭读保护必须用 FLASH_ReadOutProtection(DISABLE)，而那个操作会连带擦除整个 Flash",
+        "擦除后所有选项字节变成 0xFF（即写保护全部解除），需要重新写回你想要的值",
+        "选项字节的修改需要**复位后生效**，写完立刻读寄存器还是旧值属正常现象",
+        "错误的选项字节配置（如写保护覆盖了程序区）会让下次烧录失败，只能靠 SWD 连接时用『连接到 RAM 后全片擦除』恢复",
+        "在 C8T6 这类只有 64KB 的芯片上，选项字节位于 0x1FFFF800 区域，与主 Flash 分开，不影响用户数据"
+      ],
+      "exampleCode": "/* 修改用户选项字节的标准流程：先擦除再写回 */\nFLASH_Unlock();\nFLASH_EraseOptionBytes();\nFLASH_UserOptionByteConfig(OB_IWDG_SW, OB_STOP_NoRST, OB_STDBY_NoRST);\nFLASH_Lock();\n\n/* 选项字节的修改要等复位后才生效 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "FLASH",
+        "FLASH_COMPLETE",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_Lock",
+        "FLASH_ReadOutProtection",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_Unlock",
+        "FLASH_UserOptionByteConfig",
+        "OB_IWDG_SW",
+        "OB_STDBY_NoRST",
+        "OB_STOP_NoRST"
+      ],
+      "headerLine": 375,
+      "sourceLine": 616,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_ProgramWord",
+      "name": "FLASH_ProgramWord",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "FLASH_Status FLASH_ProgramWord(uint32_t Address, uint32_t Data);",
+      "returnType": "FLASH_Status",
+      "params": [
+        {
+          "name": "Address",
+          "type": "uint32_t",
+          "descEn": "specifies the address to be programmed.",
+          "descZh": "目标地址，必须 **4 字节对齐**（能被 4 整除）。如 0x0800FC00、0x0800FC04。"
+        },
+        {
+          "name": "Data",
+          "type": "uint32_t",
+          "descEn": "specifies the data to be programmed.",
+          "descZh": "要写入的 32 位数据（0x00000000~0xFFFFFFFF）。"
+        }
+      ],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE 成功；FLASH_ERROR_PG 编程错误（通常是目标未擦除）；FLASH_ERROR_WRP 写保护（忘了 FLASH_Unlock）；FLASH_TIMEOUT 超时。",
+      "briefEn": "Programs a word at a specified address.",
+      "briefZh": "在指定地址写入一个 32 位字（4 字节）。",
+      "usageZh": "写入 4 字节对齐的数据时使用，比两次 FLASH_ProgramHalfWord 效率高。**写入前该区域必须已擦除（全 0xFF）**。地址必须 4 字节对齐，否则会硬件错误。写完后库内部会自动等操作完成。",
+      "prerequisites": [
+        "已调用 FLASH_Unlock()",
+        "已用 FLASH_ErasePage 擦除目标页",
+        "已调用 FLASH_ClearFlag 清除上一次的错误标志",
+        "地址 4 字节对齐"
+      ],
+      "registers": [
+        "FLASH_CR",
+        "FLASH_AR",
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_ProgramHalfWord",
+        "FLASH_ErasePage",
+        "FLASH_Unlock",
+        "FLASH_WaitForLastOperation"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "**地址不对齐（不是 4 的倍数）会触发硬件错误**，通常直接 HardFault",
+        "**目标未擦除时返回 FLASH_ERROR_PG**，写入数据变成 旧值 & 新值。这是「写进去的数据不对」的第一排查点",
+        "每次写之前建议 FLASH_ClearFlag 清一次标志，上一次的错误标志残留会影响本次判断",
+        "写 Flash 期间 CPU 从 Flash 取指被暂停，会阻塞中断，实时任务要避开这个时间窗口",
+        "掉电保护：写过程中掉电会留下半写状态的数据，重要数据要加校验和或双备份"
+      ],
+      "exampleCode": "/* 往已擦除的页写 3 个 32 位数据 */\n#define BASE_ADDR  0x0800FC00\nuint32_t values[3] = {0x11223344, 0x55667788, 0x99AABBCC};\n\nFLASH_Unlock();\nFLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);\nFLASH_ErasePage(BASE_ADDR);\n\nfor (i = 0; i < 3; i++)\n{\n  /* 每次写之前清标志；地址必须 4 字节对齐 */\n  FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);\n  if (FLASH_ProgramWord(BASE_ADDR + i * 4, values[i]) != FLASH_COMPLETE)\n  {\n    break;   /* 写入失败 */\n  }\n}\n\nFLASH_Lock();",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_COMPLETE",
+        "FLASH_ClearFlag",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_ErasePage",
+        "FLASH_FLAG_EOP",
+        "FLASH_FLAG_PGERR",
+        "FLASH_FLAG_WRPRTERR",
+        "FLASH_Lock",
+        "FLASH_ProgramHalfWord",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_Unlock"
+      ],
+      "headerLine": 376,
+      "sourceLine": 681,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_ProgramHalfWord",
+      "name": "FLASH_ProgramHalfWord",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "FLASH_Status FLASH_ProgramHalfWord(uint32_t Address, uint16_t Data);",
+      "returnType": "FLASH_Status",
+      "params": [
+        {
+          "name": "Address",
+          "type": "uint32_t",
+          "descEn": "specifies the address to be programmed.",
+          "descZh": "目标地址，必须 **2 字节对齐**（偶地址）。如 0x0800FC00、0x0800FC02。"
+        },
+        {
+          "name": "Data",
+          "type": "uint16_t",
+          "descEn": "specifies the data to be programmed.",
+          "descZh": "要写入的 16 位数据（0x0000~0xFFFF）。"
+        }
+      ],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE 成功；FLASH_ERROR_PG 编程错误（多为未擦除）；FLASH_ERROR_WRP 写保护（忘了解锁）；FLASH_TIMEOUT 超时。",
+      "briefEn": "Programs a half word at a specified address.",
+      "briefZh": "在指定地址写入一个 16 位半字（2 字节）。",
+      "usageZh": "**最常用的 Flash 写入函数**。STM32F103 的 Flash 编程最小粒度就是半字，所以要写 1 个字节也要凑成半字（另一个字节填 0xFF）。地址必须 2 字节对齐。写入前区域必须已擦除。",
+      "prerequisites": [
+        "已调用 FLASH_Unlock()",
+        "已调用 FLASH_ErasePage 擦除目标页",
+        "已调用 FLASH_ClearFlag 清除标志",
+        "地址 2 字节对齐"
+      ],
+      "registers": [
+        "FLASH_CR",
+        "FLASH_AR",
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_ProgramWord",
+        "FLASH_ErasePage",
+        "FLASH_Unlock",
+        "FLASH_Lock"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "**写入前必须擦除**。Flash 位只能 1→0，往非 0xFF 的地址写会得到按位与的结果，且不报错（返回值是 FLASH_COMPLETE 但数据错）",
+        "地址必须 2 字节对齐，奇地址会触发硬件错误",
+        "**1 字节数据也要用半字写**：把另一个字节填 0xFF，读完再取低 8 位",
+        "读取 Flash 不需要解锁，直接指针访问即可，速度等同于读普通内存（受等待周期影响）",
+        "Flash 擦写寿命约 1 万次，频繁记录数据（如每秒存一次）要换页轮转，否则几个月就写坏了",
+        "写完不调用 FLASH_Lock 时，若程序跑飞产生野指针写操作，会直接破坏 Flash 内容"
+      ],
+      "exampleCode": "/* 保存一组 16 位标定参数 */\n#define PARAM_ADDR  0x0800F800\nuint16_t params[4] = {100, 200, 300, 400};\n\nFLASH_Unlock();\nFLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);\nFLASH_ErasePage(PARAM_ADDR);\n\nfor (i = 0; i < 4; i++)\n{\n  FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);\n  FLASH_ProgramHalfWord(PARAM_ADDR + i * 2, params[i]);\n}\n\nFLASH_Lock();\n\n/* 读取时直接按指针访问即可，Flash 可随机读 */\nuint16_t v = *(volatile uint16_t *)(PARAM_ADDR + 2);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_COMPLETE",
+        "FLASH_ClearFlag",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_ErasePage",
+        "FLASH_FLAG_EOP",
+        "FLASH_FLAG_PGERR",
+        "FLASH_FLAG_WRPRTERR",
+        "FLASH_Lock",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_Unlock"
+      ],
+      "headerLine": 377,
+      "sourceLine": 858,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_ProgramOptionByteData",
+      "name": "FLASH_ProgramOptionByteData",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "FLASH_Status FLASH_ProgramOptionByteData(uint32_t Address, uint8_t Data);",
+      "returnType": "FLASH_Status",
+      "params": [
+        {
+          "name": "Address",
+          "type": "uint32_t",
+          "descEn": "specifies the address to be programmed. This parameter can be 0x1FFFF804 or 0x1FFFF806.",
+          "descZh": "只能是 0x1FFFF804 或 0x1FFFF806 这两个地址之一（对应 Data0 与 Data1）。"
+        },
+        {
+          "name": "Data",
+          "type": "uint8_t",
+          "descEn": "specifies the data to be programmed.",
+          "descZh": "要写入的 8 位数据（0x00~0xFF）。"
+        }
+      ],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE 成功；FLASH_ERROR_PG、FLASH_ERROR_WRP、FLASH_TIMEOUT 表示失败。",
+      "briefEn": "Programs a half word at a specified Option Byte Data address.",
+      "briefZh": "向选项字节的数据区写入一个字节（用户自定义的 2 字节存储区）。",
+      "usageZh": "STM32F103 的选项字节里有两块用户可以自由使用的数据区（Data0 与 Data1，各 1 字节），常用来存产品序列号、版本号或加密密钥。地址固定为 0x1FFFF804 或 0x1FFFF806。",
+      "prerequisites": [
+        "已调用 FLASH_Unlock()",
+        "已调用 FLASH_EraseOptionBytes() 擦除选项字节（选项字节只能写一次，改值必须先擦）"
+      ],
+      "registers": [
+        "FLASH_CR",
+        "FLASH_OPTCR",
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_EraseOptionBytes",
+        "FLASH_UserOptionByteConfig",
+        "FLASH_Unlock"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "**地址只能是 0x1FFFF804 或 0x1FFFF806**，写别的地址不会成功",
+        "改选项字节前必须先 FLASH_EraseOptionBytes，Flash 特性决定了只能 1→0",
+        "修改要**复位后生效**，写完立刻读还是旧值",
+        "这两字节在芯片全片擦除时也会被清掉，不要用来存关键的唯一 ID（唯一 ID 是只读的 96 位，在 0x1FFFF7E8 起，不可改）"
+      ],
+      "exampleCode": "/* 往选项字节数据区写产品编号 */\nFLASH_Unlock();\nFLASH_EraseOptionBytes();                                  /* 必须整块擦除后才能改 */\nFLASH_ProgramOptionByteData(0x1FFFF804, 0x5A);             /* Data0 */\nFLASH_ProgramOptionByteData(0x1FFFF806, 0xA5);             /* Data1 */\nFLASH_Lock();\n\n/* 复位后生效，读取方式：*(uint8_t*)0x1FFFF804 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_COMPLETE",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_EraseOptionBytes",
+        "FLASH_Lock",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_Unlock"
+      ],
+      "headerLine": 378,
+      "sourceLine": 929,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_EnableWriteProtection",
+      "name": "FLASH_EnableWriteProtection",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "FLASH_Status FLASH_EnableWriteProtection(uint32_t FLASH_Pages);",
+      "returnType": "FLASH_Status",
+      "params": [
+        {
+          "name": "FLASH_Pages",
+          "type": "uint32_t",
+          "descEn": "specifies the address of the pages to be write protected. This parameter can be:",
+          "descZh": "要保护的页地址，可用 | 组合，如 FLASH_WriteProtection_0 | FLASH_WriteProtection_1。**这些宏是页编号而不是地址**，且不同容量型号的编号含义不同。"
+        }
+      ],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE 成功；FLASH_ERROR_PG、FLASH_ERROR_WRP、FLASH_TIMEOUT 表示失败。",
+      "briefEn": "Write protects the desired pages",
+      "briefZh": "对指定的 Flash 页开启写保护（修改选项字节里的 WRP 位）。",
+      "usageZh": "**危险操作**：写保护是通过选项字节实现的，开启后对应的页无法擦除和写入，而且**选项字节的修改需要复位才生效，且一旦生效普通程序无法自行解除**——解除需要连接 SWD/JTAG 用工具做全片擦除。写保护的作用是防止程序跑飞破坏关键代码区，但用错页范围会让后续烧录直接失败。\n\n在 C8T6 上写保护以 4 页（4KB）为一组，位图与型号容量相关，不熟悉的用户建议不要使用。",
+      "prerequisites": [
+        "已调用 FLASH_Unlock()",
+        "已调用 FLASH_EraseOptionBytes() 清除旧选项字节",
+        "**确认保护范围不包含你还要更新的数据页**"
+      ],
+      "registers": [
+        "FLASH_CR",
+        "FLASH_OPTCR",
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_EraseOptionBytes",
+        "FLASH_GetWriteProtectionOptionByte",
+        "FLASH_ReadOutProtection",
+        "FLASH_Lock"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "**写保护的解除必须靠外部工具全片擦除**，程序自己解不开。误保护了数据页就再也存不进去了",
+        "**复位后才生效**，写完立刻测试可能看起来没起作用，容易误判成失败",
+        "保护的页范围若覆盖程序区，之后用 ST-Link 烧录会报错，需要先用工具做『连接到 RAM + 全片擦除』",
+        "C8T6 的写保护以 4 页（4KB）为一组，与大容量型号（2 页一组）不同，直接照抄别的芯片的参数会保护到错误的区域",
+        "写保护只防擦写，从外部通过调试口仍可读取内容，要防读取必须用读保护"
+      ],
+      "exampleCode": "/* 保护前 4 页（对应 C8T6 的 0x08000000~0x08000FFF） */\nFLASH_Unlock();\nFLASH_EraseOptionBytes();                       /* 必须先擦除选项字节 */\nFLASH_EnableWriteProtection(FLASH_WriteProtection_0);\nFLASH_Lock();\n\n/* 复位后生效；生效后这几页无法擦写，只能用 SWD 全片擦除解除 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_COMPLETE",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_EraseOptionBytes",
+        "FLASH_Lock",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_Unlock"
+      ],
+      "headerLine": 379,
+      "sourceLine": 975,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_ReadOutProtection",
+      "name": "FLASH_ReadOutProtection",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec4",
+      "prototype": "FLASH_Status FLASH_ReadOutProtection(FunctionalState NewState);",
+      "returnType": "FLASH_Status",
+      "params": [
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the ReadOut Protection. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 开启读保护（芯片只能运行不能读出），DISABLE 关闭读保护（**会触发全片擦除**）。"
+        }
+      ],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE 成功；FLASH_ERROR_PG、FLASH_ERROR_WRP、FLASH_TIMEOUT 表示失败。",
+      "briefEn": "Enables or disables the read out protection.",
+      "briefZh": "使能或关闭 Flash 读保护（RDP）。",
+      "usageZh": "**最危险的 Flash 函数之一**。使能读保护后，通过 SWD/JTAG 无法读出 Flash 内容（保护知识产权），程序仍可正常运行。但**关闭读保护会触发硬件自动全片擦除**——整个 Flash 连同你的程序和数据一起被清空，这是不可逆的。\n\n另外，本函数内部会先擦除所有选项字节，如果你之前配置过写保护或用户选项字节（IWDG/STOP/STDBY 行为），调用后这些配置全部丢失，必须重新写回（ST 官方注释明确提醒了这点）。",
+      "prerequisites": [
+        "已调用 FLASH_Unlock()",
+        "**确认已经备份了全部程序和重要数据**（尤其是 DISABLE 时）",
+        "清楚当前的用户选项字节与写保护配置，调用后需要重新写回"
+      ],
+      "registers": [
+        "FLASH_CR",
+        "FLASH_OPTCR",
+        "FLASH_OBR",
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_EraseOptionBytes",
+        "FLASH_GetReadOutProtectionStatus",
+        "FLASH_UserOptionByteConfig",
+        "FLASH_EnableWriteProtection"
+      ],
+      "remarks": [
+        "If the user has already programmed the other option bytes before calling this function, he must re-program them since this function erases all option bytes.",
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "**DISABLE 会触发硬件全片擦除**，程序、标定参数、所有数据全部丢失，且不可撤销。这是最容易造成『芯片被锁死/程序没了』的操作",
+        "开启读保护后 SWD 仍能连接（能擦除和重新烧录），只是读不出内容，所以不算真正『锁死』",
+        "**本函数会先擦除所有选项字节**，因此之后的用户选项字节（IWDG 硬件/软件、STOP/STDBY 复位行为）与写保护配置都会丢失，必须重新调用 FLASH_UserOptionByteConfig 写回",
+        "修改要**复位后生效**，写完立刻用 FLASH_GetReadOutProtectionStatus 读可能还是旧值",
+        "读保护状态下调试器无法读取 Flash，但可以通过调试器擦除后重新烧录，不会永久损坏芯片",
+        "做量产时建议先烧录并验证程序，最后一步再开读保护，避免反复全片擦除"
+      ],
+      "exampleCode": "/* 开启读保护：防止固件被读出 */\nFLASH_Unlock();\nFLASH_ReadOutProtection(ENABLE);\nFLASH_Lock();\n/* 复位后生效 */\n\n/* 关闭读保护：注意！会连同整个 Flash 一起被硬件擦除 */\nFLASH_Unlock();\nFLASH_ReadOutProtection(DISABLE);   /* 全片数据在此刻丢失 */\nFLASH_Lock();\n/* 之后需要重新烧录程序 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FLASH",
+        "FLASH_COMPLETE",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_GetReadOutProtectionStatus",
+        "FLASH_Lock",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_Unlock",
+        "FLASH_UserOptionByteConfig",
+        "FunctionalState",
+        "IWDG"
+      ],
+      "headerLine": 380,
+      "sourceLine": 1049,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_UserOptionByteConfig",
+      "name": "FLASH_UserOptionByteConfig",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec5",
+      "prototype": "FLASH_Status FLASH_UserOptionByteConfig(uint16_t OB_IWDG, uint16_t OB_STOP, uint16_t OB_STDBY);",
+      "returnType": "FLASH_Status",
+      "params": [
+        {
+          "name": "OB_IWDG",
+          "type": "uint16_t",
+          "descEn": "Selects the IWDG mode This parameter can be one of the following values:",
+          "descZh": "看门狗模式，OB_IWDG_SW（用软件库的 IWDG_Enable 控制，推荐）或 OB_IWDG_HW（硬件看门狗，上电自动启动，必须一直喂狗）。"
+        },
+        {
+          "name": "OB_STOP",
+          "type": "uint16_t",
+          "descEn": "Reset event when entering STOP mode. This parameter can be one of the following values:",
+          "descZh": "进入停止模式是否复位：OB_STOP_NoRST（不复位，正常低功耗场景）或 OB_STOP_RST（复位）。"
+        },
+        {
+          "name": "OB_STDBY",
+          "type": "uint16_t",
+          "descEn": "Reset event when entering Standby mode. This parameter can be one of the following values:",
+          "descZh": "进入待机模式是否复位：OB_STDBY_NoRST 或 OB_STDBY_RST。"
+        }
+      ],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE 成功；FLASH_ERROR_PG、FLASH_ERROR_WRP、FLASH_TIMEOUT 表示失败。",
+      "briefEn": "Programs the FLASH User Option Byte: IWDG_SW / RST_STOP / RST_STDBY.",
+      "briefZh": "配置用户选项字节：独立看门狗模式、进入停止/待机模式是否复位。",
+      "usageZh": "用于把 IWDG 从硬件模式改成软件模式（避免一上电就跑狗），或修改低功耗模式下的复位行为。**写入前必须先 FLASH_EraseOptionBytes 擦除**，否则写入无效或得到按位与的错误结果。修改**复位后生效**。",
+      "prerequisites": [
+        "已调用 FLASH_Unlock()",
+        "已调用 FLASH_EraseOptionBytes() 擦除选项字节",
+        "确认修改后板子能正常重新烧录（避免看门狗配置把自己锁住）"
+      ],
+      "registers": [
+        "FLASH_CR",
+        "FLASH_OPTCR",
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_EraseOptionBytes",
+        "FLASH_GetUserOptionByte",
+        "FLASH_ReadOutProtection",
+        "FLASH_Lock"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "**必须先 FLASH_EraseOptionBytes**，选项字节是 Flash 单元，只能 1→0，不擦除写入会得到按位与的错误值",
+        "**配成 OB_IWDG_HW 后芯片上电即启动硬件看门狗**，如果程序启动慢或喂狗不及时会无限复位，此时只能靠调试器抢时间或全片擦除恢复",
+        "修改要**复位后生效**，写完立刻读 FLASH_GetUserOptionByte 还是旧值",
+        "本函数只改这三个字段，但会连带影响其他选项字节吗？不会——但 FLASH_ReadOutProtection 和 FLASH_EraseOptionBytes 会擦除全部选项字节，调用顺序要注意",
+        "低功耗应用进入停止/待机前若不希望复位，必须配成 OB_STOP_NoRST / OB_STDBY_NoRST，否则一进低功耗就重启"
+      ],
+      "exampleCode": "/* 把看门狗改成软件模式，停止/待机模式不复位 */\nFLASH_Unlock();\nFLASH_EraseOptionBytes();                                    /* 必须先擦除 */\nFLASH_UserOptionByteConfig(OB_IWDG_SW, OB_STOP_NoRST, OB_STDBY_NoRST);\nFLASH_Lock();\n\n/* 选项字节复位后才生效，写完要重启一次 */\nNVIC_SystemReset();",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_COMPLETE",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_EraseOptionBytes",
+        "FLASH_GetUserOptionByte",
+        "FLASH_Lock",
+        "FLASH_ReadOutProtection",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_Unlock",
+        "IWDG",
+        "IWDG_Enable",
+        "OB_IWDG_HW",
+        "OB_IWDG_SW",
+        "OB_STDBY_NoRST",
+        "OB_STDBY_RST",
+        "OB_STOP_NoRST",
+        "OB_STOP_RST"
+      ],
+      "headerLine": 381,
+      "sourceLine": 1118,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_GetUserOptionByte",
+      "name": "FLASH_GetUserOptionByte",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec4",
+      "prototype": "uint32_t FLASH_GetUserOptionByte(void);",
+      "returnType": "uint32_t",
+      "params": [],
+      "returnDescEn": "The FLASH User Option Bytes values:IWDG_SW(Bit0), RST_STOP(Bit1) and RST_STDBY(Bit2).",
+      "returnDescZh": "返回 32 位选项字节值：bit0 = IWDG_SW（1 = 软件 IWDG，0 = 硬件 IWDG）、bit1 = RST_STOP（1 = 进入停止模式不复位）、bit2 = RST_STDBY（1 = 进入待机模式不复位）。",
+      "briefEn": "Returns the FLASH User Option Bytes values.",
+      "briefZh": "读取 Flash 用户选项字节的值（IWDG 模式、STOP/STDBY 复位行为）。",
+      "usageZh": "用来确认当前芯片的选项字节配置，常用于排查「独立看门狗为什么一上电就复位」这类问题。返回值是位域：bit0 为 IWDG_SW（1 表示软件看门狗，0 表示硬件看门狗）、bit1 为 RST_STOP、bit2 为 RST_STDBY。",
+      "prerequisites": [
+        "无需解锁，读取是只读操作"
+      ],
+      "registers": [
+        "FLASH_OBR"
+      ],
+      "relatedFunctions": [
+        "FLASH_UserOptionByteConfig",
+        "FLASH_GetReadOutProtectionStatus"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "**bit0 = 0 表示硬件看门狗已开启**，芯片一上电 IWDG 就开始计数，如果程序没及时喂狗会不停复位，且很难查——这是最典型的『程序跑不起来』的原因之一",
+        "返回值的位含义与手册里 OBR 寄存器的位定义一致，注意不要按 WRP 的位去解读",
+        "它读的是选项字节的**当前生效值**，刚写完选项字节还没复位时读到的是旧值"
+      ],
+      "exampleCode": "uint32_t ob = FLASH_GetUserOptionByte();\n\nif ((ob & 0x01) == 0)\n{\n  /* bit0 = 0 表示硬件看门狗已使能，上电即启动，必须及时喂狗 */\n}\nif ((ob & 0x02) == 0)\n{\n  /* 进入停止模式会复位 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "IWDG"
+      ],
+      "headerLine": 382,
+      "sourceLine": 1216,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_GetWriteProtectionOptionByte",
+      "name": "FLASH_GetWriteProtectionOptionByte",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec4",
+      "prototype": "uint32_t FLASH_GetWriteProtectionOptionByte(void);",
+      "returnType": "uint32_t",
+      "params": [],
+      "returnDescEn": "The FLASH Write Protection Option Bytes Register value",
+      "returnDescZh": "返回写保护选项字节寄存器的原始值。某位为 0 表示对应的一组页处于写保护状态。",
+      "briefEn": "Returns the FLASH Write Protection Option Bytes Register value.",
+      "briefZh": "读取 Flash 写保护选项字节寄存器的值。",
+      "usageZh": "排查「为什么这一页写不进去（返回 FLASH_ERROR_WRP）」时用，可确认哪些页被写保护了。返回值的位图含义与芯片容量相关，C8T6（中容量）以 4 页为一组。",
+      "prerequisites": [
+        "无需解锁，只读操作"
+      ],
+      "registers": [
+        "FLASH_WRP",
+        "FLASH_OBR"
+      ],
+      "relatedFunctions": [
+        "FLASH_EnableWriteProtection",
+        "FLASH_EraseOptionBytes"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "位图与容量相关：中容量（C8T6）以 4 页（4KB）为一组，大容量以 2 页为一组，直接套用别的型号的位定义会判断错",
+        "写保护生效需要复位，刚开完写保护立即读可能还是旧值",
+        "如果只改了选项字节但没复位，擦写仍然可以成功，容易误判为写保护没生效"
+      ],
+      "exampleCode": "uint32_t wrp = FLASH_GetWriteProtectionOptionByte();\n/* 某位为 0 表示对应页组被写保护 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_ERROR_WRP"
+      ],
+      "headerLine": 383,
+      "sourceLine": 1228,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_GetReadOutProtectionStatus",
+      "name": "FLASH_GetReadOutProtectionStatus",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec4",
+      "prototype": "FlagStatus FLASH_GetReadOutProtectionStatus(void);",
+      "returnType": "FlagStatus",
+      "params": [],
+      "returnDescEn": "FLASH ReadOut Protection Status(SET or RESET)",
+      "returnDescZh": "SET 表示读保护已使能，RESET 表示未使能（Flash 可正常读出）。",
+      "briefEn": "Checks whether the FLASH Read Out Protection Status is set or not.",
+      "briefZh": "查询 Flash 读保护是否已使能。",
+      "usageZh": "用于确认当前芯片的读保护状态，常见于 Bootloader 判断是否需要在升级前解除保护。返回 SET 表示已开启读保护（SWD 读不出内容）。",
+      "prerequisites": [
+        "无需解锁，只读操作"
+      ],
+      "registers": [
+        "FLASH_OBR"
+      ],
+      "relatedFunctions": [
+        "FLASH_ReadOutProtection",
+        "FLASH_GetUserOptionByte"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "它在**复位后**才反映真实状态；刚调用 FLASH_ReadOutProtection 还没复位时读到的可能是旧值",
+        "读保护开启后程序仍正常运行，只是外部调试口读不出内容，别误以为是芯片坏了",
+        "解除读保护会触发全片擦除，判断到 SET 后不要贸然去 DISABLE"
+      ],
+      "exampleCode": "if (FLASH_GetReadOutProtectionStatus() == SET)\n{\n  /* 已开启读保护，调试器读不出 Flash */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "FLASH",
+        "FLASH_ReadOutProtection",
+        "FlagStatus",
+        "RESET",
+        "SET"
+      ],
+      "headerLine": 384,
+      "sourceLine": 1240,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_GetPrefetchBufferStatus",
+      "name": "FLASH_GetPrefetchBufferStatus",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec4",
+      "prototype": "FlagStatus FLASH_GetPrefetchBufferStatus(void);",
+      "returnType": "FlagStatus",
+      "params": [],
+      "returnDescEn": "FLASH Prefetch Buffer Status (SET or RESET).",
+      "returnDescZh": "SET 表示预取缓冲已使能，RESET 表示未使能。",
+      "briefEn": "Checks whether the FLASH Prefetch Buffer status is set or not.",
+      "briefZh": "查询 Flash 预取缓冲区是否已使能。",
+      "usageZh": "调试用，确认 SystemInit 是否正确开启了预取。72MHz 下正常应返回 SET。",
+      "prerequisites": [
+        "无需解锁，只读操作"
+      ],
+      "registers": [
+        "FLASH_ACR"
+      ],
+      "relatedFunctions": [
+        "FLASH_PrefetchBufferCmd",
+        "FLASH_SetLatency"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices."
+      ],
+      "notesZh": [
+        "预取关闭不会导致数据错误，只是速度变慢，所以这个问题经常被忽略",
+        "它和等待周期是两个独立的配置位，等待周期配错才是致命的"
+      ],
+      "exampleCode": "if (FLASH_GetPrefetchBufferStatus() == RESET)\n{\n  /* 72MHz 下应使能预取，否则取指效率低 */\n  FLASH_PrefetchBufferCmd(FLASH_PrefetchBuffer_Enable);\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_PrefetchBufferCmd",
+        "FLASH_PrefetchBuffer_Enable",
+        "FlagStatus",
+        "RESET",
+        "SET"
+      ],
+      "headerLine": 385,
+      "sourceLine": 1260,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_ITConfig",
+      "name": "FLASH_ITConfig",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec6",
+      "prototype": "void FLASH_ITConfig(uint32_t FLASH_IT, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FLASH_IT",
+          "type": "uint32_t",
+          "descEn": "specifies the FLASH interrupt sources to be enabled or disabled. This parameter can be any combination of the following values:",
+          "descZh": "中断源，SPL 里只有 FLASH_IT_EOP（操作结束中断，结尾错误标志也会触发）。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the specified Flash interrupts. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified FLASH interrupts.",
+      "briefZh": "使能或关闭 Flash 中断。",
+      "usageZh": "Flash 只有一种中断源 FLASH_IT_EOP（操作结束）。**绝大多数应用都用轮询，不需要开这个中断**。只有在需要长时间擦除时做异步处理才会用到。开了还要记得配 NVIC_Init，否则中断不会触发。",
+      "prerequisites": [
+        "已用 NVIC_Init 配置并使能 Flash 中断向量",
+        "已 FLASH_Unlock（如果接下来要擦写）"
+      ],
+      "registers": [
+        "FLASH_CR"
+      ],
+      "relatedFunctions": [
+        "FLASH_GetFlagStatus",
+        "FLASH_ClearFlag",
+        "NVIC_Init"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices. - For STM32F10X_XL devices, enables or disables the specified FLASH interrupts for Bank1 and Bank2. - For other devices it enables or disables the specified FLASH interrupts for Bank1."
+      ],
+      "notesZh": [
+        "**只调 FLASH_ITConfig 不调 NVIC_Init，中断永远不会触发**",
+        "超过 99% 的 Flash 应用用轮询就够了（库函数内部已经等待完成），开中断反而增加复杂度",
+        "中断里必须用 FLASH_ClearFlag 清 EOP/PGERR/WRPRTERR 标志，否则会反复进中断",
+        "在 XL 型号上本函数会同时作用于 Bank1 与 Bank2"
+      ],
+      "exampleCode": "NVIC_InitTypeDef NVIC_InitStructure;\n\nNVIC_InitStructure.NVIC_IRQChannel = FLASH_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\nFLASH_ITConfig(FLASH_IT_EOP, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FLASH",
+        "FLASH_ClearFlag",
+        "FLASH_IT_EOP",
+        "FLASH_Unlock",
+        "FunctionalState",
+        "NVIC_Init",
+        "NVIC_InitTypeDef"
+      ],
+      "headerLine": 386,
+      "sourceLine": 1290,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_GetFlagStatus",
+      "name": "FLASH_GetFlagStatus",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec7",
+      "prototype": "FlagStatus FLASH_GetFlagStatus(uint32_t FLASH_FLAG);",
+      "returnType": "FlagStatus",
+      "params": [
+        {
+          "name": "FLASH_FLAG",
+          "type": "uint32_t",
+          "descEn": "specifies the FLASH flag to check. This parameter can be one of the following values:",
+          "descZh": "要查询的标志，如 FLASH_FLAG_BSY、FLASH_FLAG_EOP、FLASH_FLAG_PGERR、FLASH_FLAG_WRPRTERR、FLASH_FLAG_OPTERR。非 XL 型号上还可以用 FLASH_FLAG_BANK1_xxx 备选名。"
+        }
+      ],
+      "returnDescEn": "The new state of FLASH_FLAG (SET or RESET).",
+      "returnDescZh": "SET 表示标志已置位，RESET 表示未置位。",
+      "briefEn": "Checks whether the specified FLASH flag is set or not.",
+      "briefZh": "查询 Flash 的指定标志是否置位。",
+      "usageZh": "轮询方式判断 Flash 操作是否结束，或检查是否发生错误。常用标志：FLASH_FLAG_BSY（忙）、FLASH_FLAG_EOP（操作结束）、FLASH_FLAG_PGERR（编程错误）、FLASH_FLAG_WRPRTERR（写保护错误）、FLASH_FLAG_OPTERR（选项字节错误）。",
+      "prerequisites": [
+        "已发起过一次 Flash 擦写操作（或想查看当前状态）"
+      ],
+      "registers": [
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_ClearFlag",
+        "FLASH_GetStatus",
+        "FLASH_ErasePage",
+        "FLASH_ProgramHalfWord"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices. - For STM32F10X_XL devices, this function checks whether the specified Bank1 or Bank2 flag is set or not. - For other devices, it checks whether the specified Bank1 flag is set or not."
+      ],
+      "notesZh": [
+        "**错误标志（PGERR/WRPRTERR）不清除会一直保持置位**，导致后续判断全部误报",
+        "EOP 标志在每次操作完成后置位，下次操作前应清掉，否则无法区分是哪次操作完成的",
+        "FLASH_FLAG_BSY 为 SET 时不要发起新的擦写操作，硬件会拒绝",
+        "FLASH_FLAG_OPTERR 为 SET 表示选项字节本身配置有问题（如读保护与写保护冲突）"
+      ],
+      "exampleCode": "/* 擦除后检查是否出错 */\nFLASH_ErasePage(0x0800FC00);\nwhile (FLASH_GetFlagStatus(FLASH_FLAG_BSY) == SET);   /* 等忙结束 */\n\nif (FLASH_GetFlagStatus(FLASH_FLAG_PGERR) == SET)\n{\n  /* 编程错误：目标没擦除 */\n}\nif (FLASH_GetFlagStatus(FLASH_FLAG_WRPRTERR) == SET)\n{\n  /* 写保护错误：多半是忘了 FLASH_Unlock */\n}\n\nFLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_ClearFlag",
+        "FLASH_ErasePage",
+        "FLASH_FLAG_BSY",
+        "FLASH_FLAG_EOP",
+        "FLASH_FLAG_OPTERR",
+        "FLASH_FLAG_PGERR",
+        "FLASH_FLAG_WRPRTERR",
+        "FLASH_Unlock",
+        "FlagStatus",
+        "RESET",
+        "SET"
+      ],
+      "headerLine": 387,
+      "sourceLine": 1357,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_ClearFlag",
+      "name": "FLASH_ClearFlag",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec7",
+      "prototype": "void FLASH_ClearFlag(uint32_t FLASH_FLAG);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "FLASH_FLAG",
+          "type": "uint32_t",
+          "descEn": "specifies the FLASH flags to clear. This parameter can be any combination of the following values:",
+          "descZh": "要清除的标志，可用 | 组合：FLASH_FLAG_EOP（操作结束）、FLASH_FLAG_PGERR（编程错误）、FLASH_FLAG_WRPRTERR（写保护错误）。非 XL 型号上也可以用 FLASH_FLAG_BANK1_xxx 备选名。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Clears the FLASH's pending flags.",
+      "briefZh": "清除 Flash 的挂起标志（EOP、PGERR、WRPRTERR）。",
+      "usageZh": "**每次 Flash 擦写操作之前都应该调用一次**，把上一次遗留的错误标志清干净，否则 FLASH_GetStatus 会一直返回上次的错误，让你误以为这次也失败了。标准写法是在 FLASH_Unlock 之后、第一次擦除之前清一次，循环里每次写之前也清一次。",
+      "prerequisites": [
+        "已调用 FLASH_Unlock()（清标志本身不需要解锁，但通常紧跟解锁之后）"
+      ],
+      "registers": [
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_GetFlagStatus",
+        "FLASH_GetStatus",
+        "FLASH_Unlock",
+        "FLASH_WaitForLastOperation"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices. - For STM32F10X_XL devices, this function clears Bank1 or Bank2抯 pending flags - For other devices, it clears Bank1抯 pending flags."
+      ],
+      "notesZh": [
+        "**不清标志的话，一次写失败之后所有后续操作都会报同样的错误**，排查时容易被误导",
+        "在循环写多个半字时，建议每次写之前都清一次，能准确定位是哪一个字节写失败",
+        "清标志不会影响正在进行的操作，但 BSY 为 1 时清标志无意义",
+        "在 XL 型号上本函数会同时清 Bank1 与 Bank2 的标志"
+      ],
+      "exampleCode": "/* 标准写入流程：解锁 → 清标志 → 擦除 → 写 → 上锁 */\nFLASH_Unlock();\nFLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);\n\nFLASH_ErasePage(0x0800FC00);\n\nfor (i = 0; i < len; i++)\n{\n  /* 每次写之前再清一次，避免上一次的错误标志干扰 */\n  FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);\n  if (FLASH_ProgramHalfWord(0x0800FC00 + i * 2, buf[i]) != FLASH_COMPLETE)\n  {\n    break;   /* 写入失败 */\n  }\n}\n\nFLASH_Lock();",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_COMPLETE",
+        "FLASH_ErasePage",
+        "FLASH_FLAG_EOP",
+        "FLASH_FLAG_PGERR",
+        "FLASH_FLAG_WRPRTERR",
+        "FLASH_GetStatus",
+        "FLASH_Lock",
+        "FLASH_ProgramHalfWord",
+        "FLASH_Unlock"
+      ],
+      "headerLine": 388,
+      "sourceLine": 1443,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_GetStatus",
+      "name": "FLASH_GetStatus",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec4",
+      "prototype": "FLASH_Status FLASH_GetStatus(void);",
+      "returnType": "FLASH_Status",
+      "params": [],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_BUSY, FLASH_ERROR_PG, FLASH_ERROR_WRP or FLASH_COMPLETE",
+      "returnDescZh": "返回 FLASH_Status：FLASH_BUSY 表示操作正在进行；FLASH_ERROR_PG 表示编程错误（目标未擦除或地址非法）；FLASH_ERROR_WRP 表示写保护（通常忘了 FLASH_Unlock 或该页被保护）；FLASH_COMPLETE 表示操作完成且无错误。",
+      "briefEn": "Returns the FLASH Status.",
+      "briefZh": "读取 Flash 的当前状态（忙/编程错误/写保护错误/完成）。",
+      "usageZh": "轮询方式判断 Flash 操作是否结束，或排查擦写失败的原因。手写底层 Flash 操作时用它替代 FLASH_WaitForLastOperation 做非阻塞判断。",
+      "prerequisites": [
+        "已发起过一次 Flash 擦写操作，或想检查当前状态"
+      ],
+      "registers": [
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_WaitForLastOperation",
+        "FLASH_GetFlagStatus",
+        "FLASH_ClearFlag",
+        "FLASH_GetBank1Status"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices, it is equivalent to FLASH_GetBank1Status function."
+      ],
+      "notesZh": [
+        "它**只读状态，不清除错误标志**。不清标志的话错误状态会一直保留，下次判断仍然报错",
+        "FLASH_ERROR_WRP 出现时先检查是否忘记 FLASH_Unlock，其次检查该页是否被写保护",
+        "FLASH_ERROR_PG 最常见的原因是目标地址没有先擦除（写入非 0xFF 的区域）",
+        "非 XL 型号上等价于 FLASH_GetBank1Status"
+      ],
+      "exampleCode": "FLASH_Status st = FLASH_GetStatus();\nswitch (st)\n{\n  case FLASH_BUSY:        /* 还在忙，继续等 */  break;\n  case FLASH_ERROR_PG:    /* 目标没擦除或地址非法 */ break;\n  case FLASH_ERROR_WRP:   /* 忘了 Unlock 或该页被写保护 */ break;\n  case FLASH_COMPLETE:    /* 完成 */ break;\n  default: break;\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_BUSY",
+        "FLASH_COMPLETE",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_GetBank1Status",
+        "FLASH_Status",
+        "FLASH_Unlock",
+        "FLASH_WaitForLastOperation"
+      ],
+      "headerLine": 389,
+      "sourceLine": 1477,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_WaitForLastOperation",
+      "name": "FLASH_WaitForLastOperation",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "FLASH_Status FLASH_WaitForLastOperation(uint32_t Timeout);",
+      "returnType": "FLASH_Status",
+      "params": [
+        {
+          "name": "Timeout",
+          "type": "uint32_t",
+          "descEn": "FLASH programming Timeout",
+          "descZh": "超时计数上限。库内部定义 COUNTING 宏并传 EraseTimeout/ProgramTimeout，普通用户传 0x000B0000 这类较大值即可。数值太小会被误判为超时。"
+        }
+      ],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE 表示操作成功；FLASH_BUSY 表示仍在忙；FLASH_ERROR_PG 编程错误；FLASH_ERROR_WRP 写保护；FLASH_TIMEOUT 表示超过 Timeout 仍未完成。",
+      "briefEn": "Waits for a Flash operation to complete or a TIMEOUT to occur.",
+      "briefZh": "等待上一次 Flash 操作完成，或等到超时。",
+      "usageZh": "库内部在每次擦写后都会调用它，返回操作结果。自己写底层 Flash 操作（直接操作寄存器）时才需要显式调用。Timeout 参数是个循环计数上限，用于防止 Flash 卡住时死等。",
+      "prerequisites": [
+        "已经发起了一次 Flash 擦除或编程操作（BSY 位为 1）"
+      ],
+      "registers": [
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_GetStatus",
+        "FLASH_ErasePage",
+        "FLASH_ProgramHalfWord",
+        "FLASH_WaitForLastBank1Operation"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices, it is equivalent to FLASH_WaitForLastBank1Operation. - For STM32F10X_XL devices this function waits for a Bank1 Flash operation to complete or a TIMEOUT to occur. - For all other devices it waits for a Flash operation to complete or a TIMEOUT to occur."
+      ],
+      "notesZh": [
+        "Timeout 太小会把正常的长擦除误判成 FLASH_TIMEOUT（C8T6 擦一页约 20~40ms）",
+        "它只等待、不清标志，错误标志要另外用 FLASH_ClearFlag 清",
+        "非 XL 型号上等价于 FLASH_WaitForLastBank1Operation",
+        "库函数（FLASH_ProgramHalfWord 等）内部已经调用过它并返回结果，不需要再手动等一遍"
+      ],
+      "exampleCode": "/* 自己操作寄存器后的等待写法 */\nFLASH_Status status;\n/* ... 发起擦除 ... */\nstatus = FLASH_WaitForLastOperation(0x000B0000);\nif (status != FLASH_COMPLETE)\n{\n  /* 处理错误：PG 通常是没擦除，WRP 通常是 forgetting Unlock */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_BUSY",
+        "FLASH_COMPLETE",
+        "FLASH_ClearFlag",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_ProgramHalfWord",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_WaitForLastBank1Operation"
+      ],
+      "headerLine": 390,
+      "sourceLine": 1595,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_UnlockBank1",
+      "name": "FLASH_UnlockBank1",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "void FLASH_UnlockBank1(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Unlocks the FLASH Bank1 Program Erase Controller.",
+      "briefZh": "解锁 Flash Bank1 的编程擦除控制器。",
+      "usageZh": "功能与 FLASH_Unlock 相同。**在 C8T6 这类非 XL 型号上两者完全等价**（64KB 只有 Bank1）。保留 Bank1/Bank2 两套接口是为了兼容大容量（XL）型号，写成 FLASH_UnlockBank1 的代码在 C8T6 上一样能用。",
+      "prerequisites": [
+        "确认要操作的是 Bank1 区域（C8T6 全部 Flash 都属于 Bank1）"
+      ],
+      "registers": [
+        "FLASH_KEYR",
+        "FLASH_CR"
+      ],
+      "relatedFunctions": [
+        "FLASH_Unlock",
+        "FLASH_LockBank1",
+        "FLASH_EraseAllBank1Pages"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices. - For STM32F10X_XL devices this function unlocks Bank1. - For all other devices it unlocks Bank1 and it is equivalent to FLASH_Unlock function."
+      ],
+      "notesZh": [
+        "C8T6 上 Bank1 就是全部 64KB，与 FLASH_Unlock 没有区别",
+        "在 XL 型号上 Bank1 与 Bank2 需要分别解锁，混用会导致一半区域写不进去",
+        "解锁后记得配对调用 FLASH_LockBank1"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_LockBank1",
+        "FLASH_Unlock"
+      ],
+      "headerLine": 393,
+      "sourceLine": 340,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_LockBank1",
+      "name": "FLASH_LockBank1",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "void FLASH_LockBank1(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Locks the FLASH Bank1 Program Erase Controller.",
+      "briefZh": "锁定 Flash Bank1 的编程擦除控制器。",
+      "usageZh": "与 FLASH_Lock 相同，在 C8T6 上两者等价。写完 Bank1 后上锁用。",
+      "prerequisites": [
+        "Bank1 的擦写操作已完成"
+      ],
+      "registers": [
+        "FLASH_CR"
+      ],
+      "relatedFunctions": [
+        "FLASH_Lock",
+        "FLASH_UnlockBank1"
+      ],
+      "remarks": [
+        "this function can be used for all STM32F10x devices. - For STM32F10X_XL devices this function Locks Bank1. - For all other devices it Locks Bank1 and it is equivalent to FLASH_Lock function."
+      ],
+      "notesZh": [
+        "C8T6 上等价于 FLASH_Lock，写哪个都能上锁",
+        "上锁后擦写返回 FLASH_ERROR_WRP"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_ERROR_WRP",
+        "FLASH_Lock"
+      ],
+      "headerLine": 394,
+      "sourceLine": 392,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_EraseAllBank1Pages",
+      "name": "FLASH_EraseAllBank1Pages",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "FLASH_Status FLASH_EraseAllBank1Pages(void);",
+      "returnType": "FLASH_Status",
+      "params": [],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE 成功；FLASH_ERROR_PG、FLASH_ERROR_WRP、FLASH_TIMEOUT 表示失败。",
+      "briefEn": "Erases all Bank1 FLASH pages.",
+      "briefZh": "擦除 Bank1 的全部 Flash 页。",
+      "usageZh": "**极度危险**，在 C8T6 上等于擦掉全部 64KB Flash，包括程序本身，调用后程序立刻失效。只有 Bootloader 场景才有意义。",
+      "prerequisites": [
+        "已调用 FLASH_Unlock 或 FLASH_UnlockBank1",
+        "已确认程序能从外部恢复"
+      ],
+      "registers": [
+        "FLASH_CR",
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_EraseAllPages",
+        "FLASH_ErasePage",
+        "FLASH_UnlockBank1"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices. - For STM32F10X_XL devices this function erases all Bank1 pages. - For all other devices it erases all Bank1 pages and it is equivalent to FLASH_EraseAllPages function."
+      ],
+      "notesZh": [
+        "**C8T6 上会把整个程序和所有数据一起清掉**，普通用户程序绝不要调用",
+        "非 XL 型号上等价于 FLASH_EraseAllPages",
+        "执行期间中断向量表被清空，任何中断都会跳飞到 0xFFFFFFFF"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_COMPLETE",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_EraseAllPages",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_Unlock",
+        "FLASH_UnlockBank1"
+      ],
+      "headerLine": 395,
+      "sourceLine": 555,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_GetBank1Status",
+      "name": "FLASH_GetBank1Status",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec4",
+      "prototype": "FLASH_Status FLASH_GetBank1Status(void);",
+      "returnType": "FLASH_Status",
+      "params": [],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_BUSY, FLASH_ERROR_PG, FLASH_ERROR_WRP or FLASH_COMPLETE",
+      "returnDescZh": "返回 FLASH_Status：FLASH_BUSY、FLASH_ERROR_PG、FLASH_ERROR_WRP 或 FLASH_COMPLETE。",
+      "briefEn": "Returns the FLASH Bank1 Status.",
+      "briefZh": "读取 Flash Bank1 的当前状态。",
+      "usageZh": "与 FLASH_GetStatus 等价，C8T6 上两者没有区别。在 XL 型号上用于单独查询 Bank1 的状态。",
+      "prerequisites": [
+        "已发起过 Bank1 上的 Flash 操作"
+      ],
+      "registers": [
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_GetStatus",
+        "FLASH_GetBank2Status",
+        "FLASH_ClearFlag"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices, it is equivalent to FLASH_GetStatus function."
+      ],
+      "notesZh": [
+        "C8T6 上等价于 FLASH_GetStatus",
+        "只读状态不清标志，错误标志要另外清"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_BUSY",
+        "FLASH_COMPLETE",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_GetStatus",
+        "FLASH_Status"
+      ],
+      "headerLine": 396,
+      "sourceLine": 1515,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_WaitForLastBank1Operation",
+      "name": "FLASH_WaitForLastBank1Operation",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "FLASH_Status FLASH_WaitForLastBank1Operation(uint32_t Timeout);",
+      "returnType": "FLASH_Status",
+      "params": [
+        {
+          "name": "Timeout",
+          "type": "uint32_t",
+          "descEn": "FLASH programming Timeout",
+          "descZh": "超时计数上限，太小会误报 FLASH_TIMEOUT。"
+        }
+      ],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE、FLASH_BUSY、FLASH_ERROR_PG、FLASH_ERROR_WRP 或 FLASH_TIMEOUT。",
+      "briefEn": "Waits for a Flash operation on Bank1 to complete or a TIMEOUT to occur.",
+      "briefZh": "等待 Bank1 的上一次 Flash 操作完成或超时。",
+      "usageZh": "与 FLASH_WaitForLastOperation 等价，C8T6 上两者没有区别。在 XL 型号上用于区分 Bank1 与 Bank2 的等待。",
+      "prerequisites": [
+        "已经在 Bank1 上发起了一次擦除或编程操作"
+      ],
+      "registers": [
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_WaitForLastOperation",
+        "FLASH_GetBank1Status"
+      ],
+      "remarks": [
+        "This function can be used for all STM32F10x devices, it is equivalent to FLASH_WaitForLastOperation."
+      ],
+      "notesZh": [
+        "C8T6 上等价于 FLASH_WaitForLastOperation",
+        "只等待不清标志，错误标志要另外用 FLASH_ClearFlag 清"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_BUSY",
+        "FLASH_COMPLETE",
+        "FLASH_ClearFlag",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_WaitForLastOperation"
+      ],
+      "headerLine": 397,
+      "sourceLine": 1623,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_UnlockBank2",
+      "name": "FLASH_UnlockBank2",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "void FLASH_UnlockBank2(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Unlocks the FLASH Bank2 Program Erase Controller.",
+      "briefZh": "解锁 Flash Bank2 的编程擦除控制器。",
+      "usageZh": "**STM32F103C8T6 上没有 Bank2**，这个函数只在 XL 系列（大容量，Flash ≥ 512KB）上有效。C8T6 只有 64KB Flash，全部属于 Bank1。库函数本身存在，但调用它对 C8T6 没有任何效果。",
+      "prerequisites": [
+        "芯片必须是 STM32F10X_XL 大容量型号（Flash ≥ 512KB）"
+      ],
+      "registers": [
+        "FLASH_KEYR2",
+        "FLASH_CR2"
+      ],
+      "relatedFunctions": [
+        "FLASH_Unlock",
+        "FLASH_LockBank2",
+        "FLASH_EraseAllBank2Pages"
+      ],
+      "remarks": [
+        "This function can be used only for STM32F10X_XL density devices."
+      ],
+      "notesZh": [
+        "**C8T6 没有 Bank2**，调用无任何效果，也不会报错",
+        "XL 型号的 Bank2 起始地址是 0x08080000，C8T6 根本没有这个地址",
+        "工程预定义宏 STM32F10X_XL 决定相关代码是否编译，C8T6 用的是 STM32F10X_MD"
+      ],
+      "exampleCode": "/* 只有 XL 大容量型号才有 Bank2；C8T6 调它没有效果 */\n#if defined(STM32F10X_XL)\nFLASH_UnlockBank2();\n#endif",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "STM32F10X_MD"
+      ],
+      "headerLine": 401,
+      "sourceLine": 354,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_LockBank2",
+      "name": "FLASH_LockBank2",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "void FLASH_LockBank2(void);",
+      "returnType": "void",
+      "params": [],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Locks the FLASH Bank2 Program Erase Controller.",
+      "briefZh": "锁定 Flash Bank2 的编程擦除控制器。",
+      "usageZh": "仅 XL 大容量型号有效。**C8T6 没有 Bank2**，调用没有实际作用。",
+      "prerequisites": [
+        "芯片必须是 STM32F10X_XL 大容量型号"
+      ],
+      "registers": [
+        "FLASH_CR2"
+      ],
+      "relatedFunctions": [
+        "FLASH_Lock",
+        "FLASH_UnlockBank2"
+      ],
+      "remarks": [
+        "This function can be used only for STM32F10X_XL density devices."
+      ],
+      "notesZh": [
+        "C8T6 上调用无效，不要指望它来上锁——上锁要用 FLASH_Lock 或 FLASH_LockBank1",
+        "只有在 XL 型号上 Bank1 与 Bank2 才需要分别加锁"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_Lock",
+        "FLASH_LockBank1"
+      ],
+      "headerLine": 402,
+      "sourceLine": 405,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_EraseAllBank2Pages",
+      "name": "FLASH_EraseAllBank2Pages",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "FLASH_Status FLASH_EraseAllBank2Pages(void);",
+      "returnType": "FLASH_Status",
+      "params": [],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE 成功；FLASH_ERROR_PG、FLASH_ERROR_WRP、FLASH_TIMEOUT 表示失败。",
+      "briefEn": "Erases all Bank2 FLASH pages.",
+      "briefZh": "擦除 Bank2 的全部 Flash 页。",
+      "usageZh": "仅 XL 大容量型号有效。**C8T6 没有 Bank2**，调用无效。即使在 XL 型号上这也是极度危险的操作。",
+      "prerequisites": [
+        "芯片必须是 STM32F10X_XL 大容量型号",
+        "已调用 FLASH_UnlockBank2"
+      ],
+      "registers": [
+        "FLASH_CR2",
+        "FLASH_SR2"
+      ],
+      "relatedFunctions": [
+        "FLASH_EraseAllPages",
+        "FLASH_UnlockBank2"
+      ],
+      "remarks": [
+        "This function can be used only for STM32F10x_XL density devices."
+      ],
+      "notesZh": [
+        "C8T6 上无效，返回的状态也不代表真实操作",
+        "在 XL 型号上会清空 Bank2 全部内容，是破坏性操作"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_COMPLETE",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_UnlockBank2"
+      ],
+      "headerLine": 403,
+      "sourceLine": 585,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_GetBank2Status",
+      "name": "FLASH_GetBank2Status",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec4",
+      "prototype": "FLASH_Status FLASH_GetBank2Status(void);",
+      "returnType": "FLASH_Status",
+      "params": [],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_BUSY, FLASH_ERROR_PG, FLASH_ERROR_WRP or FLASH_COMPLETE",
+      "returnDescZh": "返回 FLASH_Status：FLASH_BUSY、FLASH_ERROR_PG、FLASH_ERROR_WRP 或 FLASH_COMPLETE。",
+      "briefEn": "Returns the FLASH Bank2 Status.",
+      "briefZh": "读取 Flash Bank2 的当前状态。",
+      "usageZh": "仅 XL 大容量型号有效。**C8T6 没有 Bank2**，调用它读到的状态没有实际意义。",
+      "prerequisites": [
+        "芯片必须是 STM32F10X_XL 大容量型号"
+      ],
+      "registers": [
+        "FLASH_SR2"
+      ],
+      "relatedFunctions": [
+        "FLASH_GetStatus",
+        "FLASH_GetBank1Status",
+        "FLASH_UnlockBank2"
+      ],
+      "remarks": [
+        "This function can be used for STM32F10x_XL density devices."
+      ],
+      "notesZh": [
+        "**C8T6 上无效**，排查 Flash 问题请用 FLASH_GetStatus 或 FLASH_GetBank1Status",
+        "XL 型号上 Bank2 的状态是独立寄存器，不能用 Bank1 的状态代替"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_BUSY",
+        "FLASH_COMPLETE",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_GetBank1Status",
+        "FLASH_GetStatus",
+        "FLASH_Status"
+      ],
+      "headerLine": 404,
+      "sourceLine": 1553,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_WaitForLastBank2Operation",
+      "name": "FLASH_WaitForLastBank2Operation",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec3",
+      "prototype": "FLASH_Status FLASH_WaitForLastBank2Operation(uint32_t Timeout);",
+      "returnType": "FLASH_Status",
+      "params": [
+        {
+          "name": "Timeout",
+          "type": "uint32_t",
+          "descEn": "FLASH programming Timeout",
+          "descZh": "超时计数上限。"
+        }
+      ],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE、FLASH_BUSY、FLASH_ERROR_PG、FLASH_ERROR_WRP 或 FLASH_TIMEOUT。",
+      "briefEn": "Waits for a Flash operation on Bank2 to complete or a TIMEOUT to occur.",
+      "briefZh": "等待 Bank2 的上一次 Flash 操作完成或超时。",
+      "usageZh": "仅 XL 大容量型号有效。**C8T6 没有 Bank2**，调用无效。",
+      "prerequisites": [
+        "芯片必须是 STM32F10X_XL 大容量型号",
+        "已在 Bank2 上发起过擦写操作"
+      ],
+      "registers": [
+        "FLASH_SR2"
+      ],
+      "relatedFunctions": [
+        "FLASH_WaitForLastOperation",
+        "FLASH_GetBank2Status"
+      ],
+      "remarks": [
+        "This function can be used only for STM32F10x_XL density devices."
+      ],
+      "notesZh": [
+        "C8T6 上调用无效；等待 Bank1 操作用 FLASH_WaitForLastOperation",
+        "只等待不清标志"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_BUSY",
+        "FLASH_COMPLETE",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_WaitForLastOperation"
+      ],
+      "headerLine": 405,
+      "sourceLine": 1651,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "FLASH_BootConfig",
+      "name": "FLASH_BootConfig",
+      "peripheral": "FLASH",
+      "sectionId": "FLASH#sec5",
+      "prototype": "FLASH_Status FLASH_BootConfig(uint16_t FLASH_BOOT);",
+      "returnType": "FLASH_Status",
+      "params": [
+        {
+          "name": "FLASH_BOOT",
+          "type": "uint16_t",
+          "descEn": "select the FLASH Bank to boot from. This parameter can be one of the following values:",
+          "descZh": "启动 Bank 选择，FLASH_BOOT_Bank1 或 FLASH_BOOT_Bank2。"
+        }
+      ],
+      "returnDescEn": "FLASH Status: The returned value can be: FLASH_ERROR_PG, FLASH_ERROR_WRP, FLASH_COMPLETE or FLASH_TIMEOUT.",
+      "returnDescZh": "返回 FLASH_Status：FLASH_COMPLETE 成功；FLASH_ERROR_PG、FLASH_ERROR_WRP、FLASH_TIMEOUT 表示失败。",
+      "briefEn": "Configures to boot from Bank1 or Bank2.",
+      "briefZh": "配置从 Bank1 还是 Bank2 启动。",
+      "usageZh": "**仅 STM32F10X_XL 大容量型号（Flash ≥ 512KB，双 Bank）有效**。C8T6 只有 64KB 单 Bank，没有这个功能，调用无效。用于 XL 型号的双 Bank 引导（如 A/B 分区升级）。",
+      "prerequisites": [
+        "芯片必须是 STM32F10X_XL 大容量型号",
+        "已调用 FLASH_Unlock()，并已擦除选项字节"
+      ],
+      "registers": [
+        "FLASH_CR",
+        "FLASH_OPTCR",
+        "FLASH_SR"
+      ],
+      "relatedFunctions": [
+        "FLASH_EraseOptionBytes",
+        "FLASH_UserOptionByteConfig",
+        "FLASH_Unlock"
+      ],
+      "remarks": [
+        "This function can be used only for STM32F10x_XL density devices."
+      ],
+      "notesZh": [
+        "**C8T6 不支持**，它是单 Bank 64KB 芯片，调用不会有任何效果",
+        "在 XL 型号上改错了启动 Bank，而目标 Bank 里没有有效程序，芯片会跑飞，需要靠 SWD 恢复",
+        "修改复位后生效"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FLASH",
+        "FLASH_BOOT_Bank1",
+        "FLASH_BOOT_Bank2",
+        "FLASH_COMPLETE",
+        "FLASH_ERROR_PG",
+        "FLASH_ERROR_WRP",
+        "FLASH_Status",
+        "FLASH_TIMEOUT",
+        "FLASH_Unlock"
+      ],
+      "headerLine": 406,
+      "sourceLine": 1172,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    }
+  ]
+}

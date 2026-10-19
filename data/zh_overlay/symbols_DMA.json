@@ -1,0 +1,29 @@
+{
+  "_comment": "DMA 结构体成员中文。STM32F103C8T6 只有 DMA1（7 个通道），通道与外设的对应关系由硬件固定，不能自选。",
+  "symbols": {
+    "DMA_InitTypeDef": {
+      "briefZh": "DMA 通道初始化结构体，DMA_Init 用它配置传输方向、缓冲区地址与长度、数据宽度、循环模式与优先级。",
+      "usageZh": "C8T6 只有 DMA1 的 7 个通道，且每个通道固定绑定若干外设请求：USART1_TX=通道4、USART1_RX=通道5、USART2_TX=通道7、USART2_RX=通道6、SPI1_TX=通道3、SPI1_RX=通道2、I2C1_TX=通道6、I2C1_RX=通道7、ADC1=通道1、TIM1_CH1/CH2/TIM2_CH3/TIM4_CH1=通道5、TIM1_CH4/TIM2_UP/TIM3_CH3/TIM4_CH4=通道4、TIM2_CH1/TIM3_UP/TIM3_CH4/SPI2_RX/USART3_TX=通道2、TIM2_CH2/TIM3_CH1/SPI2_TX/USART3_RX=通道3、TIM2_CH4/TIM4_UP/I2C2_TX=通道7、I2C2_RX/USART1_TX=通道4。顺序：开 DMA1 时钟 RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1) → 填本结构体 → DMA_Init → DMA_Cmd(ENABLE) → 需要中断再加 DMA_ITConfig + NVIC_Init → 最后在外设侧开 DMA 请求（USART_DMACmd / SPI_I2S_DMACmd / ADC_DMACmd）。DMA_Cmd 会同时清除通道的中断标志，所以要在 DMA_ITConfig 之前调用。",
+      "notesZh": [
+        "通道选错不会报错也不会触发，现象是 DMA 全程不工作——这是 DMA 调试时最先要检查的一项。",
+        "C8T6 上所有 DMA 请求都走 DMA1，写成 DMA2 编译能过但 DMA2 不存在，DMA_Init 会写进非法地址。",
+        "DMA_Init 里隐含了中断使能/失能（最后一个参数按 DMA_M2M 是否置位推测），配置完必须调用 DMA_Cmd(ENABLE) 才真正开始传输。",
+        "同一通道在 ST 的标准映射里会同时挂在多个外设上（例如通道7 同时对应 USART2_TX 与 TIM2_CH4），两个外设不会自动仲裁，只能靠软件保证同一时刻只有一个在请求。",
+        "20KB RAM 的限制很紧：双缓冲、大块 ADC 采样数组要算着开，别一上来就 DMA_BufferSize=2048 半字。"
+      ],
+      "membersZh": {
+        "DMA_PeripheralBaseAddr": "外设侧地址，通常是外设数据寄存器地址，如 USART1_DR、SPI1_DR、ADC1_DR、TIM2_CCR1 的地址（用 (uint32_t)&USART1->DR 这种写法最稳妥，别手写绝对地址）。外设地址在搬运过程中一般不变，所以配合 DMA_PeripheralInc=Disable 使用；DMA_StructInit 默认给它 0xFFFFFFFF 这个哨兵值，忘了赋值就会去访问非法地址。",
+        "DMA_MemoryBaseAddr": "内存侧地址，即片内 RAM 的缓冲区首地址，如 (uint32_t)adc_buf 或 (uint32_t)tx_buf。发送时是数据源，接收时是目的地；必须是已分配好的有效地址，指向栈上的局部数组时要注意 DMA 传输期间函数不能返回。",
+        "DMA_DIR": "传输方向，决定外设是源还是目的：DMA_DIR_PeripheralSRC 表示外设→内存（ADC 采集、USART/SPI 接收、定时器捕获），DMA_DIR_PeripheralDST 表示内存→外设（USART/SPI 发送、DAC 输出）。方向填反时地址寄存器含义颠倒，数据会写进外设或读出一堆无效值。",
+        "DMA_BufferSize": "要搬运的数据个数（不是字节数），取值范围 0~65535，0 表示整 65536 个。单位由对应方向的数据宽度决定：当 DMA_PeripheralDataSize 与 DMA_MemoryDataSize 相同时就是字节数；两者不同（例如外设 16 位、内存 8 位）时按外设侧的宽度计数。注意传输过程中读 CNDTR 得到的是当前值的副本，不能当“剩余量”实时用，正常模式传完是 0，循环模式传完会重装。",
+        "DMA_PeripheralInc": "外设地址是否自增：DMA_PeripheralInc_Disable 表示外设地址固定（几乎所有外设数据寄存器都用这个），DMA_PeripheralInc_Enable 表示每传输一次外设地址加一个数据宽度。只有内存到内存或访问外设的一组连续寄存器时才需要 Enable，用错会读到外设的相邻寄存器。",
+        "DMA_MemoryInc": "内存地址是否自增：DMA_MemoryInc_Enable 表示按数组顺序依次搬运（缓冲区模式的标准选择），DMA_MemoryInc_Disable 表示内存地址固定——单值反复刷新（如固定输出一个 DAC 值、固定读一个寄存器）时用。忘记 Enable 会导致所有数据都写进缓冲区的第一个单元。",
+        "DMA_PeripheralDataSize": "外设侧每次搬运的宽度：DMA_PeripheralDataSize_Byte(8 位) / HalfWord(16 位) / Word(32 位)，要和外设数据寄存器实际宽度一致——USART/SPI 配 8 位时用 Byte，ADC 用 HalfWord，定时器 CCR 用 Word。这一项填错会一次搬走多个寄存器，数据完全错乱。",
+        "DMA_MemoryDataSize": "内存侧每次搬运的宽度：Byte / HalfWord / Word。一般与外设侧相同，例如 ADC 采集用 HalfWord 存进 uint16_t 数组；两者不同时 DMA 会按较窄的一侧做截断或零填充（例如内存 16 位、外设 8 位就只搬低字节）。",
+        "DMA_Mode": "工作模式：DMA_Mode_Normal 传完 DMA_BufferSize 个数据后停止，需要重新 DMA_Cmd 才能再传（适合一次性发送）；DMA_Mode_Circular 传完自动重装计数器并从缓冲区开头继续（适合 ADC 连续采集、串口不定长接收）。内存到内存（DMA_M2M_Enable）时不能用循环模式。",
+        "DMA_Priority": "通道软件优先级，决定多个通道同时请求时谁先占用总线：DMA_Priority_VeryHigh > High > Medium > Low。C8T6 上只能选这四档，别指望优先级能解决串口数据被丢帧的问题，真正要保证实时性应该保证单个传输的缓冲长度足够短。",
+        "DMA_M2M": "是否启用内存到内存搬运：DMA_M2M_Enable 时钟表里没有外设驱动，完全由软件写 CCR 的 EN 位启动，常用于快速内存拷贝、清屏、Flash 到 RAM 搬运。开启后 DMA_DIR、DMA_PeripheralInc/DataSize 都按“内存方式”解释，外设地址就是源地址，且不能用循环模式（DMA_Mode_Circular）。"
+      }
+    }
+  }
+}

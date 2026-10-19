@@ -1,0 +1,20 @@
+{
+  "_comment": "EXTI 枚举成员中文（面向 STM32F103C8T6）。",
+  "symbols": {
+    "EXTIMode_TypeDef": {
+      "briefZh": "外部中断线（EXTI）工作模式枚举，赋给 EXTI_InitTypeDef.EXTI_Mode，决定边沿事件产生中断还是只产生事件脉冲。",
+      "membersZh": {
+        "EXTI_Mode_Interrupt": "中断模式（0x00）。触发后置位挂起位并进入 NVIC，执行中断服务函数。典型场景：按键检测（PA0 → EXTI0_IRQHandler）、外部脉冲计数、唤醒 MCU。别忘了同时配 NVIC 优先级并调用 EXTI_Init，否则有挂起但进不了 ISR。",
+        "EXTI_Mode_Event": "事件模式（0x04）。触发后只产生内部事件脉冲（可唤醒 CPU 或联动其他外设），不置挂起位、不进入中断。典型场景：低功耗模式下用外部信号唤醒。易混点：事件模式不会进 ISR，若要响应则必须选 Interrupt 模式。"
+      }
+    },
+    "EXTITrigger_TypeDef": {
+      "briefZh": "外部中断触发边沿枚举，赋给 EXTI_InitTypeDef.EXTI_Trigger，决定 EXTI 线在上升沿、下降沿还是双沿触发。",
+      "membersZh": {
+        "EXTI_Trigger_Rising": "上升沿触发（0x08）。仅在 0→1 跳变时置位挂起。适合“低电平空闲、按下变高”的按键，或外部脉冲的起始计数；若信号是悬空按键请配下拉输入（IPD），否则噪声会误触发。",
+        "EXTI_Trigger_Falling": "下降沿触发（0x0C）。仅在 1→0 跳变时置位挂起。最常用于板上“按键按下接地”的电路（配 GPIO_Mode_IPU），也用于外部信号的结束沿检测。",
+        "EXTI_Trigger_Rising_Falling": "双沿触发（0x10）。上升沿和下降沿都置位挂起，一个信号跳变两次就触发两次。适合正交编码、脉冲边沿计数、需要测高/低脉宽的场合；若只关心一次按键事件，用双沿会在按下和松开时各触发一次，容易造成“按一次跳两次”。"
+      }
+    }
+  }
+}

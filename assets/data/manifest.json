@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "dataVersion": "1.0.0",
+  "splVersion": "STM32F10x_StdPeriph_Lib_V3.5.0",
+  "defaultChipId": "stm32f103c8t6",
+  "generatedAt": "2026-10-18T12:08:57+08:00",
+  "generator": "tools/merge_overlay.py",
+  "stats": {
+    "peripheralCount": 25,
+    "functionCount": 488,
+    "symbolCount": 7337,
+    "apiSymbolCount": 2450,
+    "registerSymbolCount": 4887,
+    "pinCount": 48,
+    "compileErrorCount": 15
+  },
+  "files": {
+    "peripherals": "peripherals.json",
+    "functions": "functions/",
+    "symbols": "symbols.json",
+    "registers": "registers.json",
+    "pinout": "pinout_f103c8t6.json",
+    "compileErrors": "compile_errors.json",
+    "chips": "chips/"
+  }
+}

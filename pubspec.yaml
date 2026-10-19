@@ -1,0 +1,66 @@
+name: stm32_spl_helper
+description: "STM32F103C8T6 标准外设库（SPL V3.5.0）离线查阅工具。完全离线，无任何网络请求。"
+publish_to: 'none'
+
+version: 1.0.3+5
+environment:
+  sdk: ^3.13.5
+
+# ---------------------------------------------------------------------------
+# 依赖说明（严格离线约束）
+#
+# 本项目运行时不允许发起任何网络请求。以下每个包都经过审查：
+#   - 均不申请 Android INTERNET 权限，不建立 socket 连接
+#   - 所有数据来自 assets/ 与本地 sqflite
+#
+# 明确排除的包（会被网络行为污染，或与离线目标冲突）：
+#   http / dio / retrofit     直接联网
+#   google_fonts              首次运行会去 fonts.gstatic.com 下载字体
+#   url_launcher              可打开任意 URL
+#   webview_flutter           可加载远程页面
+#   firebase_* / sentry_*     上报遥测
+#   connectivity_plus         无意义（本 APP 不关心网络状态）
+#   flutter_highlight         见 docs/phase0_architecture.md，改用自研高亮器
+#
+# 另：android/app/src/main/AndroidManifest.xml 中不声明 INTERNET 权限，
+# 这是运行期的硬保证——没有该权限，任何 socket 连接都会直接抛异常。
+# ---------------------------------------------------------------------------
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 状态管理。选 Riverpod 而非 Provider 的理由见 docs/phase0_architecture.md
+  flutter_riverpod: ^2.6.1
+
+  # 收藏 / 笔记 / 最近查看 / 搜索历史（本地 SQLite）
+  sqflite: ^2.4.1
+
+  # 取应用私有目录，用于导出笔记 Markdown
+  path_provider: ^2.1.5
+
+  # 拼接文件路径
+  path: ^1.9.0
+
+  # 主题模式 / 代码字号 / 显示开关三个标量
+  shared_preferences: ^2.3.3
+
+  # 导出笔记走系统分享面板（纯本地 Intent，不联网）
+  share_plus: ^10.1.4
+
+  # 索引构建时用 groupBy / firstWhereOrNull
+  collection: ^1.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # 静态数据。分层加载：manifest/peripherals/chips 首屏读，
+  # functions/* 进外设页时按需读，registers.json 看寄存器时才读。
+  assets:
+    - assets/data/
+    - assets/data/functions/
+    - assets/data/chips/

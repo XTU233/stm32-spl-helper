@@ -1,0 +1,2356 @@
+{
+  "schemaVersion": 1,
+  "peripheral": "I2C",
+  "functions": [
+    {
+      "id": "I2C_DeInit",
+      "name": "I2C_DeInit",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec1",
+      "prototype": "void I2C_DeInit(I2C_TypeDef* I2Cx);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。STM32F103C8T6 两个都有：I2C1 在 PB6(SCL)/PB7(SDA)，重映射后为 PB8/PB9；I2C2 在 PB10(SCL)/PB11(SDA)。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Deinitializes the I2Cx peripheral registers to their default reset values.",
+      "briefZh": "把 I2Cx 外设的所有寄存器复位为默认值（相当于对该外设做一次软件复位）。",
+      "usageZh": "用于重新配置 I2C 前把外设恢复到干净状态，或总线卡死后强制释放。它只复位 I2C 寄存器，**不会**复位对应的 GPIO，也不会解除引脚上的复用配置。若 I2C 从机把 SDA 一直拉低导致总线死锁，单靠 DeInit 往往解不开，还需要手动把 SCL 当普通 GPIO 敲 9 个时钟脉冲。",
+      "prerequisites": [
+        "已通过 RCC_APB1PeriphClockCmd 开启对应 I2C 时钟（复位也需要时钟）"
+      ],
+      "registers": [
+        "I2C_CR1",
+        "I2C_CR2",
+        "I2C_OAR1",
+        "I2C_OAR2",
+        "I2C_DR",
+        "I2C_SR1",
+        "I2C_SR2",
+        "I2C_CCR",
+        "I2C_TRISE"
+      ],
+      "relatedFunctions": [
+        "I2C_Init",
+        "I2C_Cmd",
+        "RCC_APB1PeriphClockCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "只复位 I2C 寄存器，GPIO 的复用配置仍然保留，重新初始化时 GPIO 一般不用再配一遍",
+        "调用前必须已经开 I2C 的 APB1 时钟，否则复位不生效（外设时钟关着时写寄存器无效）",
+        "总线被从机拉死时 DeInit 通常救不回来，正确做法是把 SCL 临时改成普通开漏输出、手动发 9 个脉冲后发 STOP"
+      ],
+      "exampleCode": "/* 重新配置 I2C 前先复位到默认值 */\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C1, ENABLE);\nI2C_DeInit(I2C1);\n\n/* 注意：DeInit 不会解除 PB6/PB7 的复用开漏配置，\n   重配置时要重新走一遍 GPIO_Init */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "GPIO_Init",
+        "I2C1",
+        "I2C2",
+        "I2C_TypeDef",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_I2C1"
+      ],
+      "headerLine": 533,
+      "sourceLine": 162,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_Init",
+      "name": "I2C_Init",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec1",
+      "prototype": "void I2C_Init(I2C_TypeDef* I2Cx, I2C_InitTypeDef* I2C_InitStruct);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "I2C_InitStruct",
+          "type": "I2C_InitTypeDef*",
+          "descEn": "pointer to a I2C_InitTypeDef structure that contains the configuration information for the specified I2C peripheral.",
+          "descZh": "指向 I2C_InitTypeDef 的指针，需填 6 个字段：I2C_Mode（I2C_Mode_I2C 或 I2C_Mode_SMBusDevice/I2C_Mode_SMBusHost）、I2C_DutyCycle（快速模式下 I2C_DutyCycle_2 或 I2C_DutyCycle_16_9，标准模式填 I2C_DutyCycle_2）、I2C_OwnAddress1（本机 7 位地址，主机模式随便填 0x00~0x7F）、I2C_Ack（I2C_Ack_Enable/I2C_Ack_Disable）、I2C_AcknowledgedAddress（I2C_AcknowledgedAddress_7bit/10bit）、I2C_ClockSpeed（100000 或 400000，也可更低如 50000）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Initializes the I2Cx peripheral according to the specified parameters in the I2C_InitStruct.",
+      "briefZh": "按 I2C_InitTypeDef 结构体配置 I2Cx 的时钟频率、工作模式、自身地址、应答和占空比。",
+      "usageZh": "**使用 I2C 前必须调用**，是整个 I2C 初始化的核心。关键字段是 I2C_ClockSpeed：库会根据它和当前 PCLK1 自动算 CCR 分频与 TRISE。STM32F103 的 I2C 挂在 APB1 上，PCLK1 最高 36MHz；若 I2C_ClockSpeed 配成 400000（快速模式），CCR 里的 F/S 位会自动切到快速模式，并需要按占空比设置。注意 I2C1 的 SCL/SDA 是**开漏**输出，必须在外部接 4.7kΩ 上拉（或用 MCU 内部上拉，但内部上拉约 40kΩ，只适合很短的连线与低速率）。",
+      "prerequisites": [
+        "已调用 RCC_APB1PeriphClockCmd 开启 I2C1/I2C2 时钟",
+        "已调用 RCC_APB2PeriphClockCmd 开启对应 GPIO 时钟，并把 SCL/SDA 配成 GPIO_Mode_AF_OD（复用开漏）",
+        "外部已有上拉电阻（典型 4.7kΩ），否则总线拉不高、通信必失败"
+      ],
+      "registers": [
+        "I2C_CR1",
+        "I2C_CR2",
+        "I2C_OAR1",
+        "I2C_OAR2",
+        "I2C_CCR",
+        "I2C_TRISE"
+      ],
+      "relatedFunctions": [
+        "I2C_StructInit",
+        "I2C_Cmd",
+        "GPIO_Init",
+        "RCC_APB1PeriphClockCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "**引脚必须是 GPIO_Mode_AF_OD（复用开漏）**。配成推挽（GPIO_Mode_AF_PP）时从机无法拉低总线做应答，表现为永远收不到 ACK，且可能烧引脚",
+        "开漏必须外接上拉电阻。内部上拉约 30~50kΩ，配 400kHz 时上升沿太慢，波形会变成三角波，通信随机失败",
+        "I2C_ClockSpeed 依赖 PCLK1 实际频率来算分频。如果调用顺序是「先 I2C_Init 再 RCC 配 PCLK1 到 36MHz」，算出的分频是错的，SCL 频率会偏离",
+        "I2C_OwnAddress1 用的是**左对齐的 8 位地址**（内部自己移位），不要预先左移一位；只做主机时该字段无实际作用但要赋值",
+        "快速模式（400kHz）下 I2C_DutyCycle 才有意义；如果配 I2C_DutyCycle_16_9 而 SCL 上升沿很慢，高电平时间不足会导致采样错误",
+        "从机模式要真正收到数据，I2C_Ack 必须是 I2C_Ack_Enable；从机接收完最后一个字节前才用 I2C_AcknowledgeConfig 关应答"
+      ],
+      "exampleCode": "GPIO_InitTypeDef GPIO_InitStructure;\nI2C_InitTypeDef I2C_InitStructure;\n\n/* 1. 开时钟 */\nRCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);\nRCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C1, ENABLE);\n\n/* 2. SCL=PB6, SDA=PB7，必须是复用开漏 */\nGPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;\nGPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;\nGPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_OD;\nGPIO_Init(GPIOB, &GPIO_InitStructure);\n\n/* 3. 配置 I2C：400kHz 主机 */\nI2C_InitStructure.I2C_Mode = I2C_Mode_I2C;\nI2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_2;\nI2C_InitStructure.I2C_OwnAddress1 = 0x00;   /* 主机模式不重要 */\nI2C_InitStructure.I2C_Ack = I2C_Ack_Enable;\nI2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;\nI2C_InitStructure.I2C_ClockSpeed = 400000;\nI2C_Init(I2C1, &I2C_InitStructure);\n\n/* 4. 使能 */\nI2C_Cmd(I2C1, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "GPIOB",
+        "GPIO_Init",
+        "GPIO_InitTypeDef",
+        "GPIO_Mode_AF_OD",
+        "GPIO_Mode_AF_PP",
+        "GPIO_Pin_6",
+        "GPIO_Pin_7",
+        "GPIO_Speed_50MHz",
+        "I2C1",
+        "I2C2",
+        "I2C_Ack_Disable",
+        "I2C_Ack_Enable",
+        "I2C_AcknowledgeConfig",
+        "I2C_AcknowledgedAddress_7bit",
+        "I2C_Cmd",
+        "I2C_DutyCycle_16_9",
+        "I2C_DutyCycle_2",
+        "I2C_InitTypeDef",
+        "I2C_Mode_I2C",
+        "I2C_Mode_SMBusDevice",
+        "I2C_Mode_SMBusHost",
+        "I2C_TypeDef",
+        "RCC",
+        "RCC_APB1PeriphClockCmd",
+        "RCC_APB1Periph_I2C1",
+        "RCC_APB2PeriphClockCmd",
+        "RCC_APB2Periph_GPIOB"
+      ],
+      "headerLine": 535,
+      "sourceLine": 191,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_StructInit",
+      "name": "I2C_StructInit",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec1",
+      "prototype": "void I2C_StructInit(I2C_InitTypeDef* I2C_InitStruct);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2C_InitStruct",
+          "type": "I2C_InitTypeDef*",
+          "descEn": "pointer to an I2C_InitTypeDef structure which will be initialized.",
+          "descZh": "指向待初始化的 I2C_InitTypeDef 结构体的指针。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Fills each I2C_InitStruct member with its default value.",
+      "briefZh": "把 I2C_InitTypeDef 结构体的所有字段填成库默认值。",
+      "usageZh": "在 I2C_Init 之前调用可避免漏赋值导致使用了栈上的随机值。默认值大致为：I2C_Mode_I2C、I2C_DutyCycle_2、I2C_OwnAddress1 = 0、I2C_Ack_Enable、I2C_AcknowledgedAddress_7bit、I2C_ClockSpeed = 5000（5kHz，很慢）。**默认的 5kHz 几乎肯定要改**，不改会导致 SCL 只有 5kHz，通信慢到像卡死。",
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": [
+        "I2C_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "默认 I2C_ClockSpeed 是 5000（5kHz），不改就直接用会导致 I2C 慢得离谱，看起来像通信失败",
+        "结构体里的字段是逐位写入寄存器的，漏赋值不会报错，只会用上次残留的值"
+      ],
+      "exampleCode": "I2C_InitTypeDef I2C_InitStructure;\n\nI2C_StructInit(&I2C_InitStructure);     /* 先给默认值 */\nI2C_InitStructure.I2C_ClockSpeed = 100000;  /* 默认 5000 太慢，必须改 */\nI2C_Init(I2C1, &I2C_InitStructure);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "I2C1",
+        "I2C_Ack_Enable",
+        "I2C_AcknowledgedAddress_7bit",
+        "I2C_DutyCycle_2",
+        "I2C_Init",
+        "I2C_InitTypeDef",
+        "I2C_Mode_I2C"
+      ],
+      "headerLine": 536,
+      "sourceLine": 298,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_Cmd",
+      "name": "I2C_Cmd",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec2",
+      "prototype": "void I2C_Cmd(I2C_TypeDef* I2Cx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the I2Cx peripheral. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能外设，DISABLE 关闭外设。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified I2C peripheral.",
+      "briefZh": "使能或关闭 I2Cx 外设（置位/清零 CR1 的 PE 位）。",
+      "usageZh": "I2C_Init 之后必须 I2C_Cmd(I2Cx, ENABLE) 才会真正工作。PE 是 I2C 的总开关，置位后才允许产生 START 等条件。另一个常见用途是**解除 STOPF 死锁**：STM32F103 的 I2C 在从机模式下检测到 STOP 后，若软件不清 STOPF，总线会被挂住，标准做法是读 SR1 再写 CR1（即再次调用 I2C_Cmd 使能）。",
+      "prerequisites": [
+        "已调用 I2C_Init 完成参数配置"
+      ],
+      "registers": [
+        "I2C_CR1"
+      ],
+      "relatedFunctions": [
+        "I2C_Init",
+        "I2C_SoftwareResetCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "PE 清零时 I2C 完全停止，SCL/SDA 释放为高阻；重新置位前建议重新走一遍 I2C_Init",
+        "STOPF 只能通过「读 SR1 再写 CR1」清除，单纯写 CR1 或单纯读 SR1 都不行，必须成对出现",
+        "从机模式下漏清 STOPF 是 I2C 卡死的经典原因：第一次通信正常，第二次完全没反应"
+      ],
+      "exampleCode": "I2C_Init(I2C1, &I2C_InitStructure);\nI2C_Cmd(I2C1, ENABLE);   /* PE 位置 1，I2C 才真正开始工作 */\n\n/* 清除 STOPF 的官方序列：先读 SR1，再写 CR1 */\nif (I2C_GetFlagStatus(I2C1, I2C_FLAG_STOPF) != RESET)\n{\n  I2C_Cmd(I2C1, ENABLE);  /* 写 CR1，STOPF 被清 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_FLAG_STOPF",
+        "I2C_GetFlagStatus",
+        "I2C_Init",
+        "I2C_TypeDef",
+        "RESET"
+      ],
+      "headerLine": 537,
+      "sourceLine": 322,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_DMACmd",
+      "name": "I2C_DMACmd",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec2",
+      "prototype": "void I2C_DMACmd(I2C_TypeDef* I2Cx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the I2C DMA transfer. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 允许 I2C 发 DMA 请求，DISABLE 禁止。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified I2C DMA requests.",
+      "briefZh": "使能或关闭 I2Cx 的 DMA 请求。",
+      "usageZh": "收发大量数据（如读写 EEPROM 整页、读传感器 FIFO）时用 DMA 替代逐字节轮询，可显著降低 CPU 占用。I2C1 的 DMA 请求映射到 DMA1_Channel6（TX）与 DMA1_Channel7（RX），I2C2 是 DMA1_Channel4（TX）与 DMA1_Channel5（RX）。DMA 只搬运 I2C_DR 数据，**不产生** START/STOP/地址，这些仍需软件按事件顺序操作。",
+      "prerequisites": [
+        "已用 DMA_Init 配置好对应 DMA 通道，并使能 DMA 时钟",
+        "已用 I2C_Cmd 使能 I2C 外设"
+      ],
+      "registers": [
+        "I2C_CR2"
+      ],
+      "relatedFunctions": [
+        "I2C_DMALastTransferCmd",
+        "DMA_Init",
+        "DMA_Cmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "I2C 的 DMA 通道是固定的：I2C1 用 DMA1_Channel6/7，I2C2 用 DMA1_Channel4/5，用错通道不会有任何反应",
+        "DMA 不会自动发 STOP，最后一字节必须手动调 I2C_GenerateSTOP，否则总线一直被占用",
+        "用 DMA 发送时，若在最后一个字节前就置了 I2C_DMALastTransferCmd，传输会提前结束"
+      ],
+      "exampleCode": "/* 用 DMA 发送 N 字节（地址与 START 仍需软件处理） */\nDMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&I2C1->DR;\nDMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)txBuf;\nDMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralDST;\nDMA_InitStructure.DMA_BufferSize = N;\nDMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;\nDMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;\nDMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;\nDMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;\nDMA_InitStructure.DMA_Mode = DMA_Mode_Normal;\nDMA_InitStructure.DMA_Priority = DMA_Priority_High;\nDMA_InitStructure.DMA_M2M = DMA_M2M_Disable;\nDMA_Init(DMA1_Channel6, &DMA_InitStructure);\n\nI2C_DMACmd(I2C1, ENABLE);\nDMA_Cmd(DMA1_Channel6, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "DMA1_Channel4",
+        "DMA1_Channel5",
+        "DMA1_Channel6",
+        "DMA1_Channel7",
+        "DMA_Cmd",
+        "DMA_DIR_PeripheralDST",
+        "DMA_Init",
+        "DMA_M2M_Disable",
+        "DMA_MemoryDataSize_Byte",
+        "DMA_MemoryInc_Enable",
+        "DMA_Mode_Normal",
+        "DMA_PeripheralDataSize_Byte",
+        "DMA_PeripheralInc_Disable",
+        "DMA_Priority_High",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_Cmd",
+        "I2C_DMALastTransferCmd",
+        "I2C_GenerateSTOP",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 538,
+      "sourceLine": 346,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_DMALastTransferCmd",
+      "name": "I2C_DMALastTransferCmd",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec2",
+      "prototype": "void I2C_DMALastTransferCmd(I2C_TypeDef* I2Cx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the I2C DMA last transfer. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 表示下次 DMA 传输为最后一次（会置 LAST 位），DISABLE 取消。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Specifies if the next DMA transfer will be the last one.",
+      "briefZh": "告诉 I2C 硬件「下一次 DMA 传输是最后一次」，让硬件在传输结束后自动发 STOP。",
+      "usageZh": "在 DMA 发送模式的最后一个数据字节之前调用，可让 I2C 硬件在 DMA 计数归零后自动产生 STOP 条件，省掉软件判断。只在**发送方向**有意义；接收方向不能靠它自动发 STOP。",
+      "prerequisites": [
+        "已在 DMA 发送模式下使用 I2C_DMACmd 使能了 DMA 请求"
+      ],
+      "registers": [
+        "I2C_CR2"
+      ],
+      "relatedFunctions": [
+        "I2C_DMACmd",
+        "I2C_GenerateSTOP"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "LAST 位在传输结束后由硬件自动清除，不需要手工清",
+        "接收方向没有自动 STOP 的效果，读完数据仍要手动 I2C_GenerateSTOP",
+        "如果 DMA 计数值与实际字节数不一致，会在错误的时刻发 STOP，数据可能缺一个字节"
+      ],
+      "exampleCode": "/* DMA 发送最后一个字节前调用，传输完自动发 STOP */\nI2C_DMALastTransferCmd(I2C1, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_DMACmd",
+        "I2C_GenerateSTOP",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 539,
+      "sourceLine": 370,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_GenerateSTART",
+      "name": "I2C_GenerateSTART",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec3",
+      "prototype": "void I2C_GenerateSTART(I2C_TypeDef* I2Cx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the I2C START condition generation. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 产生 START 条件，DISABLE 取消（一般不用 DISABLE）。"
+        }
+      ],
+      "returnDescEn": "None.",
+      "returnDescZh": "无返回值",
+      "briefEn": "Generates I2Cx communication START condition.",
+      "briefZh": "产生 I2C 的 START（起始）条件。",
+      "usageZh": "主机发起一次传输的第一步。调用后必须**等待 SB 标志置位**再发地址，顺序写错是最常见的坑：直接 GenerateSTART 后立刻 I2C_Send7bitAddress，地址会被丢弃。正确流程是 GenerateSTART → 等 I2C_FLAG_SB → 发地址。若当前是重复起始（Restart），同样用这个函数，硬件会自动在 STOP 之前发 Restart。",
+      "prerequisites": [
+        "已 I2C_Cmd(I2Cx, ENABLE) 使能外设",
+        "总线空闲（I2C_FLAG_BUSY 为 RESET），否则 START 不会产生"
+      ],
+      "registers": [
+        "I2C_CR1",
+        "I2C_SR1"
+      ],
+      "relatedFunctions": [
+        "I2C_CheckEvent",
+        "I2C_Send7bitAddress",
+        "I2C_GenerateSTOP"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "**发完 START 必须等 SB 事件再发地址**，否则传输直接失败（这是 I2C 最常见的错误）",
+        "总线 BUSY 时 GenerateSTART 会被硬件忽略，要先用超时循环等 BUSY 清零",
+        "在从机模式下调用无意义，START 由主机产生",
+        "I2C 有勘误：在极端时序下 START 位可能被硬件清除但 SB 不置位，稳健的代码要给等待加超时并复位重试"
+      ],
+      "exampleCode": "/* 标准的主机发送流程：每一步都必须等对应事件 */\nI2C_GenerateSTART(I2C1, ENABLE);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT));  /* 等 SB */\n\nI2C_Send7bitAddress(I2C1, 0xA0, I2C_Direction_Transmitter);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED)); /* 等 ADDR+TXE */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_CheckEvent",
+        "I2C_Cmd",
+        "I2C_Direction_Transmitter",
+        "I2C_EVENT_MASTER_MODE_SELECT",
+        "I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED",
+        "I2C_FLAG_BUSY",
+        "I2C_FLAG_SB",
+        "I2C_Send7bitAddress",
+        "I2C_TypeDef",
+        "RESET"
+      ],
+      "headerLine": 540,
+      "sourceLine": 394,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_GenerateSTOP",
+      "name": "I2C_GenerateSTOP",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec3",
+      "prototype": "void I2C_GenerateSTOP(I2C_TypeDef* I2Cx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the I2C STOP condition generation. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 产生 STOP 条件，DISABLE 取消。"
+        }
+      ],
+      "returnDescEn": "None.",
+      "returnDescZh": "无返回值",
+      "briefEn": "Generates I2Cx communication STOP condition.",
+      "briefZh": "产生 I2C 的 STOP（停止）条件，结束本次传输。",
+      "usageZh": "一次通信结束时调用，释放总线。发送流程中应在最后一个字节的 BTF 事件之后调用；接收流程中要在读走最后一个字节前先产生 STOP/NACK。漏发 STOP 会让总线一直处于 BUSY 状态，下一次 GenerateSTART 直接无效——这是「第一次通信正常、第二次就没反应」的最常见原因。",
+      "prerequisites": [
+        "当前处于主机模式且传输已到最后一个字节"
+      ],
+      "registers": [
+        "I2C_CR1"
+      ],
+      "relatedFunctions": [
+        "I2C_GenerateSTART",
+        "I2C_CheckEvent",
+        "I2C_AcknowledgeConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "**漏发 STOP 会让 BUSY 一直为 1**，之后所有 START 都无效，看起来像 I2C 完全死掉",
+        "接收流程里顺序是「先关 ACK、再发 STOP、最后读数据」，反过来会多读一个字节",
+        "STOP 产生后硬件自动清 BUSY，但有一定延时，紧接着发 START 前最好判一下 BUSY"
+      ],
+      "exampleCode": "/* 主机接收 N 字节：最后一个字节前发 NACK + STOP */\nI2C_AcknowledgeConfig(I2C1, DISABLE);      /* 最后 1 字节回 NACK */\nI2C_GenerateSTOP(I2C1, ENABLE);\nlastByte = I2C_ReceiveData(I2C1);          /* 读走即完成 */\nI2C_AcknowledgeConfig(I2C1, ENABLE);       /* 恢复 ACK 供下次使用 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_AcknowledgeConfig",
+        "I2C_ReceiveData",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 541,
+      "sourceLine": 418,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_AcknowledgeConfig",
+      "name": "I2C_AcknowledgeConfig",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec4",
+      "prototype": "void I2C_AcknowledgeConfig(I2C_TypeDef* I2Cx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the I2C Acknowledgement. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 收到字节后回 ACK（默认），DISABLE 回 NACK。"
+        }
+      ],
+      "returnDescEn": "None.",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified I2C acknowledge feature.",
+      "briefZh": "使能或关闭 I2C 的应答（ACK）功能。",
+      "usageZh": "主机接收数据时，**除最后一个字节外都要回 ACK**，读到最后一个字节前要先关闭 ACK 回 NACK，从机才知道数据结束。从机模式下要一直保持 ENABLE，否则主机发的地址和数据都收不到。典型顺序：读 N-1 个字节（ACK），然后 DISABLE ACK + GenerateSTOP，最后读走第 N 个字节，读完再把 ACK 打开。",
+      "prerequisites": [
+        "已 I2C_Cmd(I2Cx, ENABLE) 使能外设"
+      ],
+      "registers": [
+        "I2C_CR1"
+      ],
+      "relatedFunctions": [
+        "I2C_ReceiveData",
+        "I2C_GenerateSTOP",
+        "I2C_CheckEvent"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "**忘记在读完后恢复 ENABLE**，下一次读取会只收到一个字节就 NACK，表现为第二次读数据异常",
+        "接收最后一个字节前不关 ACK，从机会以为还要继续发，可能一直占着总线",
+        "关 ACK 的时机必须在最后一个字节的 RXNE 置位之前，晚了就不生效",
+        "从机模式下关掉 ACK 会导致主机通信失败，通常只在「从机故意拒收」时使用"
+      ],
+      "exampleCode": "/* 主机接收 2 字节，按手册的 2 字节接收流程 */\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED));\n\n/* 2 字节接收：先设 POS，再在 ADDR 后立刻关 ACK 并置 STOP */\nI2C_NACKPositionConfig(I2C1, I2C_NACKPosition_Next);\nI2C_AcknowledgeConfig(I2C1, DISABLE);\nI2C_GenerateSTOP(I2C1, ENABLE);\n\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_RECEIVED));\nbuf[0] = I2C_ReceiveData(I2C1);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_RECEIVED));\nbuf[1] = I2C_ReceiveData(I2C1);\n\nI2C_AcknowledgeConfig(I2C1, ENABLE);   /* 恢复 ACK，否则下次读只能收到 1 字节 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_CheckEvent",
+        "I2C_Cmd",
+        "I2C_EVENT_MASTER_BYTE_RECEIVED",
+        "I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED",
+        "I2C_GenerateSTOP",
+        "I2C_NACKPositionConfig",
+        "I2C_NACKPosition_Next",
+        "I2C_ReceiveData",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 542,
+      "sourceLine": 442,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_OwnAddress2Config",
+      "name": "I2C_OwnAddress2Config",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec4",
+      "prototype": "void I2C_OwnAddress2Config(I2C_TypeDef* I2Cx, uint8_t Address);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "Address",
+          "type": "uint8_t",
+          "descEn": "specifies the 7bit I2C own address2.",
+          "descZh": "7 位从机地址，取值范围 0x00~0x7F。硬件会左移一位后写入 OAR2，所以直接写 7 位原值，不要预先左移。"
+        }
+      ],
+      "returnDescEn": "None.",
+      "returnDescZh": "无返回值",
+      "briefEn": "Configures the specified I2C own address2.",
+      "briefZh": "设置 I2C 从机的第二个自身地址（OAR2）。",
+      "usageZh": "配合 I2C_DualAddressCmd 使用，让从机额外响应一个 7 位地址。第一个地址在 I2C_Init 里通过 I2C_OwnAddress1 设置。",
+      "prerequisites": [
+        "已 I2C_Cmd 使能外设",
+        "使用前还需 I2C_DualAddressCmd(I2Cx, ENABLE)"
+      ],
+      "registers": [
+        "I2C_OAR2"
+      ],
+      "relatedFunctions": [
+        "I2C_DualAddressCmd",
+        "I2C_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "只接受 7 位地址，传超过 0x7F 的值会被硬件截断",
+        "OAR2 的最低位（bit0）固定为 0，硬件忽略，所以 0x32 与 0x33 是同一个地址",
+        "不配合 I2C_DualAddressCmd 使能的话，写进去也不会生效"
+      ],
+      "exampleCode": "/* 从机额外响应 0x32 */\nI2C_OwnAddress2Config(I2C1, 0x32);\nI2C_DualAddressCmd(I2C1, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "I2C1",
+        "I2C2",
+        "I2C_Cmd",
+        "I2C_DualAddressCmd",
+        "I2C_Init",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 543,
+      "sourceLine": 465,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_DualAddressCmd",
+      "name": "I2C_DualAddressCmd",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec2",
+      "prototype": "void I2C_DualAddressCmd(I2C_TypeDef* I2Cx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the I2C dual addressing mode. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能双地址，DISABLE 只响应 OAR1。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified I2C dual addressing mode.",
+      "briefZh": "使能或关闭 I2C 的双地址模式（从机可同时响应 OAR1 与 OAR2 两个地址）。",
+      "usageZh": "只在**从机模式**下有意义：当设备需要接受两个不同的 7 位地址时使用，第二个地址由 I2C_OwnAddress2Config 设置。做主机时不要开这个功能。",
+      "prerequisites": [
+        "已用 I2C_OwnAddress2Config 设置第二个地址",
+        "I2C_DualAddressCmd 只对 7 位地址模式有效（OAR1 的 ADDMODE 位要清零）"
+      ],
+      "registers": [
+        "I2C_OAR2",
+        "I2C_CR1"
+      ],
+      "relatedFunctions": [
+        "I2C_OwnAddress2Config",
+        "I2C_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "10 位地址模式下双地址功能无效，ADDMODE 位必须为 7 位模式",
+        "OAR2 的最低位固定为 0（硬件忽略），所以 0x32 与 0x33 效果相同"
+      ],
+      "exampleCode": "/* 从机同时响应 0x30 和 0x32 两个地址 */\nI2C_OwnAddress2Config(I2C1, 0x32);\nI2C_DualAddressCmd(I2C1, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_OwnAddress2Config",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 544,
+      "sourceLine": 492,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_GeneralCallCmd",
+      "name": "I2C_GeneralCallCmd",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec2",
+      "prototype": "void I2C_GeneralCallCmd(I2C_TypeDef* I2Cx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the I2C General call. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 响应广播地址 0x00，DISABLE 忽略。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified I2C general call feature.",
+      "briefZh": "使能或关闭 I2C 的广播呼叫（General Call，地址 0x00）响应。",
+      "usageZh": "从机模式下需要响应主机发出的通用广播地址 0x00 时才开。开启后收到广播地址会置 ADDR 标志并且 GENCALL 位置位，可用 I2C_GetFlagStatus 判断。",
+      "prerequisites": [
+        "I2C 已工作于从机模式"
+      ],
+      "registers": [
+        "I2C_CR1",
+        "I2C_SR2"
+      ],
+      "relatedFunctions": [
+        "I2C_GetFlagStatus",
+        "I2C_AcknowledgeConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "开广播后，任何主机往 0x00 发数据本机都会应答，可能与其他设备冲突",
+        "广播呼叫的第二字节若是 0x06 表示软复位，正常从机应当处理而不是当成普通数据"
+      ],
+      "exampleCode": "I2C_GeneralCallCmd(I2C1, ENABLE);\n\n/* 中断里判断是不是广播呼叫 */\nif (I2C_GetFlagStatus(I2C1, I2C_FLAG_GENCALL) != RESET)\n{\n  /* 收到广播地址 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_FLAG_GENCALL",
+        "I2C_GetFlagStatus",
+        "I2C_TypeDef",
+        "RESET"
+      ],
+      "headerLine": 545,
+      "sourceLine": 516,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_ITConfig",
+      "name": "I2C_ITConfig",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec5",
+      "prototype": "void I2C_ITConfig(I2C_TypeDef* I2Cx, uint16_t I2C_IT, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "I2C_IT",
+          "type": "uint16_t",
+          "descEn": "specifies the I2C interrupts sources to be enabled or disabled. This parameter can be any combination of the following values:",
+          "descZh": "中断源，可取 I2C_IT_BUF（缓冲区空/非空）、I2C_IT_EVT（事件）、I2C_IT_ERR（错误），可用 | 组合。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the specified I2C interrupts. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified I2C interrupts.",
+      "briefZh": "使能或关闭 I2Cx 的指定中断源。",
+      "usageZh": "中断方式收发 I2C 时使用。常用组合：I2C_IT_BUF（TXE/RXNE，缓冲区中断，每个字节都进一次）、I2C_IT_EVT（事件中断，SB/ADDR/BTF 等状态变化）、I2C_IT_ERR（错误中断，BERR/ARLO/AF/OVR）。**注意开了 I2C_ITConfig 还必须调 NVIC_Init 配置 NVIC 通道**，否则中断不会进；I2C1 的事件与错误共用 I2C1_EV_IRQn 和 I2C1_ER_IRQn 两个向量。",
+      "prerequisites": [
+        "已调用 NVIC_Init 配置 I2C1_EV_IRQn / I2C1_ER_IRQn 并使能中断通道",
+        "已 I2C_Cmd(I2Cx, ENABLE) 使能外设"
+      ],
+      "registers": [
+        "I2C_CR2"
+      ],
+      "relatedFunctions": [
+        "I2C_GetITStatus",
+        "I2C_ClearITPendingBit",
+        "NVIC_Init",
+        "NVIC_PriorityGroupConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "只调 I2C_ITConfig 不调 NVIC_Init，中断永远不会触发，且不报错",
+        "**I2C_IT_BUF 会在每个字节都产生中断**，如果中断里处理慢，很容易触发 OVR 溢出，建议只在确实需要收发时才开",
+        "I2C1 有 I2C1_EV_IRQn 与 I2C1_ER_IRQn 两个向量，错误中断要单独配；只配 EV 而没配 ER，错误发生时中断进不去",
+        "开了 I2C_IT_ERR 后必须在 ISR 里读 SR1/SR2 清错误标志，否则会反复进中断"
+      ],
+      "exampleCode": "/* 中断方式：先配 NVIC，再开中断源 */\nNVIC_InitStructure.NVIC_IRQChannel = I2C1_EV_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\nI2C_ITConfig(I2C1, I2C_IT_EVT | I2C_IT_ERR, ENABLE);\nI2C_ITConfig(I2C1, I2C_IT_BUF, ENABLE);   /* 收发数据时才开 */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_Cmd",
+        "I2C_IT_BUF",
+        "I2C_IT_ERR",
+        "I2C_IT_EVT",
+        "I2C_TypeDef",
+        "NVIC",
+        "NVIC_Init"
+      ],
+      "headerLine": 546,
+      "sourceLine": 545,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_SendData",
+      "name": "I2C_SendData",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec6",
+      "prototype": "void I2C_SendData(I2C_TypeDef* I2Cx, uint8_t Data);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "Data",
+          "type": "uint8_t",
+          "descEn": "Byte to be transmitted..",
+          "descZh": "要发送的字节，8 位（uint8_t），取值 0x00~0xFF。I2C 一次只传 8 位。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Sends a data byte through the I2Cx peripheral.",
+      "briefZh": "向 I2Cx 的数据寄存器写一个字节。",
+      "usageZh": "发送数据或从机地址后的数据体时使用。**它不会等待，也不判断 TXE**，写之前必须确认 TXE 已置位（I2C_EVENT_MASTER_BYTE_TRANSMITTING）。如果 DR 里还有没发完的数据就硬写，新数据会被丢弃且没有任何提示。发送最后一个字节后要等 BTF（I2C_EVENT_MASTER_BYTE_TRANSMITTED）再发 STOP。",
+      "prerequisites": [
+        "已进入主机发送模式（ADDR 事件已过，即 I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED 已成立）",
+        "写入前 TXE 已置位"
+      ],
+      "registers": [
+        "I2C_DR",
+        "I2C_SR1"
+      ],
+      "relatedFunctions": [
+        "I2C_CheckEvent",
+        "I2C_Send7bitAddress",
+        "I2C_GenerateSTOP",
+        "I2C_ReceiveData"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "**写 DR 前不判 TXE 会静默丢字节**，是「数据偶尔少一个」的常见原因",
+        "写 DR 也是清除 SB、ADDR、BTF 标志的硬件序列的一部分，所以在 ISR 里写 DR 会顺带清标志",
+        "最后一个字节必须等 BTF 再发 STOP，只等 TXE 就发 STOP 会把最后一字节截断",
+        "从机发送模式下 TXE 中断里写 DR，若主机提前 NACK，会置 AF 标志，要一并处理"
+      ],
+      "exampleCode": "/* 写寄存器：先发寄存器地址，再发数据 */\nI2C_SendData(I2C1, 0x10);                               /* 寄存器地址 */\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTING));\n\nI2C_SendData(I2C1, 0x55);                               /* 数据 */\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTED));\nI2C_GenerateSTOP(I2C1, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "I2C1",
+        "I2C2",
+        "I2C_CheckEvent",
+        "I2C_EVENT_MASTER_BYTE_TRANSMITTED",
+        "I2C_EVENT_MASTER_BYTE_TRANSMITTING",
+        "I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED",
+        "I2C_GenerateSTOP",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 547,
+      "sourceLine": 570,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_ReceiveData",
+      "name": "I2C_ReceiveData",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec7",
+      "prototype": "uint8_t I2C_ReceiveData(I2C_TypeDef* I2Cx);",
+      "returnType": "uint8_t",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        }
+      ],
+      "returnDescEn": "The value of the received data.",
+      "returnDescZh": "返回收到的 8 位数据（0x00~0xFF）。",
+      "briefEn": "Returns the most recent received data by the I2Cx peripheral.",
+      "briefZh": "从 I2Cx 数据寄存器读出最近收到的字节。",
+      "usageZh": "主机接收或从机接收时读取数据。**读 DR 本身就是清除 RXNE、BTF、ADDR 标志的硬件序列**，所以在中断里读 DR 后不要再单独去清标志。读之前应确认 RXNE 已置位（I2C_EVENT_MASTER_BYTE_RECEIVED）。主机接收最后一个字节前，要先关 ACK 并产生 STOP，再读走数据。",
+      "prerequisites": [
+        "已收到 ADDR 事件且方向为接收（I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED 已成立）",
+        "读取前 RXNE 已置位"
+      ],
+      "registers": [
+        "I2C_DR",
+        "I2C_SR1"
+      ],
+      "relatedFunctions": [
+        "I2C_CheckEvent",
+        "I2C_AcknowledgeConfig",
+        "I2C_GenerateSTOP",
+        "I2C_SendData"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "**读 DR 会清 RXNE/ADDR/BTF**，在 ISR 里读完不要再调 I2C_ClearITPendingBit 清这些",
+        "最后一个字节读之前必须先发 STOP 并关 ACK，顺序反了会多读一个无效字节",
+        "读完不恢复 ACK，下一次读取只能收到 1 个字节",
+        "从机模式下如果不及时读走数据（RXNE 一直为 1），下一个字节到来会置 OVR 溢出错误"
+      ],
+      "exampleCode": "/* 主机接收 4 字节 */\nI2C_GenerateSTART(I2C1, ENABLE);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT));\nI2C_Send7bitAddress(I2C1, 0x68, I2C_Direction_Receiver);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED));\n\nfor (i = 0; i < 3; i++)                     /* 前 3 字节回 ACK */\n{\n  while (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_RECEIVED));\n  buf[i] = I2C_ReceiveData(I2C1);\n}\n\nI2C_AcknowledgeConfig(I2C1, DISABLE);       /* 最后一个字节回 NACK */\nI2C_GenerateSTOP(I2C1, ENABLE);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_RECEIVED));\nbuf[3] = I2C_ReceiveData(I2C1);\nI2C_AcknowledgeConfig(I2C1, ENABLE);        /* 恢复 ACK */",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "I2C1",
+        "I2C2",
+        "I2C_AcknowledgeConfig",
+        "I2C_CheckEvent",
+        "I2C_ClearITPendingBit",
+        "I2C_Direction_Receiver",
+        "I2C_EVENT_MASTER_BYTE_RECEIVED",
+        "I2C_EVENT_MASTER_MODE_SELECT",
+        "I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED",
+        "I2C_GenerateSTART",
+        "I2C_GenerateSTOP",
+        "I2C_Send7bitAddress",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 548,
+      "sourceLine": 583,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_Send7bitAddress",
+      "name": "I2C_Send7bitAddress",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec6",
+      "prototype": "void I2C_Send7bitAddress(I2C_TypeDef* I2Cx, uint8_t Address, uint8_t I2C_Direction);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "Address",
+          "type": "uint8_t",
+          "descEn": "specifies the slave address which will be transmitted",
+          "descZh": "从机 7 位地址（0x00~0x7F），库内部会自动左移一位。**不要自己左移**，例如 AT24C02 的 7 位地址是 0x50，就传 0x50 而不是 0xA0。"
+        },
+        {
+          "name": "I2C_Direction",
+          "type": "uint8_t",
+          "descEn": "specifies whether the I2C device will be a Transmitter or a Receiver. This parameter can be one of the following values",
+          "descZh": "I2C_Direction_Transmitter（写，方向位 0）或 I2C_Direction_Receiver（读，方向位 1）。"
+        }
+      ],
+      "returnDescEn": "None.",
+      "returnDescZh": "无返回值",
+      "briefEn": "Transmits the address byte to select the slave device.",
+      "briefZh": "发送从机地址字节（7 位地址 + 读写方向位）。",
+      "usageZh": "START 条件产生、SB 事件到达之后的第二步。第二个参数 I2C_Direction 决定后面的传输方向（写还是读）。调用后要等 ADDR 事件（I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED 或 I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED）。如果从机不存在或地址写错，会置 AF 标志，事件永远等不到。",
+      "prerequisites": [
+        "已 I2C_GenerateSTART 并等到 I2C_EVENT_MASTER_MODE_SELECT（SB 置位）"
+      ],
+      "registers": [
+        "I2C_DR",
+        "I2C_SR1",
+        "I2C_SR2"
+      ],
+      "relatedFunctions": [
+        "I2C_GenerateSTART",
+        "I2C_CheckEvent",
+        "I2C_AcknowledgeConfig",
+        "I2C_GenerateSTOP"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "**Address 传 7 位原值**，库内部会左移。传 0xA0 这种「已左移」的地址会变成 0x40，通信必然失败（这是极高频的错误）",
+        "发地址前没等 SB，地址会被硬件丢弃，表现为一直等不到 ADDR 事件",
+        "从机不存在时置 AF 标志，等 ADDR 会死循环，必须加超时；清 AF 后要补一个 STOP",
+        "10 位地址不能用这个函数，要用两次写 DR 的方式并等 I2C_EVENT_MASTER_MODE_ADDRESS10"
+      ],
+      "exampleCode": "/* 读 MPU6050 的 WHO_AM_I（从机地址 0x68） */\nI2C_GenerateSTART(I2C1, ENABLE);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT));\n\n/* 先写寄存器地址：方向 = 发送 */\nI2C_Send7bitAddress(I2C1, 0x68, I2C_Direction_Transmitter);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));\nI2C_SendData(I2C1, 0x75);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTED));\n\n/* 重复起始，方向 = 接收 */\nI2C_GenerateSTART(I2C1, ENABLE);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT));\nI2C_Send7bitAddress(I2C1, 0x68, I2C_Direction_Receiver);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED));",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "I2C1",
+        "I2C2",
+        "I2C_CheckEvent",
+        "I2C_Direction_Receiver",
+        "I2C_Direction_Transmitter",
+        "I2C_EVENT_MASTER_BYTE_TRANSMITTED",
+        "I2C_EVENT_MASTER_MODE_ADDRESS10",
+        "I2C_EVENT_MASTER_MODE_SELECT",
+        "I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED",
+        "I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED",
+        "I2C_GenerateSTART",
+        "I2C_SendData",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 549,
+      "sourceLine": 601,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_ReadRegister",
+      "name": "I2C_ReadRegister",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec8",
+      "prototype": "uint16_t I2C_ReadRegister(I2C_TypeDef* I2Cx, uint8_t I2C_Register);",
+      "returnType": "uint16_t",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "I2C_Register",
+          "type": "uint8_t",
+          "descEn": "specifies the register to read. This parameter can be one of the following values:",
+          "descZh": "要读的寄存器，用 I2C_Register_xxx 宏，如 I2C_Register_SR1、I2C_Register_SR2、I2C_Register_CCR、I2C_Register_TRISE。"
+        }
+      ],
+      "returnDescEn": "The value of the read register.",
+      "returnDescZh": "返回读取到的寄存器值（16 位）。",
+      "briefEn": "Reads the specified I2C register and returns its value.",
+      "briefZh": "直接读取 I2Cx 的某个寄存器并返回其值。",
+      "usageZh": "库提供的底层后门，常用于调试或读状态寄存器判断总线情况（例如读 I2C_SR2 看 BUSY/MSL/TRA）。寄存器名用 I2C_Register_CR1、I2C_Register_CR2、I2C_Register_OAR1、I2C_Register_OAR2、I2C_Register_DR、I2C_Register_SR1、I2C_Register_SR2、I2C_Register_CCR、I2C_Register_TRISE 这些宏。",
+      "prerequisites": [
+        "已开 I2C 时钟（否则读回的值无意义）"
+      ],
+      "registers": [
+        "I2C_CR1",
+        "I2C_CR2",
+        "I2C_OAR1",
+        "I2C_OAR2",
+        "I2C_DR",
+        "I2C_SR1",
+        "I2C_SR2",
+        "I2C_CCR",
+        "I2C_TRISE"
+      ],
+      "relatedFunctions": [
+        "I2C_GetFlagStatus",
+        "I2C_GetLastEvent"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "读 SR1 会参与标志清除序列（读 SR1 + 读 SR2 清 ADDR），调试时随手读它可能改变现场状态",
+        "**读 SR2 会清 ADDR 标志**，这是硬件的副作用，排查「ADDR 怎么自己没了」时要注意",
+        "它不做任何参数校验，传错寄存器宏会读到相邻寄存器"
+      ],
+      "exampleCode": "/* 调试：看 CCR 与 TRISE 算出来对不对 */\nuint16_t ccr = I2C_ReadRegister(I2C1, I2C_Register_CCR);\nuint16_t trise = I2C_ReadRegister(I2C1, I2C_Register_TRISE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "I2C1",
+        "I2C2",
+        "I2C_Register_CCR",
+        "I2C_Register_CR1",
+        "I2C_Register_CR2",
+        "I2C_Register_DR",
+        "I2C_Register_OAR1",
+        "I2C_Register_OAR2",
+        "I2C_Register_SR1",
+        "I2C_Register_SR2",
+        "I2C_Register_TRISE",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 550,
+      "sourceLine": 636,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_SoftwareResetCmd",
+      "name": "I2C_SoftwareResetCmd",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec2",
+      "prototype": "void I2C_SoftwareResetCmd(I2C_TypeDef* I2Cx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the I2C software reset. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 触发软件复位，DISABLE 释放复位。两者必须成对调用。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified I2C software reset.",
+      "briefZh": "对 I2Cx 执行一次软件复位（置位 CR1 的 SWRST 位），把所有 I2C 状态机清零。",
+      "usageZh": "**总线卡死时的救命函数**。当 I2C 因为仲裁丢失、总线错误或漏清标志而处于异常状态（BUSY 一直为 1、无法产生 START）时，可以软件复位。注意 STM32F103 的 SWRST 是「写 1 生效、需手动写 0 释放」，SPL 里就是先 ENABLE 再 DISABLE 成对调用。复位后必须重新 I2C_Init 并 I2C_Cmd(ENABLE)。",
+      "prerequisites": [
+        "已开 I2C 时钟（复位寄存器也需要时钟）"
+      ],
+      "registers": [
+        "I2C_CR1",
+        "I2C_SR1",
+        "I2C_SR2"
+      ],
+      "relatedFunctions": [
+        "I2C_DeInit",
+        "I2C_Init",
+        "I2C_Cmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "**必须成对调用 ENABLE/DISABLE**，只写 ENABLE 会让 I2C 一直处于复位状态，之后所有操作都没反应",
+        "软件复位会清掉 I2C_Init 的全部配置，复位后必须重新 I2C_Init",
+        "如果从机把 SDA 死拉低，软件复位也解不开，只能手动发 9 个 SCL 脉冲",
+        "STM32F103 的 I2C 有已知勘误：即使按手册流程清标志，某些时序下仍可能出现总线上锁死，恢复流程建议写成「软件复位 + 重初始化 + 超时重试」"
+      ],
+      "exampleCode": "/* 总线卡死时的恢复流程 */\nI2C_SoftwareResetCmd(I2C1, ENABLE);\nI2C_SoftwareResetCmd(I2C1, DISABLE);   /* 必须成对，只 ENABLE 不复位结束 */\n\n/* 复位后所有配置丢失，要重新初始化 */\nI2C_Init(I2C1, &I2C_InitStructure);\nI2C_Cmd(I2C1, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_Cmd",
+        "I2C_Init",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 551,
+      "sourceLine": 658,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_NACKPositionConfig",
+      "name": "I2C_NACKPositionConfig",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec4",
+      "prototype": "void I2C_NACKPositionConfig(I2C_TypeDef* I2Cx, uint16_t I2C_NACKPosition);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "I2C_NACKPosition",
+          "type": "uint16_t",
+          "descEn": "specifies the NACK position. This parameter can be one of the following values:",
+          "descZh": "I2C_NACKPosition_Next（ACK 位作用于下一字节，2 字节接收用）或 I2C_NACKPosition_Current（作用于当前字节，默认）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Selects the specified I2C NACK position in master receiver mode. This function is useful in I2C Master Receiver mode when the number of data to be received is equal to 2. In this case, this function should be called (with parameter I2C_NACKPosition_Next) before data reception starts,as described in the 2-byte reception procedure recommended in Reference Manual in Section: Master receiver.",
+      "briefZh": "设置主机接收模式下 NACK 的位置（POS 位）。",
+      "usageZh": "**只在一处必须用**：主机接收正好 2 个字节时，按参考手册的「2 字节接收流程」，必须在接收开始前把 POS 设为 I2C_NACKPosition_Next，这样 ACK/NACK 对应的是下一个字节（第 2 字节），硬件才能在正确时刻关 ACK 并发 STOP。接收 1 个字节或 3 个以上字节时用默认的 I2C_NACKPosition_Current。",
+      "prerequisites": [
+        "已 I2C_Cmd 使能外设",
+        "必须在数据接收开始前调用（通常在 ADDR 事件刚到达时）"
+      ],
+      "registers": [
+        "I2C_CR1"
+      ],
+      "relatedFunctions": [
+        "I2C_AcknowledgeConfig",
+        "I2C_GenerateSTOP",
+        "I2C_PECPositionConfig"
+      ],
+      "remarks": [
+        "This function configures the same bit (POS) as I2C_PECPositionConfig() but is intended to be used in I2C mode while I2C_PECPositionConfig() is intended to used in SMBUS mode."
+      ],
+      "notesZh": [
+        "它和 I2C_PECPositionConfig 操作的是**同一个 POS 位**：I2C 模式用这个，SMBus 模式用那个，混用会互相覆盖",
+        "接收 3 个以上字节时不要设 Next，否则 NACK 位置偏移会少读或多读一个字节",
+        "设完 POS 后如果不恢复成 Current，下一次接收（不是 2 字节）会出错"
+      ],
+      "exampleCode": "/* 只读 2 个字节时的标准流程 */\nI2C_GenerateSTART(I2C1, ENABLE);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT));\nI2C_Send7bitAddress(I2C1, 0xA1, I2C_Direction_Receiver);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED));\n\nI2C_NACKPositionConfig(I2C1, I2C_NACKPosition_Next);  /* 只有 2 字节接收才这么设 */\nI2C_AcknowledgeConfig(I2C1, DISABLE);\nI2C_GenerateSTOP(I2C1, ENABLE);\n\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_RECEIVED));\nbuf[0] = I2C_ReceiveData(I2C1);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_RECEIVED));\nbuf[1] = I2C_ReceiveData(I2C1);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "I2C1",
+        "I2C2",
+        "I2C_AcknowledgeConfig",
+        "I2C_CheckEvent",
+        "I2C_Cmd",
+        "I2C_Direction_Receiver",
+        "I2C_EVENT_MASTER_BYTE_RECEIVED",
+        "I2C_EVENT_MASTER_MODE_SELECT",
+        "I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED",
+        "I2C_GenerateSTART",
+        "I2C_GenerateSTOP",
+        "I2C_NACKPosition_Current",
+        "I2C_NACKPosition_Next",
+        "I2C_PECPositionConfig",
+        "I2C_ReceiveData",
+        "I2C_Send7bitAddress",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 552,
+      "sourceLine": 696,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_SMBusAlertConfig",
+      "name": "I2C_SMBusAlertConfig",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec4",
+      "prototype": "void I2C_SMBusAlertConfig(I2C_TypeDef* I2Cx, uint16_t I2C_SMBusAlert);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "I2C_SMBusAlert",
+          "type": "uint16_t",
+          "descEn": "specifies SMBAlert pin level. This parameter can be one of the following values:",
+          "descZh": "I2C_SMBusAlert_Low（拉低，产生告警）或 I2C_SMBusAlert_High（拉高）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Drives the SMBusAlert pin high or low for the specified I2C.",
+      "briefZh": "驱动 SMBusAlert 引脚为高电平或低电平。",
+      "usageZh": "SMBus 场景下从机用它向主机发中断请求。普通 I2C 应用完全用不到。使用前要先开 I2C 的 SMBus 模式，并注意 SMBALERT 引脚与 GPIO 复用关系。",
+      "prerequisites": [
+        "I2C 已配置为 SMBus 模式并已 I2C_Cmd 使能"
+      ],
+      "registers": [
+        "I2C_CR1"
+      ],
+      "relatedFunctions": [
+        "I2C_Init",
+        "I2C_ARPCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "只有 SMBus 模式才有意义，纯 I2C 模式下这个位是保留位，写了也没效果",
+        "SMBALERT 引脚在 STM32F103 上是复用功能，需要把对应 GPIO 配成复用开漏"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "I2C1",
+        "I2C2",
+        "I2C_Cmd",
+        "I2C_SMBusAlert_High",
+        "I2C_SMBusAlert_Low",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 553,
+      "sourceLine": 724,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_TransmitPEC",
+      "name": "I2C_TransmitPEC",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec6",
+      "prototype": "void I2C_TransmitPEC(I2C_TypeDef* I2Cx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the I2C PEC transmission. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 发送 PEC 字节，DISABLE 不发送。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified I2C PEC transfer.",
+      "briefZh": "使能或关闭在传输中发送 PEC 字节。",
+      "usageZh": "SMBus/PMBus 场景下，把硬件算好的 PEC 校验字节跟数据一起发出去。必须先 I2C_CalculatePEC 开启计算，否则发出去的 PEC 是错的。普通 I2C 通信不要开。",
+      "prerequisites": [
+        "已用 I2C_CalculatePEC 开启 PEC 计算",
+        "I2C 工作于 SMBus 模式"
+      ],
+      "registers": [
+        "I2C_CR1",
+        "I2C_DR"
+      ],
+      "relatedFunctions": [
+        "I2C_CalculatePEC",
+        "I2C_GetPEC",
+        "I2C_PECPositionConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "没先开 I2C_CalculatePEC 就开 TransmitPEC，发出去的校验字节没有意义",
+        "开启后 DR 会多传一个字节，从机的数据长度要同步 +1，否则会错位"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_CalculatePEC",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 554,
+      "sourceLine": 748,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_PECPositionConfig",
+      "name": "I2C_PECPositionConfig",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec4",
+      "prototype": "void I2C_PECPositionConfig(I2C_TypeDef* I2Cx, uint16_t I2C_PECPosition);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "I2C_PECPosition",
+          "type": "uint16_t",
+          "descEn": "specifies the PEC position. This parameter can be one of the following values:",
+          "descZh": "I2C_PECPosition_Next（PEC 为当前字节）或 I2C_PECPosition_Current（PEC 为下一个字节）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Selects the specified I2C PEC position.",
+      "briefZh": "设置 SMBus 模式下 PEC 字节的位置（POS 位）。",
+      "usageZh": "SMBus 模式专用：决定 PEC 是在当前字节之前还是之后。I2C 模式下应该用 I2C_NACKPositionConfig，两者改的是同一个 POS 位，不要同时用。",
+      "prerequisites": [
+        "I2C 已配置为 SMBus 模式",
+        "已用 I2C_CalculatePEC 开启 PEC 计算"
+      ],
+      "registers": [
+        "I2C_CR1"
+      ],
+      "relatedFunctions": [
+        "I2C_CalculatePEC",
+        "I2C_NACKPositionConfig",
+        "I2C_GetPEC"
+      ],
+      "remarks": [
+        "This function configures the same bit (POS) as I2C_NACKPositionConfig() but is intended to be used in SMBUS mode while I2C_NACKPositionConfig() is intended to used in I2C mode."
+      ],
+      "notesZh": [
+        "与 I2C_NACKPositionConfig 共用 POS 位，在 I2C 模式下调它会破坏 NACK 位置设置",
+        "SMBus 的 PEC 校验需要软件自己比对 I2C_GetPEC 的结果，硬件不会自动重传"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "I2C1",
+        "I2C2",
+        "I2C_CalculatePEC",
+        "I2C_GetPEC",
+        "I2C_NACKPositionConfig",
+        "I2C_PECPosition_Current",
+        "I2C_PECPosition_Next",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 555,
+      "sourceLine": 779,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_CalculatePEC",
+      "name": "I2C_CalculatePEC",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec3",
+      "prototype": "void I2C_CalculatePEC(I2C_TypeDef* I2Cx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the I2Cx PEC value calculation. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 开启 PEC 计算，DISABLE 关闭（默认）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the PEC value calculation of the transferred bytes.",
+      "briefZh": "使能或关闭传输字节的 PEC（包错误校验）计算。",
+      "usageZh": "SMBus/PMBus 场景下用来做数据完整性校验，硬件按 CRC-8 多项式自动累算。普通 I2C 通信不需要，而且开错方向会导致 DR 里多出一个 PEC 字节被当成数据。",
+      "prerequisites": [
+        "I2C 已使能（I2C_Cmd）"
+      ],
+      "registers": [
+        "I2C_CR1"
+      ],
+      "relatedFunctions": [
+        "I2C_TransmitPEC",
+        "I2C_GetPEC"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "PEC 功能只在 SMBus/PMBus 模式下才符合协议，纯 I2C 下开着会多出字节",
+        "校验失败不是自动的，软件要自己用 I2C_GetPEC 取回值并比对"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "CRC",
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_Cmd",
+        "I2C_GetPEC",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 556,
+      "sourceLine": 803,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_GetPEC",
+      "name": "I2C_GetPEC",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec8",
+      "prototype": "uint8_t I2C_GetPEC(I2C_TypeDef* I2Cx);",
+      "returnType": "uint8_t",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        }
+      ],
+      "returnDescEn": "The PEC value.",
+      "returnDescZh": "返回计算得到的 PEC 校验字节（0x00~0xFF）。",
+      "briefEn": "Returns the PEC value for the specified I2C.",
+      "briefZh": "返回硬件计算出的 PEC（包错误校验）值。",
+      "usageZh": "SMBus/PMBus 接收完数据后，用它与收到的 PEC 字节比对来校验数据完整性；校验失败通常需要软件重传。必须先 I2C_CalculatePEC 开启计算。",
+      "prerequisites": [
+        "已用 I2C_CalculatePEC(I2Cx, ENABLE) 开启 PEC 计算",
+        "一次完整传输已结束"
+      ],
+      "registers": [
+        "I2C_SR1",
+        "I2C_DR"
+      ],
+      "relatedFunctions": [
+        "I2C_CalculatePEC",
+        "I2C_TransmitPEC",
+        "I2C_PECPositionConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "必须对应一次完整的传输，中途插入别的操作会让累算值失效",
+        "比对失败时硬件不会自动重传，需要软件重新发起整个事务"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "I2C1",
+        "I2C2",
+        "I2C_CalculatePEC",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 557,
+      "sourceLine": 825,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_ARPCmd",
+      "name": "I2C_ARPCmd",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec2",
+      "prototype": "void I2C_ARPCmd(I2C_TypeDef* I2Cx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the I2Cx ARP. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能 ARP，DISABLE 关闭（默认）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified I2C ARP.",
+      "briefZh": "使能或关闭 SMBus 的 ARP（地址解析协议）。",
+      "usageZh": "纯 SMBus 场景使用：允许本机响应 SMBus 的 ARP 命令（0x06 开头的地址分配流程）。普通 I2C 应用（EEPROM、OLED、MPU6050 等）用不到，保持默认关闭即可。",
+      "prerequisites": [
+        "I2C 已配置为 SMBus 模式（I2C_Mode_SMBusDevice 或 I2C_Mode_SMBusHost）"
+      ],
+      "registers": [
+        "I2C_CR1"
+      ],
+      "relatedFunctions": [
+        "I2C_Init",
+        "I2C_SMBusAlertConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "在纯 I2C 模式下开 ARP 没有意义，反而可能误响应地址 0x00 的广播",
+        "使用 ARP 时从机地址由主机动态分配，不能再依赖 I2C_Init 里写死的 I2C_OwnAddress1"
+      ],
+      "exampleCode": "",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_Init",
+        "I2C_Mode_SMBusDevice",
+        "I2C_Mode_SMBusHost",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 558,
+      "sourceLine": 840,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_StretchClockCmd",
+      "name": "I2C_StretchClockCmd",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec2",
+      "prototype": "void I2C_StretchClockCmd(I2C_TypeDef* I2Cx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the I2Cx Clock stretching. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 允从机拉低 SCL 延展时钟（默认），DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified I2C Clock stretching.",
+      "briefZh": "使能或关闭从机的时钟延展（Clock Stretching）。",
+      "usageZh": "**从机模式**下，本机来不及处理数据时把 SCL 拉低，强制主机等待。默认是使能的，通常不要关。关闭时钟延展后从机必须在下一个字节到来前完成读取，否则会丢数据或触发溢出。主机模式下该位无实际作用（主机的时钟延展由硬件自动处理）。",
+      "prerequisites": [
+        "I2C 已工作于从机模式"
+      ],
+      "registers": [
+        "I2C_CR1"
+      ],
+      "relatedFunctions": [
+        "I2C_Init",
+        "I2C_AcknowledgeConfig"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "关闭时钟延展后，如果从机中断响应慢，主机已经把下一字节发完，会置起 OVR 溢出错误",
+        "部分主机（如某些硬件 I2C 控制器）对时钟延展支持不好，长延展会被判为超时",
+        "STM32F103 的 I2C 勘误中提到：在从机模式下，若时钟延展与 STOP 条件同时出现，可能出现异常，从机接收时要开超时保护"
+      ],
+      "exampleCode": "/* 从机在中断里处理数据较慢，保留时钟延展更安全 */\nI2C_StretchClockCmd(I2C1, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "ENABLE",
+        "FunctionalState",
+        "I2C1",
+        "I2C2",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 559,
+      "sourceLine": 864,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_FastModeDutyCycleConfig",
+      "name": "I2C_FastModeDutyCycleConfig",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec4",
+      "prototype": "void I2C_FastModeDutyCycleConfig(I2C_TypeDef* I2Cx, uint16_t I2C_DutyCycle);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "I2C_DutyCycle",
+          "type": "uint16_t",
+          "descEn": "specifies the fast mode duty cycle. This parameter can be one of the following values:",
+          "descZh": "I2C_DutyCycle_2 或 I2C_DutyCycle_16_9。标准模式（100kHz）下该参数无意义，写 I2C_DutyCycle_2 即可。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Selects the specified I2C fast mode duty cycle.",
+      "briefZh": "设置快速模式（400kHz）下 SCL 的占空比（Tlow/Thigh 比例）。",
+      "usageZh": "只有 I2C_ClockSpeed 配到 400kHz 时才有意义。I2C_DutyCycle_2 表示 Tlow/Thigh = 2（高电平时间较长）；I2C_DutyCycle_16_9 表示 16/9（低电平时间更长，更利于总线快速放电）。如果上拉电阻较大导致上升沿慢，用 16/9 更稳。也可以在 I2C_Init 时通过结构体的 I2C_DutyCycle 字段直接设置。",
+      "prerequisites": [
+        "I2C 工作于快速模式（I2C_ClockSpeed > 100000）",
+        "已 I2C_Cmd 使能外设"
+      ],
+      "registers": [
+        "I2C_CCR"
+      ],
+      "relatedFunctions": [
+        "I2C_Init",
+        "I2C_StretchClockCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "标准模式（100kHz）下改这个不起作用，CCR 的 DUTY 位只在快速模式生效",
+        "占空比配错会让 SCL 高低电平时间比例异常，某些从机对 Thigh 最小值有要求，会通信失败",
+        "上拉电阻越大（如 10kΩ），上升沿越慢，越应该用 16/9 给足高电平时间"
+      ],
+      "exampleCode": "/* 400kHz + 上拉较弱时用 16/9 占空比 */\nI2C_InitStructure.I2C_ClockSpeed = 400000;\nI2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_16_9;\nI2C_Init(I2C1, &I2C_InitStructure);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "I2C1",
+        "I2C2",
+        "I2C_Cmd",
+        "I2C_DutyCycle_16_9",
+        "I2C_DutyCycle_2",
+        "I2C_Init",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 560,
+      "sourceLine": 890,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_CheckEvent",
+      "name": "I2C_CheckEvent",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec3",
+      "prototype": "ErrorStatus I2C_CheckEvent(I2C_TypeDef* I2Cx, uint32_t I2C_EVENT);",
+      "returnType": "ErrorStatus",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "I2C_EVENT",
+          "type": "uint32_t",
+          "descEn": "specifies the event to be checked. This parameter can be one of the following values:",
+          "descZh": "要检查的事件宏，如 I2C_EVENT_MASTER_MODE_SELECT（START 已发）、I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED（地址已发且收到 ACK，发送方向）、I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED（接收方向）、I2C_EVENT_MASTER_BYTE_TRANSMITTING（TXE=1，可以写下一字节）、I2C_EVENT_MASTER_BYTE_TRANSMITTED（BTF=1，字节真的发完了）、I2C_EVENT_MASTER_BYTE_RECEIVED（RXNE=1）、I2C_EVENT_MASTER_MODE_ADDRESS10（10 位地址）。"
+        }
+      ],
+      "returnDescEn": "An ErrorStatus enumeration value: - SUCCESS: Last event is equal to the I2C_EVENT - ERROR: Last event is different from the I2C_EVENT",
+      "returnDescZh": "SUCCESS 表示当前事件与要求的一致；ERROR 表示不一致（通常是标志还没置起来）。返回值可以当布尔用。",
+      "briefEn": "Checks whether the last I2Cx Event is equal to the one passed as parameter.",
+      "briefZh": "检查 I2C 当前事件是否等于指定事件（同时比对 SR1 与 SR2 的组合状态）。",
+      "usageZh": "**I2C 阻塞式收发全靠它做同步**，是整个 I2C 编程的核心。事件是 SR1 与 SR2 的位组合，比如 I2C_EVENT_MASTER_MODE_SELECT 实际是「SB=1 且 BUSY=1 且 MSL=1」。使用方式是紧跟在某个动作之后 while 轮询，**顺序绝对不能错**：\n\n主机发送：START → I2C_EVENT_MASTER_MODE_SELECT → 发地址 → I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED → 逐字节 I2C_EVENT_MASTER_BYTE_TRANSMITTING（等 TXE）→ 最后一个字节等 I2C_EVENT_MASTER_BYTE_TRANSMITTED（等 BTF）→ STOP。\n\n注意 CheckEvent 内部会读 SR1 与 SR2，而读 SR1 后读 SR2 恰好是清除 ADDR 标志的官方序列，所以它能顺带清 ADDR。",
+      "prerequisites": [
+        "已 I2C_Cmd(I2Cx, ENABLE) 使能外设",
+        "已按顺序触发对应的硬件动作（如已经 GenerateSTART 才能等 SB 事件）"
+      ],
+      "registers": [
+        "I2C_SR1",
+        "I2C_SR2"
+      ],
+      "relatedFunctions": [
+        "I2C_GetLastEvent",
+        "I2C_GenerateSTART",
+        "I2C_Send7bitAddress",
+        "I2C_SendData",
+        "I2C_ReceiveData"
+      ],
+      "remarks": [
+        ": For detailed description of Events, please refer to section I2C_Events in stm32f10x_i2c.h file."
+      ],
+      "notesZh": [
+        "**事件顺序写错是 I2C 最常见的 bug**：发完 START 不等 SB 就发地址、发完地址不等 ADDR 就发数据，都会导致传输失败且不报错",
+        "等事件时从机不回 ACK 会永远卡在 while 里。生产代码必须加超时计数，超时后软件复位并重试",
+        "I2C_EVENT_MASTER_BYTE_TRANSMITTING 用的是 TXE（数据寄存器空），I2C_EVENT_MASTER_BYTE_TRANSMITTED 用的是 BTF（字节真正发完）。最后一个字节等 BTF 才能发 STOP，否则 STOP 会切断最后一个字节",
+        "这个函数内部读 SR1 再读 SR2，会顺带清除 ADDR 标志，所以不要在别处再重复读 SR2",
+        "接收方向要用 I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED，用成 TRANSMITTER 的宏会永远等不到",
+        "STM32F103 的 I2C 有已知勘误（Errata 2.14.x 类）：在特定时序下 BTF 或 ADDR 可能置位异常，导致 while 死循环，务必加超时"
+      ],
+      "exampleCode": "/* 最常用的主机发送：往从机 0xA0 写 2 字节 */\nI2C_GenerateSTART(I2C1, ENABLE);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT));\n\nI2C_Send7bitAddress(I2C1, 0xA0, I2C_Direction_Transmitter);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));\n\nI2C_SendData(I2C1, regAddr);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTING));\n\nI2C_SendData(I2C1, value);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTED));\n\nI2C_GenerateSTOP(I2C1, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "ERROR",
+        "ErrorStatus",
+        "I2C1",
+        "I2C2",
+        "I2C_Cmd",
+        "I2C_Direction_Transmitter",
+        "I2C_EVENT_MASTER_BYTE_RECEIVED",
+        "I2C_EVENT_MASTER_BYTE_TRANSMITTED",
+        "I2C_EVENT_MASTER_BYTE_TRANSMITTING",
+        "I2C_EVENT_MASTER_MODE_ADDRESS10",
+        "I2C_EVENT_MASTER_MODE_SELECT",
+        "I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED",
+        "I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED",
+        "I2C_GenerateSTART",
+        "I2C_GenerateSTOP",
+        "I2C_Send7bitAddress",
+        "I2C_SendData",
+        "I2C_TypeDef",
+        "SUCCESS"
+      ],
+      "headerLine": 645,
+      "sourceLine": 1030,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_GetLastEvent",
+      "name": "I2C_GetLastEvent",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec8",
+      "prototype": "uint32_t I2C_GetLastEvent(I2C_TypeDef* I2Cx);",
+      "returnType": "uint32_t",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        }
+      ],
+      "returnDescEn": "The last event",
+      "returnDescZh": "返回 SR1 与 SR2 组合而成的事件值（SR2 在高 16 位）。需要自己与 I2C_EVENT_xxx 宏比对，本函数不做判断。",
+      "briefEn": "Returns the last I2Cx Event.",
+      "briefZh": "把 I2Cx 的 SR1 与 SR2 拼成一个 32 位事件值返回（不判断是否匹配）。",
+      "usageZh": "**调试 I2C 卡死问题的利器**。当 while(!I2C_CheckEvent(...)) 死循环时，在这里断点看 I2C_GetLastEvent(I2C1) 的值，再对照 stm32f10x_i2c.h 里的 I2C_EVENT_xxx 宏定义，就能知道实际卡在哪个状态（是 SB 没来、地址没被 ACK，还是 BTF 没置位）。生产代码里也可以用它把实际事件打到串口日志里。",
+      "prerequisites": [
+        "已 I2C_Cmd(I2Cx, ENABLE) 使能外设"
+      ],
+      "registers": [
+        "I2C_SR1",
+        "I2C_SR2"
+      ],
+      "relatedFunctions": [
+        "I2C_CheckEvent",
+        "I2C_GetFlagStatus",
+        "I2C_ReadRegister"
+      ],
+      "remarks": [
+        ": For detailed description of Events, please refer to section I2C_Events in stm32f10x_i2c.h file."
+      ],
+      "notesZh": [
+        "与 I2C_CheckEvent 的区别：CheckEvent 会返回匹配结果，GetLastEvent 只返回值，需要自己比对",
+        "它内部同样读 SR1 与 SR2，所以调用它会**顺带清除 ADDR 标志**，在流程中间随意调用会破坏状态机",
+        "排查「事件顺序写错」最快的方法就是这个函数加超时，看实际停在哪一步",
+        "返回值 0x00000000 通常表示外设没使能（PE=0）或时钟没开"
+      ],
+      "exampleCode": "/* 带超时的等待，超时把实际事件打出来，方便定位卡在哪一步 */\nuint32_t timeout = 100000;\nI2C_GenerateSTART(I2C1, ENABLE);\nwhile (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT))\n{\n  if (--timeout == 0)\n  {\n    /* 打印实际事件值，与 I2C_EVENT_xxx 宏比对 */\n    printf(\"I2C stuck, last event = 0x%08X\\r\\n\", I2C_GetLastEvent(I2C1));\n    break;\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "I2C1",
+        "I2C2",
+        "I2C_CheckEvent",
+        "I2C_Cmd",
+        "I2C_EVENT_MASTER_MODE_SELECT",
+        "I2C_GenerateSTART",
+        "I2C_TypeDef"
+      ],
+      "headerLine": 651,
+      "sourceLine": 1078,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_GetFlagStatus",
+      "name": "I2C_GetFlagStatus",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec9",
+      "prototype": "FlagStatus I2C_GetFlagStatus(I2C_TypeDef* I2Cx, uint32_t I2C_FLAG);",
+      "returnType": "FlagStatus",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "I2C_FLAG",
+          "type": "uint32_t",
+          "descEn": "specifies the flag to check. This parameter can be one of the following values:",
+          "descZh": "要查询的标志，如 I2C_FLAG_SB、I2C_FLAG_ADDR、I2C_FLAG_BTF、I2C_FLAG_STOPF、I2C_FLAG_RXNE、I2C_FLAG_TXE、I2C_FLAG_BERR、I2C_FLAG_ARLO、I2C_FLAG_AF、I2C_FLAG_OVR、I2C_FLAG_BUSY、I2C_FLAG_DUALF、I2C_FLAG_GENCALL、I2C_FLAG_TRA、I2C_FLAG_MSL。"
+        }
+      ],
+      "returnDescEn": "The new state of I2C_FLAG (SET or RESET).",
+      "returnDescZh": "SET 表示标志已置位，RESET 表示未置位。",
+      "briefEn": "Checks whether the specified I2C flag is set or not.",
+      "briefZh": "查询 I2Cx 的指定状态标志是否置位。",
+      "usageZh": "轮询方式（不用事件宏）时用，或者用来检查单个位，如 I2C_FLAG_BUSY 判断总线是否空闲、I2C_FLAG_AF 判断应答失败、I2C_FLAG_RXNE 判断有数据可读。用事件宏能一次判断多个位组合，用 FlagStatus 只能看单个位。**注意它内部读 SR1，会参与标志清除序列**。",
+      "prerequisites": [
+        "已 I2C_Cmd(I2Cx, ENABLE) 使能外设"
+      ],
+      "registers": [
+        "I2C_SR1",
+        "I2C_SR2"
+      ],
+      "relatedFunctions": [
+        "I2C_ClearFlag",
+        "I2C_CheckEvent",
+        "I2C_GetLastEvent"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "查询某个标志**会读 SR1**，而「读 SR1 + 读 SR2」正是清 ADDR 的序列。所以在等 ADDR 的流程里插一句 I2C_GetFlagStatus，可能把 ADDR 提前清掉导致后面等不到",
+        "I2C_FLAG_BUSY 在掉电重启后可能因为引脚被拉低而一直是 1，此时 START 永远不生效，需要按勘误流程做总线恢复",
+        "判断从机应答要用 AF 标志，不要靠等 ADDR 超时，否则定位不到根因",
+        "TXE 表示数据寄存器空（可以写下一个字节），BTF 表示字节真正发送完毕（可以发 STOP），两者含义不同"
+      ],
+      "exampleCode": "/* 发 START 前确认总线空闲，避免 START 被忽略 */\nif (I2C_GetFlagStatus(I2C1, I2C_FLAG_BUSY) == RESET)\n{\n  I2C_GenerateSTART(I2C1, ENABLE);\n}\n\n/* 判断从机是否应答 */\nif (I2C_GetFlagStatus(I2C1, I2C_FLAG_AF) != RESET)\n{\n  /* 从机没应答：地址错或设备没接 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "FlagStatus",
+        "I2C1",
+        "I2C2",
+        "I2C_Cmd",
+        "I2C_FLAG_ADDR",
+        "I2C_FLAG_AF",
+        "I2C_FLAG_ARLO",
+        "I2C_FLAG_BERR",
+        "I2C_FLAG_BTF",
+        "I2C_FLAG_BUSY",
+        "I2C_FLAG_DUALF",
+        "I2C_FLAG_GENCALL",
+        "I2C_FLAG_MSL",
+        "I2C_FLAG_OVR",
+        "I2C_FLAG_RXNE",
+        "I2C_FLAG_SB",
+        "I2C_FLAG_STOPF",
+        "I2C_FLAG_TRA",
+        "I2C_FLAG_TXE",
+        "I2C_GenerateSTART",
+        "I2C_TypeDef",
+        "RESET",
+        "SET"
+      ],
+      "headerLine": 657,
+      "sourceLine": 1133,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_ClearFlag",
+      "name": "I2C_ClearFlag",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec9",
+      "prototype": "void I2C_ClearFlag(I2C_TypeDef* I2Cx, uint32_t I2C_FLAG);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "I2C_FLAG",
+          "type": "uint32_t",
+          "descEn": "specifies the flag to clear. This parameter can be any combination of the following values:",
+          "descZh": "要清除的标志，可用 | 组合，如 I2C_FLAG_AF | I2C_FLAG_BERR | I2C_FLAG_ARLO | I2C_FLAG_OVR。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Clears the I2Cx's pending flags.",
+      "briefZh": "清除 I2Cx 的挂起状态标志。",
+      "usageZh": "只对可软件清除的错误标志有效：I2C_FLAG_AF（应答失败）、I2C_FLAG_BERR（总线错误）、I2C_FLAG_ARLO（仲裁丢失）、I2C_FLAG_OVR（溢出）。SB、ADDR、RXNE、TXE、BTF、STOPF 这些**必须靠读 SR1 加读写 DR/SR2/CR1 的硬件序列清除**，调本函数清不掉。",
+      "prerequisites": [
+        "已用 I2C_GetFlagStatus 判断出标志来源"
+      ],
+      "registers": [
+        "I2C_SR1"
+      ],
+      "relatedFunctions": [
+        "I2C_GetFlagStatus",
+        "I2C_ClearITPendingBit",
+        "I2C_Cmd",
+        "I2C_SoftwareResetCmd"
+      ],
+      "remarks": [
+        "- STOPF (STOP detection) is cleared by software sequence: a read operation to I2C_SR1 register (I2C_GetFlagStatus()) followed by a write operation to I2C_CR1 register (I2C_Cmd() to re-enable the I2C peripheral). - ADD10 (10-bit header sent) is cleared by software sequence: a read operation to I2C_SR1 (I2C_GetFlagStatus()) followed by writing the second byte of the address in DR register. - BTF (Byte Transfer Finished) is cleared by software sequence: a read operation to I2C_SR1 register (I2C_GetFlagStatus()) followed by a read/write to I2C_DR register (I2C_SendData()). - ADDR (Address sent) is cleared by software sequence: a read operation to I2C_SR1 register (I2C_GetFlagStatus()) followed by a read operation to I2C_SR2 register ((void)(I2Cx->SR2)). - SB (Start Bit) is cleared software sequence: a read operation to I2C_SR1 register (I2C_GetFlagStatus()) followed by a write operation to I2C_DR register (I2C_SendData())."
+      ],
+      "notesZh": [
+        "**清不掉 SB/ADDR/RXNE/TXE/BTF**，这几个是 I2C 新手最容易误解的地方",
+        "清除 STOPF 的序列是「读 SR1 + 写 CR1」，一般通过 I2C_Cmd(I2Cx, ENABLE) 实现",
+        "清了 AF 不补 STOP，总线会一直占着，下次 START 无效",
+        "OVR 溢出说明软件读得太慢，光清标志没用，要降低速率或改用 DMA",
+        "STM32F103 的 I2C 勘误提示：错误标志清除后状态机不一定完全回到空闲，健壮的驱动在错误处理后应做一次 I2C_SoftwareResetCmd 并重新初始化"
+      ],
+      "exampleCode": "/* 应答失败后的恢复流程 */\nif (I2C_GetFlagStatus(I2C1, I2C_FLAG_AF) != RESET)\n{\n  I2C_ClearFlag(I2C1, I2C_FLAG_AF);\n  I2C_GenerateSTOP(I2C1, ENABLE);   /* 清 AF 后必须补 STOP，释放总线 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "I2C1",
+        "I2C2",
+        "I2C_Cmd",
+        "I2C_FLAG_AF",
+        "I2C_FLAG_ARLO",
+        "I2C_FLAG_BERR",
+        "I2C_FLAG_OVR",
+        "I2C_GenerateSTOP",
+        "I2C_GetFlagStatus",
+        "I2C_SendData",
+        "I2C_SoftwareResetCmd",
+        "I2C_TypeDef",
+        "RESET"
+      ],
+      "headerLine": 662,
+      "sourceLine": 1212,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_GetITStatus",
+      "name": "I2C_GetITStatus",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec5",
+      "prototype": "ITStatus I2C_GetITStatus(I2C_TypeDef* I2Cx, uint32_t I2C_IT);",
+      "returnType": "ITStatus",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "I2C_IT",
+          "type": "uint32_t",
+          "descEn": "specifies the interrupt source to check. This parameter can be one of the following values:",
+          "descZh": "要检查的中断源，如 I2C_IT_SB、I2C_IT_ADDR、I2C_IT_RXNE、I2C_IT_TXE、I2C_IT_BTF、I2C_IT_STOPF、I2C_IT_AF、I2C_IT_OVR、I2C_IT_BERR、I2C_IT_ARLO。"
+        }
+      ],
+      "returnDescEn": "The new state of I2C_IT (SET or RESET).",
+      "returnDescZh": "SET 表示该中断标志已置位，RESET 表示未置位。",
+      "briefEn": "Checks whether the specified I2C interrupt has occurred or not.",
+      "briefZh": "检查 I2Cx 的指定中断是否发生（读 SR1/SR2 判断对应标志）。",
+      "usageZh": "在中断服务函数开头判断是哪个事件触发的。典型 ISR 结构是先判 I2C_IT_SB，再判 I2C_IT_ADDR，再判 I2C_IT_RXNE/TXE，最后判错误。注意它和 I2C_GetFlagStatus 读的是同一批位，区别只是返回类型（ITStatus 与 FlagStatus，本质都是 SET/RESET）。",
+      "prerequisites": [
+        "已用 NVIC_Init 配置并使能对应中断通道",
+        "已 I2C_ITConfig 使能该中断源"
+      ],
+      "registers": [
+        "I2C_SR1",
+        "I2C_SR2"
+      ],
+      "relatedFunctions": [
+        "I2C_ITConfig",
+        "I2C_ClearITPendingBit",
+        "I2C_GetFlagStatus"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "ADDR、RXNE、TXE、SB 这些标志是「读 SR1 再读/写 DR」自动清除的，**不能用 I2C_ClearITPendingBit 清**",
+        "在 ISR 里调用本函数本身就会读 SR1，可能顺带清掉某些标志，判完要立刻处理，不要再插别的读 SR1 的操作",
+        "漏清 STOPF 会让从机中断反复触发，表现为 ISR 一直进"
+      ],
+      "exampleCode": "void I2C1_EV_IRQHandler(void)\n{\n  if (I2C_GetITStatus(I2C1, I2C_IT_ADDR) != RESET)\n  {\n    /* 读 SR1 + 读 SR2 已由本函数完成，ADDR 自动清除 */\n  }\n  if (I2C_GetITStatus(I2C1, I2C_IT_RXNE) != RESET)\n  {\n    buf[idx++] = I2C_ReceiveData(I2C1);   /* 读 DR 清 RXNE */\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "FlagStatus",
+        "I2C1",
+        "I2C2",
+        "I2C_ClearITPendingBit",
+        "I2C_GetFlagStatus",
+        "I2C_ITConfig",
+        "I2C_IT_ADDR",
+        "I2C_IT_AF",
+        "I2C_IT_ARLO",
+        "I2C_IT_BERR",
+        "I2C_IT_BTF",
+        "I2C_IT_OVR",
+        "I2C_IT_RXNE",
+        "I2C_IT_SB",
+        "I2C_IT_STOPF",
+        "I2C_IT_TXE",
+        "I2C_ReceiveData",
+        "I2C_TypeDef",
+        "ITStatus",
+        "NVIC_Init",
+        "RESET",
+        "SET"
+      ],
+      "headerLine": 664,
+      "sourceLine": 1246,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "I2C_ClearITPendingBit",
+      "name": "I2C_ClearITPendingBit",
+      "peripheral": "I2C",
+      "sectionId": "I2C#sec5",
+      "prototype": "void I2C_ClearITPendingBit(I2C_TypeDef* I2Cx, uint32_t I2C_IT);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "I2Cx",
+          "type": "I2C_TypeDef*",
+          "descEn": "where x can be 1 or 2 to select the I2C peripheral.",
+          "descZh": "I2C 外设，取值 I2C1 或 I2C2。"
+        },
+        {
+          "name": "I2C_IT",
+          "type": "uint32_t",
+          "descEn": "specifies the interrupt pending bit to clear. This parameter can be any combination of the following values:",
+          "descZh": "要清除的中断标志，可用 | 组合，如 I2C_IT_AF | I2C_IT_BERR | I2C_IT_ARLO | I2C_IT_OVR。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Clears the I2Cx抯 interrupt pending bits.",
+      "briefZh": "清除 I2Cx 的中断挂起标志。",
+      "usageZh": "**只对可以软件直接清除的错误标志有效**（如 AF 应答失败、ARLO 仲裁丢失、BERR 总线错误、OVR 溢出）。大多数正常事件标志（SB、ADDR、RXNE、TXE、BTF、STOPF）必须靠「读 SR1 + 读/写另一个寄存器」的硬件序列清除，调用本函数清不掉，这是 I2C 最让人迷惑的地方。",
+      "prerequisites": [
+        "已进入中断服务函数并已用 I2C_GetITStatus 判断出标志来源"
+      ],
+      "registers": [
+        "I2C_SR1"
+      ],
+      "relatedFunctions": [
+        "I2C_GetITStatus",
+        "I2C_ClearFlag",
+        "I2C_Cmd"
+      ],
+      "remarks": [
+        "- STOPF (STOP detection) is cleared by software sequence: a read operation to I2C_SR1 register (I2C_GetITStatus()) followed by a write operation to I2C_CR1 register (I2C_Cmd() to re-enable the I2C peripheral). - ADD10 (10-bit header sent) is cleared by software sequence: a read operation to I2C_SR1 (I2C_GetITStatus()) followed by writing the second byte of the address in I2C_DR register. - BTF (Byte Transfer Finished) is cleared by software sequence: a read operation to I2C_SR1 register (I2C_GetITStatus()) followed by a read/write to I2C_DR register (I2C_SendData()). - ADDR (Address sent) is cleared by software sequence: a read operation to I2C_SR1 register (I2C_GetITStatus()) followed by a read operation to I2C_SR2 register ((void)(I2Cx->SR2)). - SB (Start Bit) is cleared by software sequence: a read operation to I2C_SR1 register (I2C_GetITStatus()) followed by a write operation to I2C_DR register (I2C_SendData())."
+      ],
+      "notesZh": [
+        "**SB/ADDR/RXNE/TXE/BTF 清不掉**，它们只能靠读 SR1 再读/写 DR（或 SR2）自动清除",
+        "STOPF 的清除序列是「读 SR1 + 写 CR1」，通常用 I2C_Cmd(I2Cx, ENABLE) 完成",
+        "AF（应答失败）出现后必须在清除前先发 STOP 或重新开始，否则总线状态不对",
+        "清了 AF 但没停传输，后续操作会继续报错，看起来像标志没清干净"
+      ],
+      "exampleCode": "void I2C1_ER_IRQHandler(void)\n{\n  if (I2C_GetITStatus(I2C1, I2C_IT_AF) != RESET)\n  {\n    /* 从机没应答（设备没接或地址错），软件可清 */\n    I2C_ClearITPendingBit(I2C1, I2C_IT_AF);\n    I2C_GenerateSTOP(I2C1, ENABLE);\n  }\n  if (I2C_GetITStatus(I2C1, I2C_IT_BERR) != RESET)\n  {\n    I2C_ClearITPendingBit(I2C1, I2C_IT_BERR);\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ENABLE",
+        "I2C1",
+        "I2C2",
+        "I2C_Cmd",
+        "I2C_GenerateSTOP",
+        "I2C_GetITStatus",
+        "I2C_IT_AF",
+        "I2C_IT_ARLO",
+        "I2C_IT_BERR",
+        "I2C_IT_OVR",
+        "I2C_SendData",
+        "I2C_TypeDef",
+        "RESET"
+      ],
+      "headerLine": 665,
+      "sourceLine": 1307,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    }
+  ]
+}

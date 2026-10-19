@@ -1,0 +1,1701 @@
+{
+  "schemaVersion": 1,
+  "chipId": "stm32f103c8t6",
+  "package": "LQFP48",
+  "source": "STM32F103C8T6引脚定义.xlsx（DS5319 Table 5 转录）",
+  "verified": true,
+  "verifiedNote": "引脚号、引脚名、复用功能与 5V 容忍（FT）标记均来自《STM32F103C8T6引脚定义.xlsx》（DS5319 Table 5 转录），已由用户确认该表完全正确（2026-10-15）。重新解析该表与本文件逐字段比对无差异。",
+  "pins": [
+    {
+      "number": 1,
+      "name": "VBAT",
+      "groups": [
+        "power"
+      ],
+      "defaultFunction": "VBAT",
+      "defaultFunctionZh": "备份域供电。接纽扣电池可让 RTC 与备份寄存器在主电源掉电后继续工作。",
+      "functions": [
+        {
+          "name": "VBAT",
+          "kind": "power",
+          "remapRequired": false,
+          "peripheralId": "",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "不用电池时直接接 VDD（3.3V），不要悬空。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 2,
+      "name": "PC13",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PC13",
+      "defaultFunctionZh": "PC13，通用 IO。可复用为侵入检测（TAMPER-RTC）与 RTC 校准输出。",
+      "functions": [
+        {
+          "name": "PC13",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TAMPER-RTC",
+          "kind": "other",
+          "remapRequired": false,
+          "peripheralId": "BKP",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "蓝板板载 LED 接在 PC13，低电平点亮。该脚属于备份域，驱动能力弱（最大 3mA），不要直接驱动大电流负载。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 3,
+      "name": "PC14",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PC14",
+      "defaultFunctionZh": "PC14，通用 IO。默认复用为 32.768kHz 低速晶振输入（OSC32_IN）。",
+      "functions": [
+        {
+          "name": "PC14",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "OSC32_IN",
+          "kind": "other",
+          "remapRequired": false,
+          "peripheralId": "RCC",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "接外部 32.768kHz 晶振时不能再当普通 IO 用。不接晶振时可作普通 IO，但需注意备份域驱动能力弱。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 4,
+      "name": "PC15",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PC15",
+      "defaultFunctionZh": "PC15，通用 IO。默认复用为 32.768kHz 低速晶振输出（OSC32_OUT）。",
+      "functions": [
+        {
+          "name": "PC15",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "OSC32_OUT",
+          "kind": "other",
+          "remapRequired": false,
+          "peripheralId": "RCC",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "同 PC14。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 5,
+      "name": "OSC_IN",
+      "groups": [
+        "osc"
+      ],
+      "defaultFunction": "OSC_IN",
+      "defaultFunctionZh": "外部高速晶振输入（OSC_IN），通常接 8MHz 晶振。",
+      "functions": [
+        {
+          "name": "OSC_IN",
+          "kind": "osc",
+          "remapRequired": false,
+          "peripheralId": "",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "使用 HSE 时必接。若用内部 HSI 或外部有源晶振，该脚可作普通 IO（PD0）。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 6,
+      "name": "OSC_OUT",
+      "groups": [
+        "osc"
+      ],
+      "defaultFunction": "OSC_OUT",
+      "defaultFunctionZh": "外部高速晶振输出（OSC_OUT），通常接 8MHz 晶振另一端。",
+      "functions": [
+        {
+          "name": "OSC_OUT",
+          "kind": "osc",
+          "remapRequired": false,
+          "peripheralId": "",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "使用 HSE 时必接。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 7,
+      "name": "NRST",
+      "groups": [
+        "reset"
+      ],
+      "defaultFunction": "NRST",
+      "defaultFunctionZh": "复位引脚，低电平复位。",
+      "functions": [
+        {
+          "name": "NRST",
+          "kind": "reset",
+          "remapRequired": false,
+          "peripheralId": "",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "内部已有上拉，通常只需接一个 100nF 电容到地。手动复位按键接这里。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 8,
+      "name": "VSSA",
+      "groups": [
+        "ground"
+      ],
+      "defaultFunction": "VSSA",
+      "defaultFunctionZh": "模拟部分地（VSSA），接模拟地。",
+      "functions": [
+        {
+          "name": "VSSA",
+          "kind": "ground",
+          "remapRequired": false,
+          "peripheralId": "",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "用 ADC 时建议与数字地单点连接，减少干扰。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 9,
+      "name": "VDDA",
+      "groups": [
+        "power"
+      ],
+      "defaultFunction": "VDDA",
+      "defaultFunctionZh": "模拟部分电源（VDDA），接 3.3V。",
+      "functions": [
+        {
+          "name": "VDDA",
+          "kind": "power",
+          "remapRequired": false,
+          "peripheralId": "",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "用 ADC 时必须接，并加 100nF + 1uF 去耦电容。ADC 的参考电压就是 VDDA。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 10,
+      "name": "PA0",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PA0",
+      "defaultFunctionZh": "PA0，通用 IO。可复用为唤醒引脚（WKUP）、USART2_CTS、ADC12_IN0、TIM2_CH1_ETR。",
+      "functions": [
+        {
+          "name": "PA0",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "WKUP",
+          "kind": "other",
+          "remapRequired": false,
+          "peripheralId": "PWR",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART2_CTS",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "ADC12_IN0",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "ADC",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM2_CH1_ETR",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "WKUP 功能可在待机模式下唤醒芯片。与 PB0 共用 EXTI0 中断线，两者不能同时用作外部中断。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 11,
+      "name": "PA1",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PA1",
+      "defaultFunctionZh": "PA1，通用 IO。可复用为 USART2_RTS、ADC12_IN1、TIM2_CH2。",
+      "functions": [
+        {
+          "name": "PA1",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART2_RTS",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "ADC12_IN1",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "ADC",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM2_CH2",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 12,
+      "name": "PA2",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PA2",
+      "defaultFunctionZh": "PA2，通用 IO。可复用为 USART2_TX、ADC12_IN2、TIM2_CH3。",
+      "functions": [
+        {
+          "name": "PA2",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART2_TX",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "ADC12_IN2",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "ADC",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM2_CH3",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "常用作串口 2 的发送脚。复用为 USART2_TX 时 GPIO 模式必须配 GPIO_Mode_AF_PP。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 13,
+      "name": "PA3",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PA3",
+      "defaultFunctionZh": "PA3，通用 IO。可复用为 USART2_RX、ADC12_IN3、TIM2_CH4。",
+      "functions": [
+        {
+          "name": "PA3",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART2_RX",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "ADC12_IN3",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "ADC",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM2_CH4",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "复用为 USART2_RX 时 GPIO 模式配 GPIO_Mode_IN_FLOATING 或上拉输入。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 14,
+      "name": "PA4",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PA4",
+      "defaultFunctionZh": "PA4，通用 IO。可复用为 SPI1_NSS、USART2_CK、ADC12_IN4。",
+      "functions": [
+        {
+          "name": "PA4",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "SPI1_NSS",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "SPI",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART2_CK",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "ADC12_IN4",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "ADC",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "SPI1 用软件 NSS 时，该脚可作普通 IO 输出片选。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 15,
+      "name": "PA5",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PA5",
+      "defaultFunctionZh": "PA5，通用 IO。可复用为 SPI1_SCK、ADC12_IN5。",
+      "functions": [
+        {
+          "name": "PA5",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "SPI1_SCK",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "SPI",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "ADC12_IN5",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "ADC",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 16,
+      "name": "PA6",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PA6",
+      "defaultFunctionZh": "PA6，通用 IO。可复用为 SPI1_MISO、ADC12_IN6、TIM3_CH1；重映射后为 TIM1_BKIN。",
+      "functions": [
+        {
+          "name": "PA6",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "SPI1_MISO",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "SPI",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "ADC12_IN6",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "ADC",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM3_CH1",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM1_BKIN",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "TIM",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_TIM1, ENABLE)（TIM1 部分重映射）"
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 17,
+      "name": "PA7",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PA7",
+      "defaultFunctionZh": "PA7，通用 IO。可复用为 SPI1_MOSI、ADC12_IN7、TIM3_CH2；重映射后为 TIM1_CH1N。",
+      "functions": [
+        {
+          "name": "PA7",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "SPI1_MOSI",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "SPI",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "ADC12_IN7",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "ADC",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM3_CH2",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM1_CH1N",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "TIM",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_TIM1, ENABLE)（TIM1 部分重映射）"
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 18,
+      "name": "PB0",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB0",
+      "defaultFunctionZh": "PB0，通用 IO。可复用为 ADC12_IN8、TIM3_CH3；重映射后为 TIM1_CH2N。",
+      "functions": [
+        {
+          "name": "PB0",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "ADC12_IN8",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "ADC",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM3_CH3",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM1_CH2N",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "TIM",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_TIM1, ENABLE)（TIM1 部分重映射）"
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "与 PA0 共用 EXTI0 中断线。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 19,
+      "name": "PB1",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB1",
+      "defaultFunctionZh": "PB1，通用 IO。可复用为 ADC12_IN9、TIM3_CH4；重映射后为 TIM1_CH3N。",
+      "functions": [
+        {
+          "name": "PB1",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "ADC12_IN9",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "ADC",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM3_CH4",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM1_CH3N",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "TIM",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_TIM1, ENABLE)（TIM1 部分重映射）"
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 20,
+      "name": "PB2",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB2/BOOT1",
+      "defaultFunctionZh": "PB2，通用 IO（5V 容忍）。BOOT1 引脚，默认功能为 PB2/BOOT1。",
+      "functions": [
+        {
+          "name": "PB2",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "上电时该脚电平决定启动模式（与 BOOT0 配合）：BOOT0=0 从 Flash 启动；BOOT0=1 且 BOOT1=0 从系统存储器启动（ISP 下载）；BOOT0=1 且 BOOT1=1 从 SRAM 启动。做普通 IO 时注意不要影响启动配置。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 21,
+      "name": "PB10",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB10",
+      "defaultFunctionZh": "PB10，通用 IO（5V 容忍）。可复用为 I2C2_SCL、USART3_TX；重映射后为 TIM2_CH3。",
+      "functions": [
+        {
+          "name": "PB10",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "I2C2_SCL",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "I2C",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART3_TX",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM2_CH3",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "TIM",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_PartialRemap1_TIM2, ENABLE)（TIM2 部分重映射 1）"
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 22,
+      "name": "PB11",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB11",
+      "defaultFunctionZh": "PB11，通用 IO（5V 容忍）。可复用为 I2C2_SDA、USART3_RX；重映射后为 TIM2_CH4。",
+      "functions": [
+        {
+          "name": "PB11",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "I2C2_SDA",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "I2C",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART3_RX",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM2_CH4",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "TIM",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_PartialRemap1_TIM2, ENABLE)（TIM2 部分重映射 1）"
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 23,
+      "name": "VSS_1",
+      "groups": [
+        "ground"
+      ],
+      "defaultFunction": "VSS_1",
+      "defaultFunctionZh": "数字地（VSS_1）。",
+      "functions": [
+        {
+          "name": "VSS_1",
+          "kind": "ground",
+          "remapRequired": false,
+          "peripheralId": "",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 24,
+      "name": "VDD_1",
+      "groups": [
+        "power"
+      ],
+      "defaultFunction": "VDD_1",
+      "defaultFunctionZh": "数字电源（VDD_1），接 3.3V。",
+      "functions": [
+        {
+          "name": "VDD_1",
+          "kind": "power",
+          "remapRequired": false,
+          "peripheralId": "",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 25,
+      "name": "PB12",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB12",
+      "defaultFunctionZh": "PB12，通用 IO（5V 容忍）。可复用为 SPI2_NSS、I2C2_SMBAI、USART3_CK、TIM1_BKIN。",
+      "functions": [
+        {
+          "name": "PB12",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "SPI2_NSS",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "SPI",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "I2C2_SMBAI",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "I2C",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART3_CK",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM1_BKIN",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 26,
+      "name": "PB13",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB13",
+      "defaultFunctionZh": "PB13，通用 IO（5V 容忍）。可复用为 SPI2_SCK、USART3_CTS、TIM1_CH1N。",
+      "functions": [
+        {
+          "name": "PB13",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "SPI2_SCK",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "SPI",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART3_CTS",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM1_CH1N",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 27,
+      "name": "PB14",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB14",
+      "defaultFunctionZh": "PB14，通用 IO（5V 容忍）。可复用为 SPI2_MISO、USART3_RTS、TIM1_CH2N。",
+      "functions": [
+        {
+          "name": "PB14",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "SPI2_MISO",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "SPI",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART3_RTS",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM1_CH2N",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 28,
+      "name": "PB15",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB15",
+      "defaultFunctionZh": "PB15，通用 IO（5V 容忍）。可复用为 SPI2_MOSI、TIM1_CH3N。",
+      "functions": [
+        {
+          "name": "PB15",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "SPI2_MOSI",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "SPI",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM1_CH3N",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 29,
+      "name": "PA8",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PA8",
+      "defaultFunctionZh": "PA8，通用 IO（5V 容忍）。可复用为 USART1_CK、TIM1_CH1、MCO（时钟输出）。",
+      "functions": [
+        {
+          "name": "PA8",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART1_CK",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM1_CH1",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "MCO",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "RCC",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "MCO 功能可把系统时钟分频后输出，用来测量实际主频，调试时钟配置时很有用。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 30,
+      "name": "PA9",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PA9",
+      "defaultFunctionZh": "PA9，通用 IO（5V 容忍）。可复用为 USART1_TX、TIM1_CH2。",
+      "functions": [
+        {
+          "name": "PA9",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART1_TX",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM1_CH2",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "最常用的串口发送脚。复用为 USART1_TX 时 GPIO 模式必须配 GPIO_Mode_AF_PP，配成 Out_PP 会收不到数据。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 31,
+      "name": "PA10",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PA10",
+      "defaultFunctionZh": "PA10，通用 IO（5V 容忍）。可复用为 USART1_RX、TIM1_CH3。",
+      "functions": [
+        {
+          "name": "PA10",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART1_RX",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM1_CH3",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "复用为 USART1_RX 时 GPIO 模式配 GPIO_Mode_IN_FLOATING 或上拉输入。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 32,
+      "name": "PA11",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PA11",
+      "defaultFunctionZh": "PA11，通用 IO（5V 容忍）。可复用为 USART1_CTS、USBDM、CAN_RX、TIM1_CH4。",
+      "functions": [
+        {
+          "name": "PA11",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART1_CTS",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USBDM",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USB",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "CAN_RX",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "CAN",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM1_CH4",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 33,
+      "name": "PA12",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PA12",
+      "defaultFunctionZh": "PA12，通用 IO（5V 容忍）。可复用为 USART1_RTS、USBDP、CAN_TX、TIM1_ETR。",
+      "functions": [
+        {
+          "name": "PA12",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART1_RTS",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USART",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USBDP",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "USB",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "CAN_TX",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "CAN",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM1_ETR",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 34,
+      "name": "PA13",
+      "groups": [
+        "debug",
+        "gpio"
+      ],
+      "defaultFunction": "JTMS/SWDIO",
+      "defaultFunctionZh": "PA13，默认功能为 JTMS/SWDIO（SWD 数据线）。",
+      "functions": [
+        {
+          "name": "PA13",
+          "kind": "gpio",
+          "remapRequired": true,
+          "peripheralId": "",
+          "remapNoteZh": "需 GPIO_Remap_SWJ_JTAGDisable 才能释放（且 SWD 仍占用 PA13/PA14，完全释放需 SWJ_Disable，风险高）"
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": "JTMS/SWDIO",
+      "notesZh": "默认被调试口占用。配置成普通 GPIO 会导致下载器连不上芯片。确需使用时先调用 GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE) 关闭 JTAG（SWD 仍可用），此时 PA13 仍被 SWD 占用，只有彻底关闭 SWJ 才能完全释放——但那会导致无法下载，需谨慎。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 35,
+      "name": "VSS_2",
+      "groups": [
+        "ground"
+      ],
+      "defaultFunction": "VSS_2",
+      "defaultFunctionZh": "数字地（VSS_2）。",
+      "functions": [
+        {
+          "name": "VSS_2",
+          "kind": "ground",
+          "remapRequired": false,
+          "peripheralId": "",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 36,
+      "name": "VDD_2",
+      "groups": [
+        "power"
+      ],
+      "defaultFunction": "VDD_2",
+      "defaultFunctionZh": "数字电源（VDD_2），接 3.3V。",
+      "functions": [
+        {
+          "name": "VDD_2",
+          "kind": "power",
+          "remapRequired": false,
+          "peripheralId": "",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 37,
+      "name": "PA14",
+      "groups": [
+        "debug",
+        "gpio"
+      ],
+      "defaultFunction": "JTCK/SWCLK",
+      "defaultFunctionZh": "PA14，默认功能为 JTCK/SWCLK（SWD 时钟线）。",
+      "functions": [
+        {
+          "name": "PA14",
+          "kind": "gpio",
+          "remapRequired": true,
+          "peripheralId": "",
+          "remapNoteZh": "同 PA13，需关闭 SWJ 才能完全释放，风险高"
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": "JTCK/SWCLK",
+      "notesZh": "同 PA13，默认被调试口占用，不要随意配置为普通 IO。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 38,
+      "name": "PA15",
+      "groups": [
+        "debug",
+        "gpio"
+      ],
+      "defaultFunction": "JTDI",
+      "defaultFunctionZh": "PA15，默认功能为 JTDI。",
+      "functions": [
+        {
+          "name": "TIM2_CH1_ETR",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "TIM",
+          "remapNoteZh": "需先 GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE) 释放 PA15，再 GPIO_PinRemapConfig(GPIO_PartialRemap1_TIM2, ENABLE)（TIM2 部分重映射 1）"
+        },
+        {
+          "name": "PA15",
+          "kind": "gpio",
+          "remapRequired": true,
+          "peripheralId": "",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE)，且要先开 AFIO 时钟"
+        },
+        {
+          "name": "SPI1_NSS",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "SPI",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_SPI1, ENABLE)；PA15 同时被 JTAG 占用，还要 GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE) 释放"
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": "JTDI",
+      "notesZh": "默认被 JTAG 占用。调用 GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE) 后可释放为普通 IO，同时还能复用为 TIM2_CH1_ETR 或 SPI1_NSS。释放后需重新用 GPIO_Init 配置。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 39,
+      "name": "PB3",
+      "groups": [
+        "debug",
+        "gpio"
+      ],
+      "defaultFunction": "JTDO",
+      "defaultFunctionZh": "PB3，默认功能为 JTDO。",
+      "functions": [
+        {
+          "name": "PB3",
+          "kind": "gpio",
+          "remapRequired": true,
+          "peripheralId": "",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE)，且要先开 AFIO 时钟"
+        },
+        {
+          "name": "TRACESWO",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "DBGMCU",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE) 释放 PB3（JTDO）；同时会关掉 JTAG，SWD 仍可用"
+        },
+        {
+          "name": "TIM2_CH2",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "TIM",
+          "remapNoteZh": "需先 GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE) 释放 PB3，再 GPIO_PinRemapConfig(GPIO_PartialRemap1_TIM2, ENABLE)（TIM2 部分重映射 1）"
+        },
+        {
+          "name": "SPI1_SCK",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "SPI",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_SPI1, ENABLE)；PB3 同时被 JTAG 占用，还要 GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE) 释放"
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": "JTDO",
+      "notesZh": "默认被 JTAG 占用。关闭 JTAG 后可释放为普通 IO，或复用为 TRACESWO、TIM2_CH2、SPI1_SCK。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 40,
+      "name": "PB4",
+      "groups": [
+        "debug",
+        "gpio"
+      ],
+      "defaultFunction": "NJTRST",
+      "defaultFunctionZh": "PB4，默认功能为 NJTRST。",
+      "functions": [
+        {
+          "name": "PB4",
+          "kind": "gpio",
+          "remapRequired": true,
+          "peripheralId": "",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE)，且要先开 AFIO 时钟"
+        },
+        {
+          "name": "TIM3_CH1",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "TIM",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_PartialRemap_TIM3, ENABLE)（TIM3 部分重映射）"
+        },
+        {
+          "name": "SPI1_MISO",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "SPI",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_SPI1, ENABLE)；PB4 同时被 JTAG 占用（NJTRST），还要 GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE) 释放"
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": "NJTRST",
+      "notesZh": "默认被 JTAG 占用。关闭 JTAG 后可释放为普通 IO，或复用为 TIM3_CH1、SPI1_MISO。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 41,
+      "name": "PB5",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB5",
+      "defaultFunctionZh": "PB5，通用 IO。可复用为 I2C1_SMBAI；重映射后为 TIM3_CH2、SPI1_MOSI。",
+      "functions": [
+        {
+          "name": "PB5",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "I2C1_SMBAI",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "I2C",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM3_CH2",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "TIM",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_PartialRemap_TIM3, ENABLE)（TIM3 部分重映射）"
+        },
+        {
+          "name": "SPI1_MOSI",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "SPI",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_SPI1, ENABLE)"
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 42,
+      "name": "PB6",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB6",
+      "defaultFunctionZh": "PB6，通用 IO（5V 容忍）。可复用为 I2C1_SCL、TIM4_CH1；重映射后为 USART1_TX。",
+      "functions": [
+        {
+          "name": "PB6",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "I2C1_SCL",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "I2C",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM4_CH1",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART1_TX",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "USART",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_USART1, ENABLE)"
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "USART1 重映射后 TX 到 PB6、RX 到 PB7。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 43,
+      "name": "PB7",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB7",
+      "defaultFunctionZh": "PB7，通用 IO（5V 容忍）。可复用为 I2C1_SDA、TIM4_CH2；重映射后为 USART1_RX。",
+      "functions": [
+        {
+          "name": "PB7",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "I2C1_SDA",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "I2C",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM4_CH2",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "USART1_RX",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "USART",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_USART1, ENABLE)"
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 44,
+      "name": "BOOT0",
+      "groups": [
+        "boot"
+      ],
+      "defaultFunction": "BOOT0",
+      "defaultFunctionZh": "BOOT0，启动模式选择输入。",
+      "functions": [
+        {
+          "name": "BOOT0",
+          "kind": "boot",
+          "remapRequired": false,
+          "peripheralId": "",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "上电时决定启动模式：接低（10k 下拉）从 Flash 启动，正常运行必须接低；接高则从系统存储器启动，可用串口 ISP 下载程序。这是救回「下载器连不上」的芯片的关键引脚。",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 45,
+      "name": "PB8",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB8",
+      "defaultFunctionZh": "PB8，通用 IO（5V 容忍）。可复用为 TIM4_CH3；重映射后为 I2C1_SCL、CAN_RX。",
+      "functions": [
+        {
+          "name": "PB8",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM4_CH3",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "I2C1_SCL",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "I2C",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_I2C1, ENABLE)"
+        },
+        {
+          "name": "CAN_RX",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "CAN",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap2_CAN1, ENABLE)（CAN1 重映射到 PB8/PB9）"
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 46,
+      "name": "PB9",
+      "groups": [
+        "gpio"
+      ],
+      "defaultFunction": "PB9",
+      "defaultFunctionZh": "PB9，通用 IO（5V 容忍）。可复用为 TIM4_CH4；重映射后为 I2C1_SDA、CAN_TX。",
+      "functions": [
+        {
+          "name": "PB9",
+          "kind": "gpio",
+          "remapRequired": false,
+          "peripheralId": "GPIO",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "TIM4_CH4",
+          "kind": "af",
+          "remapRequired": false,
+          "peripheralId": "TIM",
+          "remapNoteZh": ""
+        },
+        {
+          "name": "I2C1_SDA",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "I2C",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap_I2C1, ENABLE)"
+        },
+        {
+          "name": "CAN_TX",
+          "kind": "af",
+          "remapRequired": true,
+          "peripheralId": "CAN",
+          "remapNoteZh": "需 GPIO_PinRemapConfig(GPIO_Remap2_CAN1, ENABLE)（CAN1 重映射到 PB8/PB9）"
+        }
+      ],
+      "fiveVoltTolerant": true,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 47,
+      "name": "VSS_3",
+      "groups": [
+        "ground"
+      ],
+      "defaultFunction": "VSS_3",
+      "defaultFunctionZh": "数字地（VSS_3）。",
+      "functions": [
+        {
+          "name": "VSS_3",
+          "kind": "ground",
+          "remapRequired": false,
+          "peripheralId": "",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    },
+    {
+      "number": 48,
+      "name": "VDD_3",
+      "groups": [
+        "power"
+      ],
+      "defaultFunction": "VDD_3",
+      "defaultFunctionZh": "数字电源（VDD_3），接 3.3V。",
+      "functions": [
+        {
+          "name": "VDD_3",
+          "kind": "power",
+          "remapRequired": false,
+          "peripheralId": "",
+          "remapNoteZh": ""
+        }
+      ],
+      "fiveVoltTolerant": false,
+      "jtagSwd": null,
+      "notesZh": "",
+      "relatedFunctionIds": []
+    }
+  ]
+}

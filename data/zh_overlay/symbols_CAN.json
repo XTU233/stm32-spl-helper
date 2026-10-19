@@ -1,0 +1,58 @@
+{
+  "_comment": "CAN 结构体成员中文。STM32F103C8T6 只有 CAN1（PA11=RX、PA12=TX，重映射后 PB8/PB9），CAN2 是互联型才有的外设。CAN 挂在 APB1（36MHz）。滤波器共 14 组（0~13），CAN_FilterInit 内部固定操作 CAN1。",
+  "symbols": {
+    "CAN_InitTypeDef": {
+      "briefZh": "CAN 位时序与工作模式结构体，CAN_Init 用它配置分频、采样点(BS1/BS2)、同步跳宽、工作模式以及自动离线/唤醒等管理位。",
+      "membersZh": {
+        "CAN_Prescaler": "CAN 时钟的分频系数，取值 1~1024（断言 IS_CAN_PRESCALER）。每一位由 tq 组成，tq = CAN 时钟 / Prescaler，CAN 时钟通常就是 PCLK1（36MHz），所以必须先配好时钟再调 CAN_Init。波特率 = 36MHz / (CAN_Prescaler × (1 + BS1的tq数 + BS2的tq数))，算例：Prescaler=12、BS1=3tq、BS2=2tq 得 36M/(12×6) = 500kbps；Prescaler=48、BS1=2tq、BS2=3tq 得 125kbps。先按目标波特率反推组合，再检查 BS1/BS2 的比例（决定采样点位置）。晶振来源也会影响误码率，用 HSI 振荡出的 36MHz 温漂大，长时间运行易出错误帧，建议用 HSE。",
+        "CAN_Mode": "CAN 工作模式，取 CAN_Mode_Normal（正常收发）、CAN_Mode_LoopBack（回环，自发自收，不驱动总线，调试用）、CAN_Mode_Silent（只听不发）、CAN_Mode_Silent_LoopBack（回环+只听）。注意它与 CAN_OperatingModeRequest 的 Initialization/Normal/Sleep 不是一回事：本字段是初始化阶段配的外设特性，后者是运行期切换的状态。没有接其它节点时选 LoopBack 自测；只接 USB-CAN 分析仪被动监听时用 Silent，避免自己的报文干扰总线。C8T6 只有 CAN1，别误传 CAN2。",
+        "CAN_SJW": "重同步跳变宽度，取 CAN_SJW_1tq / 2tq / 3tq / 4tq（默认 1tq）。它允许硬件在检测到相位误差时把当前位拉长或缩短最多 SJW 个 tq，用来容忍两端时钟偏差。低速与长线用 1tq 足够；不同晶振源、多个节点组网时取 2tq~4tq 更稳。SJW 不能超过 BS2 的长度（建议 SJW ≤ BS2），否则总线抗抖动能力设计不正确。",
+        "CAN_BS1": "位段 1（传播段+相位缓冲 1）长度，取 CAN_BS1_1tq ~ CAN_BS1_16tq（默认 4tq）。BS1 越长采样点越靠后，标称采样点位置 = (1 + BS1_tq) / (1 + BS1_tq + BS2_tq)。CAN 标准推荐采样点 75%~87.5%：500kbps 常用 BS1=8tq、BS2=1tq，250kbps 常用 BS1=13tq、BS2=2tq。BS1 与 BS2 一起决定波特率，改一个必须重算另一个，不能只增大 BS1 而不减 BS2。",
+        "CAN_BS2": "位段 2（相位缓冲 2，采样点之后的部分）长度，取 CAN_BS2_1tq ~ CAN_BS2_8tq（默认 3tq）。它决定采样点到本帧结束的时间，会影响仲裁与错误帧的插入，不能设成 0。要提升采样点百分比就减 BS2，但 BS2 太短会让重同步余量不足、误码率上升。与 BS1 一起决定波特率：36MHz/(Prescaler×(1+BS1+BS2))，其中 BS1/BS2 按各自的 tq 数代入。",
+        "CAN_TTCM": "时间触发通信模式，取 ENABLE 或 DISABLE（默认 DISABLE）。打开后硬件在收发帧里自动附加时间戳（TGT 位与 16 位时间戳，可用 CAN_TTComModeCmd 配合），用于 TTCAN 级别的硬实时调度，此时报文内容与标准 CAN 帧不同，普通节点无法解析。绝大多数应用保持 DISABLE，做时间敏感网络时才打开。",
+        "CAN_ABOM": "自动离线管理，取 ENABLE 或 DISABLE（默认 DISABLE，即进入 bus-off 后不自动恢复）。ENABLE 时总线上错误计数超限进入 bus-off，硬件在检测到 128 次连续 11 个隐性位后自动回到正常模式；DISABLE 时进入 bus-off 后必须软件调 CAN_OperatingModeRequest(CAN1, CAN_OperatingMode_Initialization) 再切 Normal 才能恢复。无人值守的节点建议 ENABLE，否则一旦 bus-off 就永久失联。",
+        "CAN_AWUM": "自动唤醒模式，取 ENABLE 或 DISABLE（默认 DISABLE）。ENABLE 时进入 Sleep 后检测到总线活动会自动醒来并恢复时钟，DISABLE 时必须软件唤醒。用 CAN_OperatingModeRequest 进 Sleep 做低功耗时打开它，可以让总线上任意一帧把 MCU 从 CAN 睡眠中拉回来（但 MCU 的 STOP 模式仍需 EXTI 等中断才能真正唤醒内核）。",
+        "CAN_NART": "禁止自动重传，取 ENABLE 或 DISABLE（默认 DISABLE，即允许无限次自动重传）。标准 CAN 要求发送失败自动重试直到确认，绝大多数场合保持 DISABLE；选 ENABLE 后硬件只发一次，失败就置 RQCP 并报错，适合单向广播或对时延要求严格、宁可丢帧也不能阻塞的场景。注意开着自动重传时，如果总线没有其它节点应答，发送会一直挂在邮箱里，CAN_TransmitStatus 反复返回 Pending，看起来像程序卡死。",
+        "CAN_RFLM": "接收 FIFO 锁定模式，取 ENABLE 或 DISABLE（默认 DISABLE，即覆盖模式）。DISABLE（解锁）时 FIFO 满了之后新报文会覆盖最旧的报文；ENABLE（锁定）时 FIFO 满了直接丢弃新报文并置溢出标志（FOVR）。对数据完整性要求高、希望察觉丢帧时用 ENABLE；要求始终拿到最新数据时用 DISABLE。断帧丢帧的判断只能靠 CAN_IT_FOV0 / CAN_IT_FOV1 溢出中断。",
+        "CAN_TXFP": "发送 FIFO 优先级，取 ENABLE 或 DISABLE（默认 DISABLE）。DISABLE 时三个发送邮箱按报文标识符（ID 数值小优先）决定发送顺序，符合 CAN 总线仲裁规则；ENABLE 时按请求发送的先后顺序（请求顺序）发送。要求时序确定（比如按队列顺序刷参数）时打开，通常会保持默认。"
+      }
+    },
+    "CAN_FilterInitTypeDef": {
+      "briefZh": "CAN 接收滤波器结构体，CAN_FilterInit 用它配置滤波器的编号、位宽、屏蔽/列表模式、ID/Mask 值、归属 FIFO 以及是否立即激活。",
+      "membersZh": {
+        "CAN_FilterIdHigh": "要匹配的标识符的高 16 位。32 位位宽时它和 CAN_FilterIdLow 拼成 (IdHigh<<16 | IdLow) 的 32 位 ID 寄存器，16 位位宽时是第 2 个 16 位 ID。注意这里填的是硬件寄存器布局、不是裸 ID：标准帧 11 位 ID 位于 RTR 与 IDE 位之前的高位区，要用标准帧 ID 精确过滤时应先按位段换算（ST 示例 CAN/Networking 里 IdHigh=0x6420、IdLow=0x0000 就是换算后的值），直接把 0x7FF 这种裸 ID 填进来不会匹配到 ID 0x7FF。",
+        "CAN_FilterIdLow": "要匹配的标识符的低 16 位。32 位位宽时是 ID 的低半部分（含 RTR、IDE 标志位），16 位位宽时是第 1 个 16 位 ID。16 位位宽下 CAN_FilterInit 把 IdLow 与 MaskIdLow 拼进 FR1、IdHigh 与 MaskIdHigh 拼进 FR2，也就是一次配好两组 16 位滤波器，四个字段都会被用到，不能只填其中一组。",
+        "CAN_FilterMaskIdHigh": "掩码/列表的高 16 位。屏蔽模式（CAN_FilterMode_IdMask）下它是掩码：对应位为 1 表示 ID 该位必须一致，为 0 表示不关心（全 0 掩码即接收全部报文，ST 自带的 LoopBack 例程就是这样收所有帧）。列表模式（CAN_FilterMode_IdList）下它不再是掩码，而是第二个（或第三、第四个）要精确匹配的 ID。若只填了 ID 却把掩码全 0，效果是放行所有报文，这是最常见的“滤波器配了等于没配”。",
+        "CAN_FilterMaskIdLow": "掩码/列表的低 16 位，语义与 CAN_FilterMaskIdHigh 相同，只作用于 ID 的低半部分。标准帧的 RTR 位和 IDE 位也在这 16 位里，想只收数据帧不收远程帧时，需要把对应位在掩码里置 1 并在 ID 里写成数据帧的值，否则远程帧也会进来。16 位位宽模式下它是第 1 组滤波器的掩码，而 CAN_FilterMaskIdHigh 变成了第 2 组的掩码，字段名与实际作用容易错位，配置时对照 CAN_FilterInit 源码理解。",
+        "CAN_FilterFIFOAssignment": "命中的报文进入哪个接收 FIFO，取 CAN_Filter_FIFO0 或 CAN_Filter_FIFO1（头文件里的注释/断言写作 CAN_FilterFIFO0/1，实际宏名是 CAN_Filter_FIFO0）。每个 FIFO 只有 3 级深度，总线上突发帧多时建议两个 FIFO 分开：比如 FIFO0 放高优先级报文并开 CAN_IT_FMP0 中断，FIFO1 放周期性报文用轮询读。接收时 CAN_Receive 的第二个参数（CAN_FIFO0/CAN_FIFO1）必须与这里一致，否则读到的是另一个 FIFO 的数据。",
+        "CAN_FilterNumber": "使用哪一组滤波器，0~13（STM32F10X_CL 互联型才是 0~27，断言 IS_CAN_FILTER_NUMBER 随该宏变化）。14 组共享 28 个 32 位寄存器；按 16 位位宽使用时每组相当于两个 16 位滤波器。CAN_FilterInit 内部固定操作 CAN1 的 FMR/FS1R/FM1R/FFA1R/FA1R，与传入的外设无关。C8T6 只有 CAN1，直接用 0~13 即可，同一组被重复初始化会覆盖前一次配置，别让两组配置争用同一个编号。",
+        "CAN_FilterMode": "滤波器的匹配方式，取 CAN_FilterMode_IdMask（ID+掩码，一段范围/一组位型，最常用）或 CAN_FilterMode_IdList（精确 ID 列表，逐个匹配）。屏蔽模式好理解也好扩展：想接收 0x100~0x1FF 的任意帧，就把 ID 的无关位掩码置 0。列表模式在 32 位位宽下每两组寄存器只能放两个 ID，能精确放行的 ID 数量有限，做多 ID 白名单时要按 ID 数量算占用组数。",
+        "CAN_FilterScale": "滤波器位宽，取 CAN_FilterScale_32bit（一组 = 1 个 32 位 ID + 32 位掩码/列表）或 CAN_FilterScale_16bit（一组 = 2 个 16 位滤波单元，16 位模式下只能匹配标准帧 ID 的一部分，且包含 RTR/IDE 位）。扩展帧（29 位 ID）只能用 32 位位宽，因为 16 位模式装不下 EXID 位段。14 组 × 32 位共 28 个寄存器，选 16 位时相当于提供 28 个 16 位滤波单元。",
+        "CAN_FilterActivation": "是否立即激活该滤波器，取 ENABLE 或 DISABLE。CAN_FilterInit 会先把该组在 FA1R 里关掉、写入配置，再按这个值决定是否重新打开，所以填 DISABLE 等于“只写好配置不启用”——常用于先批量配置若干组再一起打开，或调试时逐个打开观察哪组在生效。注意如果所有滤波器都是未激活状态，CAN 收不到任何帧（不同型号的默认过滤规则不完全一样，最保险的做法是至少显式启用一组）。"
+      }
+    },
+    "CanTxMsg": {
+      "briefZh": "CAN 发送报文结构体，CAN_Transmit 用它填标识符、帧类型、数据长度和数据字节，把一帧放进三个发送邮箱之一；CAN_TTComModeCmd 也会用到它。",
+      "membersZh": {
+        "StdId": "标准帧的 11 位标识符，取值 0~0x7FF（断言 IS_CAN_STDID），填裸 ID 即可，库写 TIR 时会自动左移 21 位。只有 IDE=CAN_Id_Standard 时有效，发扩展帧时硬件用 ExtId，StdId 即使填了也被忽略。标识符数值越小仲裁优先级越高，别把周期性报文都堆在 0x000 附近。",
+        "ExtId": "扩展帧的 29 位标识符，取值 0~0x1FFFFFFF（断言 IS_CAN_EXTID），只在 IDE=CAN_Id_Extended 时有效。填 29 位原始 ID 即可，不需要手动左移或拼 IDE 位——库在写 TIxR 时已经按寄存器布局拼好了。发标准帧时它无意义，习惯上填 0 避免看代码的人误判。",
+        "IDE": "标识符类型，取 CAN_Id_Standard（标准帧，11 位 ID）或 CAN_Id_Extended（扩展帧，29 位 ID）。它决定硬件发送时实际采用 StdId 还是 ExtId，也决定接收端 CanRxMsg 里哪个字段有值。宏定义在 stm32f10x_can.h 里，某些旧工程/示例会写成 CAN_ID_STD / CAN_ID_EXT（这是 stm32f10x_can.c 内部宏），两者不要混用，以头文件为准。",
+        "RTR": "帧类型，取 CAN_RTR_Data（数据帧，携带 0~8 字节数据）或 CAN_RTR_Remote（远程帧，只请求对方发数据，不带数据）。兼容旧写法会有 CAN_RTR_DATA / CAN_RTR_REMOTE 之类的拼写差异，统一用头文件里的 CAN_RTR_Data / CAN_RTR_Remote。远程帧的 DLC 表示期望的数据长度，但 Data[] 内容不会被使用。",
+        "DLC": "数据长度码，取值 0~8（断言 IS_CAN_DLC），表示 Data[] 里有多少个有效字节。经典 CAN 最大 8 字节，没有 FD 那样的扩展长度。填大了会发出未赋值的栈垃圾字节，填小了对方会收到被截断的报文，每次改报文内容务必同步改 DLC。",
+        "Data": "要发送的数据缓冲区，uint8_t Data[8]，只有前 DLC 个字节会被发出（有效值 0~0xFF）。经典 CAN 规定最大 8 字节，超过 8 字节的数据必须由上层协议分包（如 ISO-TP、CANopen SDO 分段）。注意这是数组成员不是指针，取地址直接用 TxMessage.Data 即可，不要写成 &TxMessage.Data。"
+      }
+    },
+    "CanRxMsg": {
+      "briefZh": "CAN 接收报文结构体，CAN_Receive 把指定 FIFO 里最早的一帧解析到它里面，之后从 IDE/RTR/StdId/ExtId/DLC/Data/FMI 读内容；也可以当作缓冲区传给 CAN_Receive 接收。",
+      "membersZh": {
+        "StdId": "接收到的标准帧标识符，0~0x7FF；只有 IDE 为 CAN_Id_Standard 时才有意义。扩展帧的 StdId 通常读到 0，判断帧类型要看 IDE 而不是 StdId 是否为 0。可先判断 IDE，再决定用 StdId 还是 ExtId 匹配。",
+        "ExtId": "接收到的扩展帧标识符，0~0x1FFFFFFF；只有 IDE 为 CAN_Id_Extended 时才有意义。它已经是拼好、可直接比较的 29 位 ID，不需要自己从寄存器位域里再移位还原——库里的 CAN_Receive 已经做了还原。",
+        "IDE": "接收帧的标识符类型，CAN_Id_Standard 或 CAN_Id_Extended，由硬件在收到帧时解析填入。回调/中断里先判断 IDE 再决定读 StdId 还是 ExtId 是标准写法，否则可能读到无意义的 0。有些旧驱动用 CAN_ID_STD/CAN_ID_EXT 命名，值其实相同，但读代码时要以头文件为准。",
+        "RTR": "接收帧的类型，CAN_RTR_Data（数据帧）或 CAN_RTR_Remote（远程帧）。远程帧表示总线上有节点在请求数据，Data[] 内容是无效的，DLC 只表示请求的字节数。不处理远程帧的业务可以在此过滤掉，避免把请求帧当数据处理。",
+        "DLC": "接收帧的数据长度码，0~8，表示 Data[] 中有几个有效字节。读数据时必须以它为准，不能固定读 8 个字节；注意 FIFO 里残留的旧字节可能让 Data[3..7] 看起来有值。",
+        "Data": "接收到的数据缓冲区，uint8_t Data[8]；只有前 DLC 个字节是本次报文的内容。一次 CAN_Receive 读一帧，FIFO 空时读到的内容无意义（返回的必须是队首报文，不能靠反复读 DR 覆盖——必须用 CAN_Receive 逐帧弹出）。",
+        "FMI": "Filter Match Index，该报文命中的滤波器编号（就是 CAN_FilterNumber 的值，0~13，不按 FIFO 重排；断言注释里的 0~0xFF 只是字段宽度）。用于判断“这帧是哪个滤波器收下的”，进而路由到不同的处理逻辑。它只表示组号，不区分 16 位位宽里的两个子单元，需要更细的区分时请自己比较 ID 内容。"
+      }
+    }
+  }
+}

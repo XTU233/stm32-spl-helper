@@ -1,0 +1,1374 @@
+{
+  "_comment": "TIM 外设的中文补充。参数名以 base JSON 为准。",
+  "peripheral": "TIM",
+  "functions": {
+    "TIM_DeInit": {
+      "briefZh": "把指定定时器的所有寄存器恢复为复位默认值。",
+      "usageZh": "需要彻底重置一个定时器时使用，内部通过 RCC 的 APB 复位寄存器实现。重新配置定时器前调用可避免残留配置干扰。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要复位的定时器，C8T6 可用 TIM1（高级）、TIM2/TIM3/TIM4（通用）。" },
+      "prerequisites": ["需先使能 TIMx 时钟（TIM1 在 APB2，TIM2/3/4 在 APB1）"],
+      "registers": ["TIMx_CR1", "TIMx_CR2", "TIMx_SMCR", "TIMx_DIER", "TIMx_PSC", "TIMx_ARR"],
+      "relatedFunctions": ["TIM_TimeBaseInit", "RCC_APB1PeriphClockCmd", "RCC_APB2PeriphClockCmd"],
+      "exampleCode": "RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);\nTIM_DeInit(TIM2);",
+      "notesZh": ["复位后定时器停止计数，需要重新 TIM_TimeBaseInit 并 TIM_Cmd 启动"]
+    },
+
+    "TIM_TimeBaseInit": {
+      "briefZh": "配置定时器的时基单元：预分频、计数模式、自动重装值、时钟分频。",
+      "usageZh": "任何定时器应用的第一步。定时频率 = 定时器时钟 / (Prescaler + 1) / (Period + 1)。例如 TIM2 时钟 72MHz、Prescaler=7199、Period=9999 得到 1Hz（1 秒中断一次）。注意本函数会立即产生一次更新事件，把预分频值写入影子寄存器，所以调用后计数器可能已经开始跑。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_TimeBaseInitStruct": "指向时基配置结构体的指针，需先填好 TIM_Prescaler、TIM_Period、TIM_CounterMode、TIM_ClockDivision、TIM_RepetitionCounter 五个字段。"
+      },
+      "prerequisites": [
+        "已使能 TIMx 时钟",
+        "结构体各字段已全部赋值（建议先用 TIM_TimeBaseStructInit 填默认值）",
+        "通用定时器 TIM2/3/4 的 TIM_RepetitionCounter 必须填 0"
+      ],
+      "registers": ["TIMx_PSC", "TIMx_ARR", "TIMx_CR1", "TIMx_RCR"],
+      "relatedFunctions": ["TIM_TimeBaseStructInit", "TIM_Cmd", "TIM_ITConfig", "TIM_SetAutoreload"],
+      "exampleCode": "TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;\n\n/* 目标：1 秒中断一次。TIM2 时钟 72MHz\n   Prescaler=7199 → 72MHz/7200 = 10kHz\n   Period=9999    → 10kHz/10000 = 1Hz */\nTIM_TimeBaseStructure.TIM_Prescaler = 7199;\nTIM_TimeBaseStructure.TIM_Period = 9999;\nTIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;\nTIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;\nTIM_TimeBaseStructure.TIM_RepetitionCounter = 0;   /* 通用定时器必须填 0 */\nTIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);\n\nTIM_Cmd(TIM2, ENABLE);",
+      "notesZh": [
+        "Prescaler 与 Period 都是「实际值减 1」：写 7199 表示 7200 分频",
+        "TIM_RepetitionCounter 只对高级定时器 TIM1 有效，TIM2/3/4 必须填 0，否则计数行为异常",
+        "TIM1（高级定时器）挂 APB2，时钟 72MHz；TIM2/3/4 挂 APB1，虽然 APB1 是 36MHz，但因为 APB 分频不为 1，定时器时钟是 APB×2 = 72MHz",
+        "本函数会置位更新事件标志（UG 位），如果之前开过更新中断，可能立刻进一次中断"
+      ]
+    },
+
+    "TIM_OC1Init": {
+      "briefZh": "配置定时器通道 1 的输出比较（OC）单元。",
+      "usageZh": "输出 PWM 或比较翻转波形的核心函数。配置前必须先 TIM_TimeBaseInit 设好时基。通道 1 对应引脚：TIM1_CH1=PA8、TIM2_CH1=PA0、TIM3_CH1=PA6、TIM4_CH1=PB6。注意高级定时器 TIM1 还必须调用 TIM_CtrlPWMOutputs(TIM1, ENABLE) 使能主输出，否则引脚上没有波形。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_OCInitStruct": "指向输出比较配置结构体的指针，需填 TIM_OCMode、TIM_OutputState、TIM_Pulse、TIM_OCPolarity 等字段。"
+      },
+      "prerequisites": [
+        "已调用 TIM_TimeBaseInit 配置时基",
+        "对应 GPIO 引脚已配成复用推挽输出（GPIO_Mode_AF_PP）",
+        "TIM1 还需 TIM_CtrlPWMOutputs(TIM1, ENABLE)"
+      ],
+      "registers": ["TIMx_CCMR1", "TIMx_CCER", "TIMx_CCR1"],
+      "relatedFunctions": ["TIM_TimeBaseInit", "TIM_OCStructInit", "TIM_CtrlPWMOutputs", "TIM_SetCompare1", "TIM_OC1PreloadConfig"],
+      "exampleCode": "TIM_OCInitTypeDef TIM_OCInitStructure;\n\nTIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;\nTIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;\nTIM_OCInitStructure.TIM_Pulse = 500;          /* 初始占空比 */\nTIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;\nTIM_OC1Init(TIM3, &TIM_OCInitStructure);\n\n/* 使能预装载，改占空比时无毛刺 */\nTIM_OC1PreloadConfig(TIM3, TIM_OCPreload_Enable);\nTIM_ARRPreloadConfig(TIM3, ENABLE);\nTIM_Cmd(TIM3, ENABLE);",
+      "notesZh": [
+        "TIM1 是高级定时器，必须额外调用 TIM_CtrlPWMOutputs(TIM1, ENABLE)，否则引脚没波形——这是最常见的坑",
+        "结构体里还有 TIM_OutputNState、TIM_OCNPolarity、TIM_OCIdleState 等字段，只对 TIM1 有效；TIM2/3/4 上填默认值即可",
+        "建议用 TIM_OCStructInit 先填默认值再改需要的字段"
+      ]
+    },
+
+    "TIM_OC2Init": {
+      "briefZh": "配置定时器通道 2 的输出比较（OC）单元。",
+      "usageZh": "与 TIM_OC1Init 用法完全相同，只是作用于通道 2。通道 2 对应引脚：TIM1_CH2=PA9、TIM2_CH2=PA1、TIM3_CH2=PA7、TIM4_CH2=PB7。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_OCInitStruct": "输出比较配置结构体，字段含义同 TIM_OC1Init。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit 配置时基", "对应 GPIO 已配成 GPIO_Mode_AF_PP", "TIM1 还需 TIM_CtrlPWMOutputs"],
+      "registers": ["TIMx_CCMR1", "TIMx_CCER", "TIMx_CCR2"],
+      "relatedFunctions": ["TIM_TimeBaseInit", "TIM_OCStructInit", "TIM_CtrlPWMOutputs", "TIM_SetCompare2", "TIM_OC2PreloadConfig"],
+      "exampleCode": "TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;\nTIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;\nTIM_OCInitStructure.TIM_Pulse = 250;\nTIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;\nTIM_OC2Init(TIM3, &TIM_OCInitStructure);",
+      "notesZh": ["通道 1 与通道 2 共用 TIMx_CCMR1 寄存器，但各占不同的位域，互不影响"]
+    },
+
+    "TIM_OC3Init": {
+      "briefZh": "配置定时器通道 3 的输出比较（OC）单元。",
+      "usageZh": "与 TIM_OC1Init 用法相同，作用于通道 3。通道 3 对应引脚：TIM1_CH3=PA10、TIM2_CH3=PA2、TIM3_CH3=PB0、TIM4_CH3=PB8。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_OCInitStruct": "输出比较配置结构体。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit 配置时基", "对应 GPIO 已配成 GPIO_Mode_AF_PP", "TIM1 还需 TIM_CtrlPWMOutputs"],
+      "registers": ["TIMx_CCMR2", "TIMx_CCER", "TIMx_CCR3"],
+      "relatedFunctions": ["TIM_TimeBaseInit", "TIM_OCStructInit", "TIM_CtrlPWMOutputs", "TIM_SetCompare3", "TIM_OC3PreloadConfig"],
+      "exampleCode": "TIM_OCInitStructure.TIM_Pulse = 750;\nTIM_OC3Init(TIM3, &TIM_OCInitStructure);",
+      "notesZh": ["通道 3 与通道 4 共用 TIMx_CCMR2 寄存器"]
+    },
+
+    "TIM_OC4Init": {
+      "briefZh": "配置定时器通道 4 的输出比较（OC）单元。",
+      "usageZh": "与 TIM_OC1Init 用法相同，作用于通道 4。通道 4 对应引脚：TIM1_CH4=PA11、TIM2_CH4=PA3、TIM3_CH4=PB1、TIM4_CH4=PB9。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_OCInitStruct": "输出比较配置结构体。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit 配置时基", "对应 GPIO 已配成 GPIO_Mode_AF_PP", "TIM1 还需 TIM_CtrlPWMOutputs"],
+      "registers": ["TIMx_CCMR2", "TIMx_CCER", "TIMx_CCR4"],
+      "relatedFunctions": ["TIM_TimeBaseInit", "TIM_OCStructInit", "TIM_CtrlPWMOutputs", "TIM_SetCompare4", "TIM_OC4PreloadConfig"],
+      "exampleCode": "TIM_OCInitStructure.TIM_Pulse = 1000;\nTIM_OC4Init(TIM3, &TIM_OCInitStructure);",
+      "notesZh": [
+        "通道 4 没有互补输出（N 通道），TIM_OC4NPolarityConfig 之类的函数不存在",
+        "TIM3_CH4 与 TIM3 的通道 1~3 引脚分布在不同端口，接线时注意查引脚表"
+      ]
+    },
+
+    "TIM_ICInit": {
+      "briefZh": "配置定时器的输入捕获（IC）单元。",
+      "usageZh": "用于测量外部信号的脉宽、周期或频率。原理是外部信号跳变时把当前计数值锁存到 CCR 寄存器，再用 TIM_GetCapturex 读出。测高频信号时要注意计数器的溢出问题。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_ICInitStruct": "指向输入捕获配置结构体的指针，需填 TIM_Channel、TIM_ICPolarity、TIM_ICSelection、TIM_ICPrescaler、TIM_ICFilter 五个字段。"
+      },
+      "prerequisites": [
+        "已调用 TIM_TimeBaseInit 配置时基",
+        "捕获引脚已配成输入模式（通常是浮空或上拉输入，不是复用推挽）"
+      ],
+      "registers": ["TIMx_CCMR1", "TIMx_CCMR2", "TIMx_CCER", "TIMx_CCR1", "TIMx_CCR2"],
+      "relatedFunctions": ["TIM_TimeBaseInit", "TIM_ICStructInit", "TIM_GetCapture1", "TIM_SetIC1Prescaler", "TIM_PWMIConfig"],
+      "exampleCode": "TIM_ICInitTypeDef TIM_ICInitStructure;\n\nTIM_ICInitStructure.TIM_Channel = TIM_Channel_1;\nTIM_ICInitStructure.TIM_ICPolarity = TIM_ICPolarity_Rising;\nTIM_ICInitStructure.TIM_ICSelection = TIM_ICSelection_DirectTI;\nTIM_ICInitStructure.TIM_ICPrescaler = TIM_ICPSC_DIV1;   /* 每次边沿都捕获 */\nTIM_ICInitStructure.TIM_ICFilter = 0x0;                 /* 不滤波 */\nTIM_ICInit(TIM3, &TIM_ICInitStructure);\n\nTIM_Cmd(TIM3, ENABLE);",
+      "notesZh": [
+        "TIM_ICFilter 用于滤除高频噪声，信号干净时填 0 即可；有毛刺时适当增大",
+        "TIM_ICPSC_DIV1 表示每次边沿都捕获，DIV2/DIV4/DIV8 用于降低捕获频率",
+        "测很慢的信号时计数器会溢出多次，需要配合溢出中断计数"
+      ]
+    },
+
+    "TIM_PWMIConfig": {
+      "briefZh": "把定时器配置为 PWM 输入模式，同时测量周期和占空比。",
+      "usageZh": "一次配置就能测出外部 PWM 信号的周期与高电平时间，是测 PWM 最方便的方式。它内部把两个通道配成主从关系：一个测上升沿到上升沿（周期），另一个测上升沿到下降沿（高电平时间）。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_ICInitStruct": "输入捕获配置结构体，函数会自动派生另一通道的配置。"
+      },
+      "prerequisites": [
+        "已调用 TIM_TimeBaseInit 配置时基",
+        "两个捕获通道对应的 GPIO 已配成输入模式",
+        "TIM_ICInitStruct.TIM_Channel 指定作为主捕获的通道"
+      ],
+      "registers": ["TIMx_CCMR1", "TIMx_CCER", "TIMx_CCR1", "TIMx_CCR2"],
+      "relatedFunctions": ["TIM_ICInit", "TIM_GetCapture1", "TIM_GetCapture2", "TIM_TimeBaseInit"],
+      "exampleCode": "TIM_ICInitTypeDef TIM_ICInitStructure;\n\nTIM_ICInitStructure.TIM_Channel = TIM_Channel_1;\nTIM_ICInitStructure.TIM_ICPolarity = TIM_ICPolarity_Rising;\nTIM_ICInitStructure.TIM_ICSelection = TIM_ICSelection_DirectTI;\nTIM_ICInitStructure.TIM_ICPrescaler = TIM_ICPSC_DIV1;\nTIM_ICInitStructure.TIM_ICFilter = 0x0;\nTIM_PWMIConfig(TIM3, &TIM_ICInitStructure);\n\n/* 选输入触发源与从模式 */\nTIM_SelectInputTrigger(TIM3, TIM_TS_TI1FP1);\nTIM_SelectSlaveMode(TIM3, TIM_SlaveMode_Reset);\nTIM_Cmd(TIM3, ENABLE);\n\n/* 读取：CCR1 = 周期，CCR2 = 高电平时间 */",
+      "notesZh": [
+        "必须配合 TIM_SelectInputTrigger 与 TIM_SelectSlaveMode(TIM_SlaveMode_Reset) 才能自动复位计数器",
+        "两个通道必须相邻（通道 1 与 2，或通道 3 与 4）",
+        "占空比 = CCR2 / CCR1，频率 = 定时器时钟 / 分频 / CCR1"
+      ]
+    },
+
+    "TIM_BDTRConfig": {
+      "briefZh": "配置刹车与死区时间（仅高级定时器 TIM1）。",
+      "usageZh": "只有 TIM1 有 BDTR 寄存器，用于电机控制等需要互补输出与死区保护的场合。死区时间防止上下桥臂直通短路，刹车输入可在故障时立即关闭输出。TIM2/3/4 上调用本函数无意义。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "只能传 TIM1。",
+        "TIM_BDTRInitStruct": "指向 BDTR 配置结构体的指针，包含死区时间、刹车极性、刹车使能、OSSR/OSSI 空闲状态、锁定等级等字段。"
+      },
+      "prerequisites": ["TIMx 必须是 TIM1", "已调用 TIM_TimeBaseInit 配置时基"],
+      "registers": ["TIM1_BDTR"],
+      "relatedFunctions": ["TIM_BDTRStructInit", "TIM_CtrlPWMOutputs", "TIM_OC1NPolarityConfig"],
+      "exampleCode": "TIM_BDTRInitTypeDef TIM_BDTRInitStructure;\n\nTIM_BDTRInitStructure.TIM_OSSRState = TIM_OSSRState_Enable;\nTIM_BDTRInitStructure.TIM_OSSIState = TIM_OSSIState_Enable;\nTIM_BDTRInitStructure.TIM_LOCKLevel = TIM_LOCKLevel_1;\nTIM_BDTRInitStructure.TIM_DeadTime = 0x0A;          /* 死区时间 */\nTIM_BDTRInitStructure.TIM_Break = TIM_Break_Disable;\nTIM_BDTRInitStructure.TIM_BreakPolarity = TIM_BreakPolarity_High;\nTIM_BDTRInitStructure.TIM_AutomaticOutput = TIM_AutomaticOutput_Enable;\nTIM_BDTRConfig(TIM1, &TIM_BDTRInitStructure);",
+      "notesZh": [
+        "只有 TIM1 有刹车与死区功能，TIM2/3/4 调用无意义",
+        "死区时间过长会损失有效占空比，要按驱动器的开关速度选合适的值",
+        "TIM_AutomaticOutput_Enable 让刹车解除后自动恢复输出，否则要软件重新使能 MOE"
+      ]
+    },
+
+    "TIM_TimeBaseStructInit": {
+      "briefZh": "把时基配置结构体填充为默认值。",
+      "usageZh": "在 TIM_TimeBaseInit 之前调用，得到确定的起点。默认值为：TIM_Prescaler=0x0000、TIM_CounterMode=TIM_CounterMode_Up、TIM_Period=0xFFFF、TIM_ClockDivision=TIM_CKD_DIV1、TIM_RepetitionCounter=0x0000。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIM_TimeBaseInitStruct": "待初始化的结构体指针。" },
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": ["TIM_TimeBaseInit"],
+      "exampleCode": "TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;\n\nTIM_TimeBaseStructInit(&TIM_TimeBaseStructure);\nTIM_TimeBaseStructure.TIM_Prescaler = 7199;\nTIM_TimeBaseStructure.TIM_Period = 9999;\nTIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);",
+      "notesZh": ["默认 TIM_Period 是 0xFFFF（最大），忘了改会导致周期远超预期"]
+    },
+
+    "TIM_OCStructInit": {
+      "briefZh": "把输出比较配置结构体填充为默认值。",
+      "usageZh": "在 TIM_OCxInit 之前调用。默认值会把输出设为禁止状态、模式设为冻结，所以调用后必须显式改 TIM_OutputState 为 Enable 并设置 TIM_OCMode，否则引脚没有输出。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIM_OCInitStruct": "待初始化的结构体指针。" },
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": ["TIM_OC1Init", "TIM_OC2Init", "TIM_OC3Init", "TIM_OC4Init"],
+      "exampleCode": "TIM_OCInitTypeDef TIM_OCInitStructure;\n\nTIM_OCStructInit(&TIM_OCInitStructure);\nTIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;\nTIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;   /* 必须改，否则无输出 */\nTIM_OCInitStructure.TIM_Pulse = 500;\nTIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;\nTIM_OC1Init(TIM3, &TIM_OCInitStructure);",
+      "notesZh": ["默认 TIM_OutputState 是 Disable，不改的话引脚上永远没波形"]
+    },
+
+    "TIM_ICStructInit": {
+      "briefZh": "把输入捕获配置结构体填充为默认值。",
+      "usageZh": "在 TIM_ICInit 之前调用。默认值为：TIM_Channel=TIM_Channel_1、TIM_ICPolarity=上升沿、TIM_ICSelection=直接映射、TIM_ICPrescaler=DIV1、TIM_ICFilter=0。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIM_ICInitStruct": "待初始化的结构体指针。" },
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": ["TIM_ICInit", "TIM_PWMIConfig"],
+      "exampleCode": "TIM_ICInitTypeDef TIM_ICInitStructure;\n\nTIM_ICStructInit(&TIM_ICInitStructure);\nTIM_ICInitStructure.TIM_Channel = TIM_Channel_2;   /* 改到通道 2 */\nTIM_ICInit(TIM3, &TIM_ICInitStructure);",
+      "notesZh": ["默认通道是通道 1，用其它通道时记得改"]
+    },
+
+    "TIM_BDTRStructInit": {
+      "briefZh": "把 BDTR 配置结构体填充为默认值（仅 TIM1）。",
+      "usageZh": "在 TIM_BDTRConfig 之前调用。默认值会关闭刹车、死区时间为 0，属于「安全但不保护」的状态。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIM_BDTRInitStruct": "待初始化的结构体指针。" },
+      "prerequisites": ["仅 TIM1 使用"],
+      "registers": [],
+      "relatedFunctions": ["TIM_BDTRConfig"],
+      "exampleCode": "TIM_BDTRInitTypeDef TIM_BDTRInitStructure;\nTIM_BDTRStructInit(&TIM_BDTRInitStructure);\nTIM_BDTRInitStructure.TIM_DeadTime = 0x0A;\nTIM_BDTRConfig(TIM1, &TIM_BDTRInitStructure);",
+      "notesZh": ["只对 TIM1 有意义"]
+    },
+
+    "TIM_Cmd": {
+      "briefZh": "使能或关闭定时器（启动/停止计数）。",
+      "usageZh": "所有定时器应用的最后一步。配置完时基、中断、输出比较之后调用 TIM_Cmd(TIMx, ENABLE) 才开始计数。注意它只控制计数器开关（CEN 位），不影响输出使能。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "NewState": "ENABLE 启动计数，DISABLE 停止计数。"
+      },
+      "prerequisites": ["已完成时基与通道配置"],
+      "registers": ["TIMx_CR1"],
+      "relatedFunctions": ["TIM_TimeBaseInit", "TIM_CtrlPWMOutputs", "TIM_ITConfig"],
+      "exampleCode": "TIM_Cmd(TIM3, ENABLE);    /* 启动 */\n/* ... */\nTIM_Cmd(TIM3, DISABLE);   /* 停止 */",
+      "notesZh": [
+        "对 TIM1 输出 PWM，除了 TIM_Cmd 还必须 TIM_CtrlPWMOutputs(TIM1, ENABLE)，两个都要开",
+        "停止计数不会清除计数器当前值，重新使能会从停止处继续"
+      ]
+    },
+
+    "TIM_CtrlPWMOutputs": {
+      "briefZh": "使能或关闭高级定时器的主输出（MOE 位）。",
+      "usageZh": "**TIM1 输出 PWM 的必需步骤**，TIM2/3/4 不需要（它们没有 MOE 位）。TIM1 即使时基、通道、TIM_Cmd 都配好了，不调用本函数引脚上也没有任何波形，这是新手最常踩的坑。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器，实际只对 TIM1 有意义。",
+        "NewState": "ENABLE 使能主输出，DISABLE 关闭（引脚变为无效电平）。"
+      },
+      "prerequisites": [
+        "已完成 TIM_TimeBaseInit 与 TIM_OCxInit 配置",
+        "TIMx 应为 TIM1"
+      ],
+      "registers": ["TIM1_BDTR"],
+      "relatedFunctions": ["TIM_Cmd", "TIM_OC1Init", "TIM_BDTRConfig"],
+      "exampleCode": "/* TIM1 输出 PWM 的完整收尾 */\nTIM_Cmd(TIM1, ENABLE);\nTIM_CtrlPWMOutputs(TIM1, ENABLE);   /* 少了这行引脚没波形 */",
+      "notesZh": [
+        "只有 TIM1 有 MOE 位，TIM2/3/4 调用本函数是空操作，但写上也不会出错",
+        "刹车事件触发后 MOE 会被硬件清零，需要软件重新使能（除非配了 TIM_AutomaticOutput_Enable）"
+      ]
+    },
+
+    "TIM_ITConfig": {
+      "briefZh": "使能或关闭定时器的某个中断源。",
+      "usageZh": "定时中断的必需步骤。最常用的是 TIM_IT_Update（更新/溢出中断）。开中断后还要在 NVIC 里使能对应的 TIMx_IRQn 通道，否则中断进不来。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_IT": "中断源，可用按位或组合。常用：TIM_IT_Update（更新）、TIM_IT_CC1~CC4（捕获/比较）、TIM_IT_Trigger（触发）、TIM_IT_Break（刹车，仅 TIM1）。",
+        "NewState": "ENABLE 使能，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已调用 TIM_TimeBaseInit",
+        "NVIC 里已使能对应的 TIMx_IRQn 中断通道"
+      ],
+      "registers": ["TIMx_DIER"],
+      "relatedFunctions": ["TIM_GetITStatus", "TIM_ClearITPendingBit", "NVIC_Init", "TIM_Cmd"],
+      "exampleCode": "TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);\n\n/* NVIC 也要配，否则中断进不来 */\nNVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x01;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x01;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\nTIM_Cmd(TIM2, ENABLE);",
+      "notesZh": [
+        "只开 TIM_ITConfig 而不配 NVIC，中断不会触发，且不会有任何报错",
+        "中断服务函数里必须 TIM_ClearITPendingBit 清标志，否则反复进中断"
+      ]
+    },
+
+    "TIM_GenerateEvent": {
+      "briefZh": "用软件产生一个定时器事件。",
+      "usageZh": "可手动触发更新事件（TIM_EventSource_Update），常用于初始化后立即把预分频值、重装值等影子寄存器刷新到生效状态，让第一次定时周期就准确。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_EventSource": "要产生的事件：TIM_EventSource_Update、TIM_EventSource_CC1~CC4、TIM_EventSource_COM、TIM_EventSource_Trigger、TIM_EventSource_Break。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit"],
+      "registers": ["TIMx_EGR"],
+      "relatedFunctions": ["TIM_TimeBaseInit", "TIM_ARRPreloadConfig"],
+      "exampleCode": "/* 手动产生更新事件，立即刷新影子寄存器 */\nTIM_GenerateEvent(TIM2, TIM_EventSource_Update);",
+      "notesZh": [
+        "产生更新事件会同时把计数器清零并置位更新标志，若开了更新中断会立刻进一次中断",
+        "TIM_TimeBaseInit 内部已经产生过一次更新事件"
+      ]
+    },
+
+    "TIM_DMAConfig": {
+      "briefZh": "配置定时器 DMA 的基地址与突发传输长度。",
+      "usageZh": "用 DMA 搬运定时器数据（如批量更新 CCR 值做任意波形）时使用，必须先调用它设定 DMA 访问的寄存器基址。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_DMABase": "DMA 传输的寄存器基址，如 TIM_DMABase_CR1、TIM_DMABase_CCR1、TIM_DMABase_ARR。",
+        "TIM_DMABurstLength": "每次 DMA 传输的字节数，TIM_DMABurstLength_1Transfer ~ 18Transfers。"
+      },
+      "prerequisites": ["已使能 DMA1 时钟并配置好 DMA 通道", "已调用 TIM_TimeBaseInit"],
+      "registers": ["TIMx_DCR"],
+      "relatedFunctions": ["TIM_DMACmd", "DMA_Init", "TIM_TimeBaseInit"],
+      "exampleCode": "/* 让 DMA 批量写 CCR1，实现任意波形 */\nTIM_DMAConfig(TIM1, TIM_DMABase_CCR1, TIM_DMABurstLength_1Transfer);\nTIM_DMACmd(TIM1, TIM_DMA_Update, ENABLE);",
+      "notesZh": ["不调用本函数设定基址，DMA 传输会写到错误的寄存器"]
+    },
+
+    "TIM_DMACmd": {
+      "briefZh": "使能或关闭定时器的 DMA 请求。",
+      "usageZh": "让定时器事件自动触发 DMA 传输，如定时触发 ADC 采样、定时把数据搬到 CCR 做波形输出。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_DMASource": "DMA 请求源，如 TIM_DMA_Update、TIM_DMA_CC1~CC4、TIM_DMA_Trigger、TIM_DMA_COM。",
+        "NewState": "ENABLE 使能，DISABLE 关闭。"
+      },
+      "prerequisites": [
+        "已使能 DMA1 时钟并配置好对应通道（DMA_Init）",
+        "TIM 与 DMA 通道的对应关系是硬件固定的，要查参考手册"
+      ],
+      "registers": ["TIMx_DIER"],
+      "relatedFunctions": ["TIM_DMAConfig", "DMA_Init", "DMA_Cmd"],
+      "exampleCode": "/* TIM2 更新事件触发 DMA */\nTIM_DMACmd(TIM2, TIM_DMA_Update, ENABLE);",
+      "notesZh": [
+        "TIM 与 DMA 通道的绑定关系固定（如 TIM2_UP 对应 DMA1_Channel2），选错通道不会报错但不工作",
+        "DMA 侧还要 DMA_Cmd 使能通道，两边都要开"
+      ]
+    },
+
+    "TIM_InternalClockConfig": {
+      "briefZh": "选择内部时钟作为定时器时钟源。",
+      "usageZh": "默认就是内部时钟，通常不需要调用。只有在之前配置过外部时钟模式、现在想切回内部时钟时才需要显式调用。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要配置的定时器。" },
+      "prerequisites": [],
+      "registers": ["TIMx_SMCR"],
+      "relatedFunctions": ["TIM_ITRxExternalClockConfig", "TIM_TIxExternalClockConfig", "TIM_ETRClockMode1Config"],
+      "exampleCode": "TIM_InternalClockConfig(TIM2);   /* 切回内部时钟 */",
+      "notesZh": ["内部时钟模式下定时器时钟来自 APB 总线，不需要额外引脚"]
+    },
+
+    "TIM_ITRxExternalClockConfig": {
+      "briefZh": "配置内部触发（ITRx）作为外部时钟源。",
+      "usageZh": "用于多个定时器级联：把一个定时器的输出作为另一个定时器的时钟。例如 TIM1 的更新事件驱动 TIM2 计数，实现同步或分频。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器（从定时器）。",
+        "TIM_InputTriggerSource": "内部触发源：TIM_TS_ITR0~TIM_TS_ITR3。具体对应哪个定时器由芯片的 ITR 映射表决定，需查参考手册。"
+      },
+      "prerequisites": ["主定时器已配置好输出触发（TIM_SelectOutputTrigger）"],
+      "registers": ["TIMx_SMCR"],
+      "relatedFunctions": ["TIM_SelectInputTrigger", "TIM_SelectSlaveMode", "TIM_SelectOutputTrigger"],
+      "exampleCode": "/* TIM2 用内部触发 0 作为时钟 */\nTIM_ITRxExternalClockConfig(TIM2, TIM_TS_ITR0);\nTIM_SelectSlaveMode(TIM2, TIM_SlaveMode_External1);",
+      "notesZh": [
+        "ITR 编号与定时器的对应关系因芯片而异，C8T6 上 TIM2 的 ITR0 是 TIM1，需查参考手册确认",
+        "必须配合 TIM_SelectSlaveMode(TIM_SlaveMode_External1) 才生效"
+      ]
+    },
+
+    "TIM_TIxExternalClockConfig": {
+      "briefZh": "配置外部输入引脚（TIx）作为定时器时钟源。",
+      "usageZh": "用于对外部信号计数（如流量计脉冲、编码器信号）。外部信号接到 TIMx_CHx 引脚，每个边沿让计数器加一。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_TIxExternalCLKSource": "输入源与边沿：TIM_TIxExternalCLK1Source_TI1、TI2、TI1ED（TI1 双边沿）。",
+        "TIM_ICPolarity": "捕获极性：TIM_ICPolarity_Rising（上升沿）、Falling（下降沿）、Rising_Falling（双边沿）。",
+        "ICFilter": "输入滤波器 0x0~0xF，用于滤除抖动噪声。"
+      },
+      "prerequisites": ["对应捕获引脚已配成输入模式"],
+      "registers": ["TIMx_SMCR", "TIMx_CCMR1", "TIMx_CCER"],
+      "relatedFunctions": ["TIM_ETRClockMode1Config", "TIM_SelectSlaveMode", "TIM_GetCounter"],
+      "exampleCode": "/* PA6(TIM3_CH1) 输入脉冲，每个上升沿计数 */\nTIM_TIxExternalClockConfig(TIM3, TIM_TIxExternalCLK1Source_TI1,\n                           TIM_ICPolarity_Rising, 0x0);\nTIM_SelectSlaveMode(TIM3, TIM_SlaveMode_External1);\nTIM_Cmd(TIM3, ENABLE);",
+      "notesZh": [
+        "必须配合 TIM_SelectSlaveMode(TIM_SlaveMode_External1)",
+        "外部信号频率不能超过定时器时钟的一半，否则会丢计数",
+        "信号有抖动时用 ICFilter 滤波，比外部加 RC 更方便"
+      ]
+    },
+
+    "TIM_ETRClockMode1Config": {
+      "briefZh": "配置外部触发引脚（ETR）作为时钟源，模式 1。",
+      "usageZh": "外部信号从 ETR 引脚输入作为定时器时钟，同时 ETR 还参与触发逻辑。用于对外部事件计数。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_ExtTRGPrescaler": "外部触发预分频：TIM_ExtTRGPSC_OFF、DIV2、DIV4、DIV8。",
+        "TIM_ExtTRGPolarity": "触发极性：TIM_ExtTRGPolarity_Inverted（下降沿有效）或 TIM_ExtTRGPolarity_NonInverted（上升沿有效）。",
+        "ExtTRGFilter": "外部触发滤波器 0x0~0xF。"
+      },
+      "prerequisites": ["ETR 引脚已配成输入模式"],
+      "registers": ["TIMx_SMCR"],
+      "relatedFunctions": ["TIM_ETRClockMode2Config", "TIM_ETRConfig", "TIM_SelectSlaveMode"],
+      "exampleCode": "/* ETR 上升沿计数，2 分频 */\nTIM_ETRClockMode1Config(TIM2, TIM_ExtTRGPSC_DIV2,\n                        TIM_ExtTRGPolarity_NonInverted, 0x0);\nTIM_SelectSlaveMode(TIM2, TIM_SlaveMode_External1);",
+      "notesZh": ["模式 1 与模式 2 的区别在于 ETR 是否同时用作触发输入，多数计数场景用模式 2 更直观"]
+    },
+
+    "TIM_ETRClockMode2Config": {
+      "briefZh": "配置外部触发引脚（ETR）作为时钟源，模式 2。",
+      "usageZh": "与模式 1 类似，但 ETR 只作时钟源、不参与触发逻辑。对外部脉冲计数时通常用这个模式。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_ExtTRGPrescaler": "外部触发预分频：TIM_ExtTRGPSC_OFF、DIV2、DIV4、DIV8。",
+        "TIM_ExtTRGPolarity": "触发极性。",
+        "ExtTRGFilter": "外部触发滤波器 0x0~0xF。"
+      },
+      "prerequisites": ["ETR 引脚已配成输入模式"],
+      "registers": ["TIMx_SMCR"],
+      "relatedFunctions": ["TIM_ETRClockMode1Config", "TIM_ETRConfig"],
+      "exampleCode": "TIM_ETRClockMode2Config(TIM2, TIM_ExtTRGPSC_OFF,\n                        TIM_ExtTRGPolarity_NonInverted, 0x0);",
+      "notesZh": ["不需要配合 TIM_SelectSlaveMode，模式 2 自动把 ETR 配为时钟源"]
+    },
+
+    "TIM_ETRConfig": {
+      "briefZh": "配置外部触发（ETR）的预分频、极性与滤波器。",
+      "usageZh": "只配置 ETR 的参数，不改变时钟源选择。在已经用 ETR 作为触发源、只想调整滤波或极性时使用。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_ExtTRGPrescaler": "外部触发预分频。",
+        "TIM_ExtTRGPolarity": "触发极性。",
+        "ExtTRGFilter": "滤波器 0x0~0xF。"
+      },
+      "prerequisites": [],
+      "registers": ["TIMx_SMCR"],
+      "relatedFunctions": ["TIM_ETRClockMode1Config", "TIM_ETRClockMode2Config"],
+      "exampleCode": "TIM_ETRConfig(TIM2, TIM_ExtTRGPSC_DIV4, TIM_ExtTRGPolarity_NonInverted, 0x8);",
+      "notesZh": ["只改参数不改时钟源，用途比前两个窄"]
+    },
+
+    "TIM_PrescalerConfig": {
+      "briefZh": "运行时修改预分频值。",
+      "usageZh": "在定时器运行中动态改变定时周期。注意预分频值写入影子寄存器，需要更新事件才生效，所以要用 TIM_PSCReloadMode 指定立即生效还是等下次更新事件。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "Prescaler": "新的预分频值（实际分频为值+1），0~65535。",
+        "TIM_PSCReloadMode": "TIM_PSCReloadMode_Immediate（立即生效）或 TIM_PSCReloadMode_Update（等下次更新事件生效）。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit"],
+      "registers": ["TIMx_PSC", "TIMx_EGR"],
+      "relatedFunctions": ["TIM_TimeBaseInit", "TIM_SetAutoreload", "TIM_GenerateEvent"],
+      "exampleCode": "/* 把定时周期改为 0.5 秒 */\nTIM_PrescalerConfig(TIM2, 7199, TIM_PSCReloadMode_Immediate);\nTIM_SetAutoreload(TIM2, 4999);",
+      "notesZh": [
+        "Immediate 模式会立即产生更新事件，可能造成当前周期不完整",
+        "改预分频不会改变计数器的当前值，只影响后续计数速率"
+      ]
+    },
+
+    "TIM_CounterModeConfig": {
+      "briefZh": "运行时修改计数模式。",
+      "usageZh": "在向上计数、向下计数、中央对齐之间切换。中央对齐模式常用于电机 PWM，可产生对称波形、减少谐波。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_CounterMode": "TIM_CounterMode_Up（向上）、Down（向下）、CenterAligned1/2/3（中央对齐三种）。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit"],
+      "registers": ["TIMx_CR1"],
+      "relatedFunctions": ["TIM_TimeBaseInit"],
+      "exampleCode": "TIM_CounterModeConfig(TIM1, TIM_CounterMode_CenterAligned1);",
+      "notesZh": [
+        "中央对齐模式下实际中断频率是向上计数模式的一半（因为一个周期上下各计一次）",
+        "中央对齐模式的三种子模式区别在于比较中断在哪些计数方向产生"
+      ]
+    },
+
+    "TIM_SelectInputTrigger": {
+      "briefZh": "选择定时器的输入触发源（TRGI）。",
+      "usageZh": "配置从模式时必须先选定触发源，再用 TIM_SelectSlaveMode 决定触发后做什么（复位、启动、门控等）。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_InputTriggerSource": "触发源：TIM_TS_ITR0~ITR3（其它定时器）、TIM_TS_TI1F_ED（TI1 边沿检测）、TIM_TS_TI1FP1/TI2FP2（滤波后的 TI1/TI2）、TIM_TS_ETRF（外部触发）。"
+      },
+      "prerequisites": ["触发源对应的定时器或引脚已配置好"],
+      "registers": ["TIMx_SMCR"],
+      "relatedFunctions": ["TIM_SelectSlaveMode", "TIM_PWMIConfig", "TIM_ITRxExternalClockConfig"],
+      "exampleCode": "/* PWM 输入模式下的标准配置 */\nTIM_SelectInputTrigger(TIM3, TIM_TS_TI1FP1);\nTIM_SelectSlaveMode(TIM3, TIM_SlaveMode_Reset);",
+      "notesZh": ["必须与 TIM_SelectSlaveMode 配合，只设触发源不设从模式不会有任何效果"]
+    },
+
+    "TIM_EncoderInterfaceConfig": {
+      "briefZh": "配置定时器的编码器接口模式。",
+      "usageZh": "用于读取增量式旋转编码器：编码器的 A/B 两相接定时器的两个通道，硬件自动根据相位差增减计数器。省掉外部中断，且能识别方向。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器（通常 TIM2/3/4）。",
+        "TIM_EncoderMode": "TIM_EncoderMode_TI1（只数 TI1）、TI2（只数 TI2）、TI12（两相都数，四倍频，最常用）。",
+        "TIM_IC1Polarity": "TI1 极性：TIM_ICPolarity_Rising、Falling、Rising_Falling。",
+        "TIM_IC2Polarity": "TI2 极性。"
+      },
+      "prerequisites": [
+        "已调用 TIM_TimeBaseInit 配置时基（ARR 设为编码器满量程）",
+        "两个通道引脚已配成输入模式"
+      ],
+      "registers": ["TIMx_SMCR", "TIMx_CCMR1", "TIMx_CCER"],
+      "relatedFunctions": ["TIM_TimeBaseInit", "TIM_GetCounter", "TIM_SetCounter"],
+      "exampleCode": "/* TIM3 接编码器 A/B 相，四倍频 */\nTIM_EncoderInterfaceConfig(TIM3, TIM_EncoderMode_TI12,\n                           TIM_ICPolarity_Rising, TIM_ICPolarity_Rising);\nTIM_Cmd(TIM3, ENABLE);\n\n/* 读位置：计数器值 */\nuint16_t pos = TIM_GetCounter(TIM3);",
+      "notesZh": [
+        "TI12 模式是四倍频（A/B 相的上升沿下降沿都计数），分辨率最高",
+        "编码器模式下计数器会在 0 与 ARR 之间环绕，读绝对值要处理溢出",
+        "TIM_ICPolarity 传 Rising_Falling 会导致计数异常，编码器模式应传单一极性"
+      ]
+    },
+
+    "TIM_ForcedOC1Config": {
+      "briefZh": "强制通道 1 的输出为有效或无效电平。",
+      "usageZh": "不依赖计数器比较，直接把输出拉到指定电平。用于测试引脚连通性，或在故障时强制输出安全电平。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_ForcedAction": "TIM_ForcedAction_Active（强制有效电平）、TIM_ForcedAction_InActive（强制无效电平）。"
+      },
+      "prerequisites": ["已调用 TIM_OC1Init 配置通道"],
+      "registers": ["TIMx_CCMR1"],
+      "relatedFunctions": ["TIM_OC1Init", "TIM_SelectOCxM", "TIM_ForcedOC2Config"],
+      "exampleCode": "/* 强制 TIM3_CH1 输出高电平（极性为 High 时） */\nTIM_ForcedOC1Config(TIM3, TIM_ForcedAction_Active);",
+      "notesZh": [
+        "强制动作会覆盖当前的输出比较模式，恢复 PWM 需要重新 TIM_SelectOCxM",
+        "实际电平还取决于 TIM_OCPolarity 的配置"
+      ]
+    },
+
+    "TIM_ForcedOC2Config": {
+      "briefZh": "强制通道 2 的输出为有效或无效电平。",
+      "usageZh": "同 TIM_ForcedOC1Config，作用于通道 2。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_ForcedAction": "强制有效或无效电平。" },
+      "prerequisites": ["已调用 TIM_OC2Init 配置通道"],
+      "registers": ["TIMx_CCMR1"],
+      "relatedFunctions": ["TIM_OC2Init", "TIM_ForcedOC1Config"],
+      "exampleCode": "TIM_ForcedOC2Config(TIM3, TIM_ForcedAction_InActive);",
+      "notesZh": ["强制动作会覆盖 PWM 输出，需重新配置才能恢复"]
+    },
+
+    "TIM_ForcedOC3Config": {
+      "briefZh": "强制通道 3 的输出为有效或无效电平。",
+      "usageZh": "同 TIM_ForcedOC1Config，作用于通道 3。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_ForcedAction": "强制有效或无效电平。" },
+      "prerequisites": ["已调用 TIM_OC3Init 配置通道"],
+      "registers": ["TIMx_CCMR2"],
+      "relatedFunctions": ["TIM_OC3Init", "TIM_ForcedOC1Config"],
+      "exampleCode": "TIM_ForcedOC3Config(TIM3, TIM_ForcedAction_Active);",
+      "notesZh": ["强制动作会覆盖 PWM 输出"]
+    },
+
+    "TIM_ForcedOC4Config": {
+      "briefZh": "强制通道 4 的输出为有效或无效电平。",
+      "usageZh": "同 TIM_ForcedOC1Config，作用于通道 4。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_ForcedAction": "强制有效或无效电平。" },
+      "prerequisites": ["已调用 TIM_OC4Init 配置通道"],
+      "registers": ["TIMx_CCMR2"],
+      "relatedFunctions": ["TIM_OC4Init", "TIM_ForcedOC1Config"],
+      "exampleCode": "TIM_ForcedOC4Config(TIM3, TIM_ForcedAction_InActive);",
+      "notesZh": ["强制动作会覆盖 PWM 输出"]
+    },
+
+    "TIM_ARRPreloadConfig": {
+      "briefZh": "使能或关闭自动重装值（ARR）的预装载。",
+      "usageZh": "使能后，写入 ARR 的新值会在下一个更新事件时才生效，避免运行中改周期产生异常波形。调 PWM 频率时建议开启。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "NewState": "ENABLE 使能预装载，DISABLE 关闭（写入立即生效）。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit"],
+      "registers": ["TIMx_CR1"],
+      "relatedFunctions": ["TIM_TimeBaseInit", "TIM_SetAutoreload", "TIM_OC1PreloadConfig"],
+      "exampleCode": "TIM_ARRPreloadConfig(TIM3, ENABLE);\nTIM_OC1PreloadConfig(TIM3, TIM_OCPreload_Enable);",
+      "notesZh": [
+        "预装载使能后，改 ARR 不会立即生效，要等一个完整周期，调试时别以为没生效",
+        "与 TIM_OCxPreloadConfig 配合使用，PWM 应用里两个通常都开"
+      ]
+    },
+
+    "TIM_SelectCOM": {
+      "briefZh": "使能或关闭换向事件（COM）的触发。",
+      "usageZh": "仅高级定时器 TIM1 有效，用于电机换向控制：COM 事件可以同时更新多个通道的输出状态，实现六步换向。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "只能传 TIM1。",
+        "NewState": "ENABLE 使能 COM 事件，DISABLE 关闭。"
+      },
+      "prerequisites": ["TIMx 应为 TIM1", "已配置 TIM_BDTRConfig"],
+      "registers": ["TIM1_CR2"],
+      "relatedFunctions": ["TIM_BDTRConfig", "TIM_GenerateEvent", "TIM_CtrlPWMOutputs"],
+      "exampleCode": "TIM_SelectCOM(TIM1, ENABLE);",
+      "notesZh": ["只对 TIM1 有效，TIM2/3/4 调用无意义"]
+    },
+
+    "TIM_SelectCCDMA": {
+      "briefZh": "使能或关闭捕获/比较 DMA 的突发传输。",
+      "usageZh": "让捕获/比较事件触发 DMA 批量传输。高级应用（如多通道波形生成）才用得到。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "NewState": "ENABLE 使能，DISABLE 关闭。"
+      },
+      "prerequisites": ["已配置 TIM_DMAConfig 与 TIM_DMACmd"],
+      "registers": ["TIMx_CR2"],
+      "relatedFunctions": ["TIM_DMAConfig", "TIM_DMACmd"],
+      "exampleCode": "TIM_SelectCCDMA(TIM1, ENABLE);",
+      "notesZh": ["普通 DMA 传输不需要它，只有需要突发访问多个寄存器时才用"]
+    },
+
+    "TIM_CCPreloadControl": {
+      "briefZh": "统一控制所有捕获/比较通道的预装载。",
+      "usageZh": "一次性开关全部通道的 CCR 预装载，比逐个调用 TIM_OCxPreloadConfig 方便。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "NewState": "ENABLE 所有通道都使能预装载，DISABLE 全部关闭。"
+      },
+      "prerequisites": ["已调用 TIM_OCxInit 配置通道"],
+      "registers": ["TIMx_CR2"],
+      "relatedFunctions": ["TIM_OC1PreloadConfig", "TIM_ARRPreloadConfig"],
+      "exampleCode": "/* 四个通道一起使能预装载 */\nTIM_CCPreloadControl(TIM3, ENABLE);",
+      "notesZh": ["等价于对四个通道分别调用 TIM_OCxPreloadConfig"]
+    },
+
+    "TIM_OC1PreloadConfig": {
+      "briefZh": "使能或关闭通道 1 的 CCR1 预装载。",
+      "usageZh": "调 PWM 占空比时强烈建议开启。使能后，写入 CCR1 的新值在下一个更新事件才生效，避免当前周期出现半截波形（毛刺）。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_OCPreload": "TIM_OCPreload_Enable（使能，推荐）或 TIM_OCPreload_Disable。"
+      },
+      "prerequisites": ["已调用 TIM_OC1Init"],
+      "registers": ["TIMx_CCMR1"],
+      "relatedFunctions": ["TIM_OC1Init", "TIM_SetCompare1", "TIM_ARRPreloadConfig"],
+      "exampleCode": "TIM_OC1PreloadConfig(TIM3, TIM_OCPreload_Enable);\nTIM_ARRPreloadConfig(TIM3, ENABLE);",
+      "notesZh": [
+        "不开预装载时，改 CCR 会立即影响当前周期，可能产生窄脉冲损坏功率器件",
+        "开预装载后改占空比的响应会延迟一个周期，做快速调节时要注意"
+      ]
+    },
+
+    "TIM_OC2PreloadConfig": {
+      "briefZh": "使能或关闭通道 2 的 CCR2 预装载。",
+      "usageZh": "同 TIM_OC1PreloadConfig，作用于通道 2。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_OCPreload": "使能或关闭预装载。" },
+      "prerequisites": ["已调用 TIM_OC2Init"],
+      "registers": ["TIMx_CCMR1"],
+      "relatedFunctions": ["TIM_OC2Init", "TIM_SetCompare2"],
+      "exampleCode": "TIM_OC2PreloadConfig(TIM3, TIM_OCPreload_Enable);",
+      "notesZh": ["调占空比前建议开启"]
+    },
+
+    "TIM_OC3PreloadConfig": {
+      "briefZh": "使能或关闭通道 3 的 CCR3 预装载。",
+      "usageZh": "同 TIM_OC1PreloadConfig，作用于通道 3。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_OCPreload": "使能或关闭预装载。" },
+      "prerequisites": ["已调用 TIM_OC3Init"],
+      "registers": ["TIMx_CCMR2"],
+      "relatedFunctions": ["TIM_OC3Init", "TIM_SetCompare3"],
+      "exampleCode": "TIM_OC3PreloadConfig(TIM3, TIM_OCPreload_Enable);",
+      "notesZh": ["调占空比前建议开启"]
+    },
+
+    "TIM_OC4PreloadConfig": {
+      "briefZh": "使能或关闭通道 4 的 CCR4 预装载。",
+      "usageZh": "同 TIM_OC1PreloadConfig，作用于通道 4。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_OCPreload": "使能或关闭预装载。" },
+      "prerequisites": ["已调用 TIM_OC4Init"],
+      "registers": ["TIMx_CCMR2"],
+      "relatedFunctions": ["TIM_OC4Init", "TIM_SetCompare4"],
+      "exampleCode": "TIM_OC4PreloadConfig(TIM3, TIM_OCPreload_Enable);",
+      "notesZh": ["调占空比前建议开启"]
+    },
+
+    "TIM_OC1FastConfig": {
+      "briefZh": "使能或关闭通道 1 的输出比较快速使能功能。",
+      "usageZh": "在单脉冲模式下有用：让输出在比较匹配时立即响应，而不必等下一个周期。普通 PWM 用不到。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_OCFast": "TIM_OCFast_Enable 或 TIM_OCFast_Disable。"
+      },
+      "prerequisites": ["已调用 TIM_OC1Init"],
+      "registers": ["TIMx_CCMR1"],
+      "relatedFunctions": ["TIM_OC1Init", "TIM_SelectOnePulseMode"],
+      "exampleCode": "TIM_OC1FastConfig(TIM1, TIM_OCFast_Enable);",
+      "notesZh": ["普通 PWM 输出不需要开，只在单脉冲等特殊时序下有意义"]
+    },
+
+    "TIM_OC2FastConfig": {
+      "briefZh": "使能或关闭通道 2 的输出比较快速使能功能。",
+      "usageZh": "同 TIM_OC1FastConfig，作用于通道 2。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_OCFast": "使能或关闭。" },
+      "prerequisites": ["已调用 TIM_OC2Init"],
+      "registers": ["TIMx_CCMR1"],
+      "relatedFunctions": ["TIM_OC2Init"],
+      "exampleCode": "TIM_OC2FastConfig(TIM1, TIM_OCFast_Enable);",
+      "notesZh": ["普通 PWM 不需要"]
+    },
+
+    "TIM_OC3FastConfig": {
+      "briefZh": "使能或关闭通道 3 的输出比较快速使能功能。",
+      "usageZh": "同 TIM_OC1FastConfig，作用于通道 3。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_OCFast": "使能或关闭。" },
+      "prerequisites": ["已调用 TIM_OC3Init"],
+      "registers": ["TIMx_CCMR2"],
+      "relatedFunctions": ["TIM_OC3Init"],
+      "exampleCode": "TIM_OC3FastConfig(TIM1, TIM_OCFast_Enable);",
+      "notesZh": ["普通 PWM 不需要"]
+    },
+
+    "TIM_OC4FastConfig": {
+      "briefZh": "使能或关闭通道 4 的输出比较快速使能功能。",
+      "usageZh": "同 TIM_OC1FastConfig，作用于通道 4。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_OCFast": "使能或关闭。" },
+      "prerequisites": ["已调用 TIM_OC4Init"],
+      "registers": ["TIMx_CCMR2"],
+      "relatedFunctions": ["TIM_OC4Init"],
+      "exampleCode": "TIM_OC4FastConfig(TIM1, TIM_OCFast_Enable);",
+      "notesZh": ["普通 PWM 不需要"]
+    },
+
+    "TIM_ClearOC1Ref": {
+      "briefZh": "配置通道 1 的 OC1REF 信号在外部事件时被清除。",
+      "usageZh": "让 ETR 输入的电平自动清除 OC1REF，用于过流保护等需要硬件快速关断的场合。响应速度比中断快得多。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_OCClear": "TIM_OCClear_Enable（ETR 高电平清除 OC1REF）或 TIM_OCClear_Disable。"
+      },
+      "prerequisites": ["已配置 TIM_ETRConfig", "已调用 TIM_OC1Init"],
+      "registers": ["TIMx_CCMR1"],
+      "relatedFunctions": ["TIM_ETRConfig", "TIM_OC1Init", "TIM_BDTRConfig"],
+      "exampleCode": "/* ETR 输入高电平时自动关闭 OC1 输出，做过流保护 */\nTIM_ClearOC1Ref(TIM1, TIM_OCClear_Enable);",
+      "notesZh": ["硬件自动关断比软件中断响应快，做保护电路时优先考虑"]
+    },
+
+    "TIM_ClearOC2Ref": {
+      "briefZh": "配置通道 2 的 OC2REF 信号在外部事件时被清除。",
+      "usageZh": "同 TIM_ClearOC1Ref，作用于通道 2。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_OCClear": "使能或关闭。" },
+      "prerequisites": ["已配置 TIM_ETRConfig", "已调用 TIM_OC2Init"],
+      "registers": ["TIMx_CCMR1"],
+      "relatedFunctions": ["TIM_ETRConfig", "TIM_OC2Init"],
+      "exampleCode": "TIM_ClearOC2Ref(TIM1, TIM_OCClear_Enable);",
+      "notesZh": ["用于硬件级快速保护"]
+    },
+
+    "TIM_ClearOC3Ref": {
+      "briefZh": "配置通道 3 的 OC3REF 信号在外部事件时被清除。",
+      "usageZh": "同 TIM_ClearOC1Ref，作用于通道 3。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_OCClear": "使能或关闭。" },
+      "prerequisites": ["已配置 TIM_ETRConfig", "已调用 TIM_OC3Init"],
+      "registers": ["TIMx_CCMR2"],
+      "relatedFunctions": ["TIM_ETRConfig", "TIM_OC3Init"],
+      "exampleCode": "TIM_ClearOC3Ref(TIM1, TIM_OCClear_Enable);",
+      "notesZh": ["用于硬件级快速保护"]
+    },
+
+    "TIM_ClearOC4Ref": {
+      "briefZh": "配置通道 4 的 OC4REF 信号在外部事件时被清除。",
+      "usageZh": "同 TIM_ClearOC1Ref，作用于通道 4。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_OCClear": "使能或关闭。" },
+      "prerequisites": ["已配置 TIM_ETRConfig", "已调用 TIM_OC4Init"],
+      "registers": ["TIMx_CCMR2"],
+      "relatedFunctions": ["TIM_ETRConfig", "TIM_OC4Init"],
+      "exampleCode": "TIM_ClearOC4Ref(TIM1, TIM_OCClear_Enable);",
+      "notesZh": ["用于硬件级快速保护"]
+    },
+
+    "TIM_OC1PolarityConfig": {
+      "briefZh": "配置通道 1 输出极性。",
+      "usageZh": "决定比较匹配时输出高电平还是低电平。驱动共阳 LED 或反相逻辑时需要设置。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_OCPolarity": "TIM_OCPolarity_High（有效电平为高）或 TIM_OCPolarity_Low（有效电平为低）。"
+      },
+      "prerequisites": ["已调用 TIM_OC1Init"],
+      "registers": ["TIMx_CCER"],
+      "relatedFunctions": ["TIM_OC1Init", "TIM_OC1NPolarityConfig"],
+      "exampleCode": "/* 反相输出：有效电平为低 */\nTIM_OC1PolarityConfig(TIM3, TIM_OCPolarity_Low);",
+      "notesZh": [
+        "极性影响占空比的定义：Polarity_Low 时占空比表示低电平的比例",
+        "改极性会立即生效，运行中改变可能导致输出跳变"
+      ]
+    },
+
+    "TIM_OC1NPolarityConfig": {
+      "briefZh": "配置通道 1 互补输出（OC1N）的极性。",
+      "usageZh": "仅高级定时器 TIM1 有效。用于设置互补通道（CH1N）的有效电平，电机驱动中上下桥臂通常需要相反的极性。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "只能传 TIM1。",
+        "TIM_OCNPolarity": "TIM_OCNPolarity_High 或 TIM_OCNPolarity_Low。"
+      },
+      "prerequisites": ["TIMx 应为 TIM1", "已调用 TIM_OC1Init 并配置了 TIM_OutputNState"],
+      "registers": ["TIM1_CCER"],
+      "relatedFunctions": ["TIM_OC1Init", "TIM_OC1PolarityConfig", "TIM_CCxNCmd"],
+      "exampleCode": "/* TIM1 互补输出极性 */\nTIM_OC1NPolarityConfig(TIM1, TIM_OCNPolarity_High);",
+      "notesZh": ["只对 TIM1 有效，TIM2/3/4 没有互补输出通道"]
+    },
+
+    "TIM_OC2PolarityConfig": {
+      "briefZh": "配置通道 2 输出极性。",
+      "usageZh": "同 TIM_OC1PolarityConfig，作用于通道 2。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_OCPolarity": "高电平或低电平有效。" },
+      "prerequisites": ["已调用 TIM_OC2Init"],
+      "registers": ["TIMx_CCER"],
+      "relatedFunctions": ["TIM_OC2Init", "TIM_OC2NPolarityConfig"],
+      "exampleCode": "TIM_OC2PolarityConfig(TIM3, TIM_OCPolarity_High);",
+      "notesZh": ["极性决定占空比的参考电平"]
+    },
+
+    "TIM_OC2NPolarityConfig": {
+      "briefZh": "配置通道 2 互补输出（OC2N）的极性。",
+      "usageZh": "仅高级定时器 TIM1 有效。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "只能传 TIM1。", "TIM_OCNPolarity": "互补输出的有效电平。" },
+      "prerequisites": ["TIMx 应为 TIM1"],
+      "registers": ["TIM1_CCER"],
+      "relatedFunctions": ["TIM_OC2Init", "TIM_OC2PolarityConfig"],
+      "exampleCode": "TIM_OC2NPolarityConfig(TIM1, TIM_OCNPolarity_High);",
+      "notesZh": ["只对 TIM1 有效"]
+    },
+
+    "TIM_OC3PolarityConfig": {
+      "briefZh": "配置通道 3 输出极性。",
+      "usageZh": "同 TIM_OC1PolarityConfig，作用于通道 3。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_OCPolarity": "高电平或低电平有效。" },
+      "prerequisites": ["已调用 TIM_OC3Init"],
+      "registers": ["TIMx_CCER"],
+      "relatedFunctions": ["TIM_OC3Init", "TIM_OC3NPolarityConfig"],
+      "exampleCode": "TIM_OC3PolarityConfig(TIM3, TIM_OCPolarity_High);",
+      "notesZh": ["极性决定占空比的参考电平"]
+    },
+
+    "TIM_OC3NPolarityConfig": {
+      "briefZh": "配置通道 3 互补输出（OC3N）的极性。",
+      "usageZh": "仅高级定时器 TIM1 有效。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "只能传 TIM1。", "TIM_OCNPolarity": "互补输出的有效电平。" },
+      "prerequisites": ["TIMx 应为 TIM1"],
+      "registers": ["TIM1_CCER"],
+      "relatedFunctions": ["TIM_OC3Init", "TIM_OC3PolarityConfig"],
+      "exampleCode": "TIM_OC3NPolarityConfig(TIM1, TIM_OCNPolarity_High);",
+      "notesZh": ["只对 TIM1 有效"]
+    },
+
+    "TIM_OC4PolarityConfig": {
+      "briefZh": "配置通道 4 输出极性。",
+      "usageZh": "同 TIM_OC1PolarityConfig，作用于通道 4。通道 4 没有互补输出，所以没有对应的 N 极性函数。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_OCPolarity": "高电平或低电平有效。" },
+      "prerequisites": ["已调用 TIM_OC4Init"],
+      "registers": ["TIMx_CCER"],
+      "relatedFunctions": ["TIM_OC4Init", "TIM_OC4PolarityConfig"],
+      "exampleCode": "TIM_OC4PolarityConfig(TIM3, TIM_OCPolarity_High);",
+      "notesZh": ["通道 4 没有互补输出，不存在 TIM_OC4NPolarityConfig"]
+    },
+
+    "TIM_CCxCmd": {
+      "briefZh": "使能或关闭指定通道的输出。",
+      "usageZh": "运行时单独开关某个通道的输出，比重新调用 TIM_OCxInit 轻量。做多路 PWM 分时控制时有用。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_Channel": "TIM_Channel_1 ~ TIM_Channel_4。",
+        "TIM_CCx": "TIM_CCx_Enable 或 TIM_CCx_Disable。"
+      },
+      "prerequisites": ["已调用 TIM_OCxInit 配置该通道"],
+      "registers": ["TIMx_CCER"],
+      "relatedFunctions": ["TIM_OC1Init", "TIM_CCxNCmd", "TIM_Cmd"],
+      "exampleCode": "/* 关闭通道 1 输出，但定时器继续计数 */\nTIM_CCxCmd(TIM3, TIM_Channel_1, TIM_CCx_Disable);",
+      "notesZh": [
+        "关闭通道输出不影响计数器运行，也不影响其它通道",
+        "对 TIM1，即使通道使能，MOE 未开也没有波形"
+      ]
+    },
+
+    "TIM_CCxNCmd": {
+      "briefZh": "使能或关闭指定通道的互补输出（N 通道）。",
+      "usageZh": "仅高级定时器 TIM1 有效。电机驱动中用来单独控制互补桥臂。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "只能传 TIM1。",
+        "TIM_Channel": "TIM_Channel_1 ~ TIM_Channel_3（通道 4 无互补输出）。",
+        "TIM_CCxN": "TIM_CCxN_Enable 或 TIM_CCxN_Disable。"
+      },
+      "prerequisites": ["TIMx 应为 TIM1", "已配置 TIM_OutputNState 为 Enable"],
+      "registers": ["TIM1_CCER"],
+      "relatedFunctions": ["TIM_CCxCmd", "TIM_OC1NPolarityConfig", "TIM_CtrlPWMOutputs"],
+      "exampleCode": "TIM_CCxNCmd(TIM1, TIM_Channel_1, TIM_CCxN_Enable);",
+      "notesZh": [
+        "只有 TIM1 的通道 1/2/3 有互补输出，通道 4 没有",
+        "互补输出还受 MOE 位（TIM_CtrlPWMOutputs）总控"
+      ]
+    },
+
+    "TIM_SelectOCxM": {
+      "briefZh": "运行时选择指定通道的输出比较模式。",
+      "usageZh": "动态切换输出模式，例如从 PWM 切到强制输出、或在 PWM1/PWM2 之间切换以改变有效电平定义。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_Channel": "TIM_Channel_1 ~ TIM_Channel_4。",
+        "TIM_OCMode": "输出比较模式：TIM_OCMode_PWM1、PWM2、Timing、Active、Inactive、Toggle、ForcedActive、ForcedInactive。"
+      },
+      "prerequisites": ["已调用 TIM_OCxInit 配置该通道"],
+      "registers": ["TIMx_CCMR1", "TIMx_CCMR2"],
+      "relatedFunctions": ["TIM_OC1Init", "TIM_ForcedOC1Config", "TIM_CCxCmd"],
+      "exampleCode": "/* 运行时把通道 1 从 PWM1 切到 PWM2 */\nTIM_SelectOCxM(TIM3, TIM_Channel_1, TIM_OCMode_PWM2);",
+      "notesZh": [
+        "切换模式前通常要先 TIM_CCxCmd 关闭通道输出，改完再打开，避免中间态产生毛刺",
+        "PWM1 与 PWM2 的区别是有效电平相反：PWM1 在 CNT<CCR 时有效，PWM2 相反"
+      ]
+    },
+
+    "TIM_UpdateDisableConfig": {
+      "briefZh": "使能或关闭更新事件。",
+      "usageZh": "关闭更新事件（UDIS 位）后，计数器溢出不会产生更新事件，因此预装载的寄存器不会刷新、更新中断也不会触发。用于需要精确控制刷新时机的场合。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "NewState": "ENABLE 关闭更新事件（注意是反的），DISABLE 允许更新事件。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit"],
+      "registers": ["TIMx_CR1"],
+      "relatedFunctions": ["TIM_UpdateRequestConfig", "TIM_ARRPreloadConfig", "TIM_GenerateEvent"],
+      "exampleCode": "/* 暂停更新事件（预装载寄存器不再刷新） */\nTIM_UpdateDisableConfig(TIM1, ENABLE);",
+      "notesZh": [
+        "参数语义容易搞反：ENABLE 表示「禁止更新事件」",
+        "关闭更新事件会让预装载的 ARR/CCR 永不生效，通常只在特殊同步场景使用"
+      ]
+    },
+
+    "TIM_UpdateRequestConfig": {
+      "briefZh": "选择更新事件的触发来源。",
+      "usageZh": "决定更新事件是由「计数器溢出」还是「UG 位被置位」触发。中央对齐模式下这个选择会影响中断时机。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_UpdateSource": "TIM_UpdateSource_Regular（仅计数器溢出触发，最常用）或 TIM_UpdateSource_Global（溢出或软件置 UG 都触发）。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit"],
+      "registers": ["TIMx_CR1"],
+      "relatedFunctions": ["TIM_UpdateDisableConfig", "TIM_GenerateEvent"],
+      "exampleCode": "TIM_UpdateRequestConfig(TIM2, TIM_UpdateSource_Regular);",
+      "notesZh": ["默认是 Global，软件调用 TIM_GenerateEvent 也会触发更新中断"]
+    },
+
+    "TIM_SelectHallSensor": {
+      "briefZh": "使能或关闭霍尔传感器接口。",
+      "usageZh": "仅高级定时器 TIM1 有效，用于无刷电机控制：三路霍尔信号接入后，硬件自动记录换向时刻，简化换向逻辑。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "只能传 TIM1。",
+        "NewState": "ENABLE 使能霍尔接口，DISABLE 关闭。"
+      },
+      "prerequisites": ["TIMx 应为 TIM1", "三路霍尔信号已接到 TI1/TI2/TI3 引脚"],
+      "registers": ["TIM1_CR2"],
+      "relatedFunctions": ["TIM_SelectCOM", "TIM_EncoderInterfaceConfig"],
+      "exampleCode": "TIM_SelectHallSensor(TIM1, ENABLE);",
+      "notesZh": ["只对 TIM1 有效，用于 BLDC 电机换向"]
+    },
+
+    "TIM_SelectOnePulseMode": {
+      "briefZh": "选择单脉冲模式的触发方式。",
+      "usageZh": "单脉冲模式下定时器产生一个脉冲后自动停止。用于精确定时一个脉冲宽度（如红外发射、超声波触发）。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_OPMode": "TIM_OPMode_Single（单脉冲，计完一个周期就停）或 TIM_OPMode_Repetitive（重复，正常模式）。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit 与 TIM_OCxInit"],
+      "registers": ["TIMx_CR1"],
+      "relatedFunctions": ["TIM_OC1Init", "TIM_OC1FastConfig", "TIM_Cmd"],
+      "exampleCode": "/* 单脉冲模式：产生一个固定宽度的脉冲后自动停止 */\nTIM_SelectOnePulseMode(TIM1, TIM_OPMode_Single);",
+      "notesZh": [
+        "单脉冲模式下脉冲宽度由 ARR 与 CCR 共同决定，具体关系见参考手册",
+        "TIM_SelectOnePulseMode 只是选择模式，还要 TIM_Cmd 启动才会产生脉冲"
+      ]
+    },
+
+    "TIM_SelectOutputTrigger": {
+      "briefZh": "选择定时器 TRGO 输出触发的信号源。",
+      "usageZh": "把定时器的某个事件作为触发信号输出给其它外设（如触发 ADC 采样、驱动另一个定时器）。配置 ADC 由定时器定时触发时必用。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_TRGOSource": "触发源：TIM_TRGOSource_Reset、Enable、Update（最常用，溢出时触发）、ComparePulse、Compare_Oc1Ref~Oc4Ref。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit"],
+      "registers": ["TIMx_CR2"],
+      "relatedFunctions": ["TIM_SelectSlaveMode", "ADC_ExternalTrigConvCmd"],
+      "exampleCode": "/* TIM2 更新事件作为 TRGO，用于定时触发 ADC */\nTIM_SelectOutputTrigger(TIM2, TIM_TRGOSource_Update);",
+      "notesZh": [
+        "TIM_TRGOSource_Update 是最常用的，每次溢出输出一个触发脉冲",
+        "TRGO 还可以用来级联另一个定时器（配合 TIM_ITRxExternalClockConfig）"
+      ]
+    },
+
+    "TIM_SelectSlaveMode": {
+      "briefZh": "选择定时器的从模式。",
+      "usageZh": "决定收到触发信号后定时器如何响应：复位计数器、启动计数、门控计数等。PWM 输入测量、编码器、级联等高级用法都要配它。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要配置的定时器。",
+        "TIM_SlaveMode": "TIM_SlaveMode_Reset（触发时复位计数器，PWM 输入测量用）、Gated（门控）、Trigger（触发启动）、External1（外部时钟模式 1）。"
+      },
+      "prerequisites": ["已用 TIM_SelectInputTrigger 选定触发源"],
+      "registers": ["TIMx_SMCR"],
+      "relatedFunctions": ["TIM_SelectInputTrigger", "TIM_PWMIConfig", "TIM_ITRxExternalClockConfig"],
+      "exampleCode": "/* PWM 输入测量：每个上升沿复位计数器 */\nTIM_SelectInputTrigger(TIM3, TIM_TS_TI1FP1);\nTIM_SelectSlaveMode(TIM3, TIM_SlaveMode_Reset);",
+      "notesZh": [
+        "必须与 TIM_SelectInputTrigger 配合，只设一个不起作用",
+        "TIM_SlaveMode_Reset 是 PWM 输入测量与周期测量的标准配置"
+      ]
+    },
+
+    "TIM_SelectMasterSlaveMode": {
+      "briefZh": "使能或关闭主从模式。",
+      "usageZh": "使能后，触发输入（TRGI）的信号会同时影响主从逻辑。多数情况下不需要开，只有复杂级联场景才用。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_MasterSlaveMode": "TIM_MasterSlaveMode_Enable 或 TIM_MasterSlaveMode_Disable。"
+      },
+      "prerequisites": ["已配置触发源与从模式"],
+      "registers": ["TIMx_SMCR"],
+      "relatedFunctions": ["TIM_SelectSlaveMode", "TIM_SelectInputTrigger"],
+      "exampleCode": "TIM_SelectMasterSlaveMode(TIM1, TIM_MasterSlaveMode_Enable);",
+      "notesZh": ["一般级联应用不需要开启，保持默认关闭即可"]
+    },
+
+    "TIM_SetCounter": {
+      "briefZh": "设置计数器的当前值。",
+      "usageZh": "手动给计数器赋初值，例如让定时器从一个特定位置开始计数，或清零重新计时。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "Counter": "要写入的计数值，0~65535（16 位定时器）。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit"],
+      "registers": ["TIMx_CNT"],
+      "relatedFunctions": ["TIM_GetCounter", "TIM_SetAutoreload", "TIM_GenerateEvent"],
+      "exampleCode": "/* 计数器清零，重新开始计时 */\nTIM_SetCounter(TIM2, 0);",
+      "notesZh": [
+        "写入是立即生效的，运行中改会让当前周期不完整",
+        "注意 TIM2 是 16 位计数器，写超过 65535 的值会被截断"
+      ]
+    },
+
+    "TIM_SetAutoreload": {
+      "briefZh": "设置自动重装值（ARR），即计数上限。",
+      "usageZh": "运行时动态改变定时周期或 PWM 频率。若已使能 TIM_ARRPreloadConfig，新值会在下一个更新事件生效；否则立即生效。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "Autoreload": "新的重装值，0~65535。实际周期为 (Autoreload + 1) 个计数。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit"],
+      "registers": ["TIMx_ARR"],
+      "relatedFunctions": ["TIM_TimeBaseInit", "TIM_ARRPreloadConfig", "TIM_SetCompare1"],
+      "exampleCode": "/* 改 PWM 频率：ARR 从 999 改为 499 */\nTIM_SetAutoreload(TIM3, 499);\n\n/* 同时按比例改占空比，否则占空比会变 */\nTIM_SetCompare1(TIM3, 250);",
+      "notesZh": [
+        "改 ARR 会同时改变 PWM 频率与占空比（因为占空比 = CCR/ARR），要同步调整 CCR",
+        "开了预装载后新值延迟一个周期生效"
+      ]
+    },
+
+    "TIM_SetCompare1": {
+      "briefZh": "设置通道 1 的比较值（CCR1），即 PWM 占空比。",
+      "usageZh": "**动态调 PWM 占空比最常用的函数**。占空比 = CCR1 / (ARR + 1)。配合 TIM_OC1PreloadConfig 使能预装载，可避免改值时产生毛刺。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "Compare1": "比较值 0~65535。等于 0 时输出恒为无效电平，大于 ARR 时恒为有效电平。"
+      },
+      "prerequisites": ["已调用 TIM_OC1Init 配置通道 1"],
+      "registers": ["TIMx_CCR1"],
+      "relatedFunctions": ["TIM_OC1Init", "TIM_OC1PreloadConfig", "TIM_SetAutoreload", "TIM_GetCapture1"],
+      "exampleCode": "/* ARR=999 时，CCR1=250 表示 25% 占空比 */\nTIM_SetCompare1(TIM3, 250);\n\n/* 呼吸灯：循环改占空比 */\nfor (uint16_t i = 0; i <= 1000; i += 10)\n{\n  TIM_SetCompare1(TIM3, i);\n  Delay_ms(10);\n}",
+      "notesZh": [
+        "占空比是相对 ARR 的，改 ARR 后要重新算 CCR",
+        "CCR 写 0 或超过 ARR 会输出恒定电平，可用作「完全关断/完全导通」",
+        "开了预装载后新占空比延迟到下一个更新事件生效，调光时看不出来但做快速控制要注意"
+      ]
+    },
+
+    "TIM_SetCompare2": {
+      "briefZh": "设置通道 2 的比较值（CCR2）。",
+      "usageZh": "同 TIM_SetCompare1，作用于通道 2。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "Compare2": "比较值 0~65535。" },
+      "prerequisites": ["已调用 TIM_OC2Init"],
+      "registers": ["TIMx_CCR2"],
+      "relatedFunctions": ["TIM_OC2Init", "TIM_OC2PreloadConfig", "TIM_SetCompare1"],
+      "exampleCode": "TIM_SetCompare2(TIM3, 500);   /* 50% 占空比（ARR=999） */",
+      "notesZh": ["占空比 = CCR2 / (ARR + 1)"]
+    },
+
+    "TIM_SetCompare3": {
+      "briefZh": "设置通道 3 的比较值（CCR3）。",
+      "usageZh": "同 TIM_SetCompare1，作用于通道 3。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "Compare3": "比较值 0~65535。" },
+      "prerequisites": ["已调用 TIM_OC3Init"],
+      "registers": ["TIMx_CCR3"],
+      "relatedFunctions": ["TIM_OC3Init", "TIM_OC3PreloadConfig", "TIM_SetCompare1"],
+      "exampleCode": "TIM_SetCompare3(TIM3, 750);   /* 75% 占空比（ARR=999） */",
+      "notesZh": ["占空比 = CCR3 / (ARR + 1)"]
+    },
+
+    "TIM_SetCompare4": {
+      "briefZh": "设置通道 4 的比较值（CCR4）。",
+      "usageZh": "同 TIM_SetCompare1，作用于通道 4。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "Compare4": "比较值 0~65535。" },
+      "prerequisites": ["已调用 TIM_OC4Init"],
+      "registers": ["TIMx_CCR4"],
+      "relatedFunctions": ["TIM_OC4Init", "TIM_OC4PreloadConfig", "TIM_SetCompare1"],
+      "exampleCode": "TIM_SetCompare4(TIM3, 1000);   /* 100% 占空比（ARR=999） */",
+      "notesZh": ["占空比 = CCR4 / (ARR + 1)"]
+    },
+
+    "TIM_SetIC1Prescaler": {
+      "briefZh": "设置通道 1 输入捕获的预分频。",
+      "usageZh": "降低捕获频率，每 N 个边沿才捕获一次。信号频率远高于定时器时钟时用它避免频繁中断。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_ICPSC": "TIM_ICPSC_DIV1（每次边沿捕获）、DIV2、DIV4、DIV8。"
+      },
+      "prerequisites": ["已调用 TIM_ICInit 配置捕获通道"],
+      "registers": ["TIMx_CCMR1"],
+      "relatedFunctions": ["TIM_ICInit", "TIM_GetCapture1"],
+      "exampleCode": "TIM_SetIC1Prescaler(TIM3, TIM_ICPSC_DIV4);   /* 每 4 个边沿捕获一次 */",
+      "notesZh": ["分频后测量到的周期是实际周期的 N 倍，换算时别忘了"]
+    },
+
+    "TIM_SetIC2Prescaler": {
+      "briefZh": "设置通道 2 输入捕获的预分频。",
+      "usageZh": "同 TIM_SetIC1Prescaler，作用于通道 2。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_ICPSC": "捕获预分频 DIV1/DIV2/DIV4/DIV8。" },
+      "prerequisites": ["已调用 TIM_ICInit"],
+      "registers": ["TIMx_CCMR1"],
+      "relatedFunctions": ["TIM_ICInit", "TIM_GetCapture2"],
+      "exampleCode": "TIM_SetIC2Prescaler(TIM3, TIM_ICPSC_DIV2);",
+      "notesZh": ["换算周期时记得乘上分频系数"]
+    },
+
+    "TIM_SetIC3Prescaler": {
+      "briefZh": "设置通道 3 输入捕获的预分频。",
+      "usageZh": "同 TIM_SetIC1Prescaler，作用于通道 3。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_ICPSC": "捕获预分频 DIV1/DIV2/DIV4/DIV8。" },
+      "prerequisites": ["已调用 TIM_ICInit"],
+      "registers": ["TIMx_CCMR2"],
+      "relatedFunctions": ["TIM_ICInit", "TIM_GetCapture3"],
+      "exampleCode": "TIM_SetIC3Prescaler(TIM3, TIM_ICPSC_DIV1);",
+      "notesZh": ["换算周期时记得乘上分频系数"]
+    },
+
+    "TIM_SetIC4Prescaler": {
+      "briefZh": "设置通道 4 输入捕获的预分频。",
+      "usageZh": "同 TIM_SetIC1Prescaler，作用于通道 4。",
+      "returnDescZh": "无返回值",
+      "paramsZh": { "TIMx": "要操作的定时器。", "TIM_ICPSC": "捕获预分频 DIV1/DIV2/DIV4/DIV8。" },
+      "prerequisites": ["已调用 TIM_ICInit"],
+      "registers": ["TIMx_CCMR2"],
+      "relatedFunctions": ["TIM_ICInit", "TIM_GetCapture4"],
+      "exampleCode": "TIM_SetIC4Prescaler(TIM3, TIM_ICPSC_DIV8);",
+      "notesZh": ["换算周期时记得乘上分频系数"]
+    },
+
+    "TIM_SetClockDivision": {
+      "briefZh": "设置时钟分频（CKD），影响数字滤波器的采样时钟。",
+      "usageZh": "**注意：它不改变定时器的计数频率**，只改变 tDTS（数字滤波器采样时钟）。容易误解为定时分频，实际调节定时周期要用 TIM_PrescalerConfig。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_CKD": "TIM_CKD_DIV1（tDTS = tCK_INT）、DIV2、DIV4。"
+      },
+      "prerequisites": ["已调用 TIM_TimeBaseInit"],
+      "registers": ["TIMx_CR1"],
+      "relatedFunctions": ["TIM_TimeBaseInit", "TIM_PrescalerConfig", "TIM_ICInit"],
+      "exampleCode": "/* 只影响输入滤波器采样率，不影响定时周期 */\nTIM_SetClockDivision(TIM3, TIM_CKD_DIV2);",
+      "notesZh": [
+        "与定时周期无关！调定时频率请用 TIM_PrescalerConfig 或 TIM_SetAutoreload",
+        "CKD 影响输入捕获滤波器的采样时钟，间接影响能滤除的噪声频率范围"
+      ]
+    },
+
+    "TIM_GetCapture1": {
+      "briefZh": "读取通道 1 的输入捕获值。",
+      "usageZh": "输入捕获应用的核心读取函数。外部信号触发时，硬件把当时的计数器值锁存到 CCR1，本函数把它读出来。测周期、脉宽都靠它。",
+      "returnDescZh": "返回捕获到的计数值（16 位）。",
+      "paramsZh": { "TIMx": "要读取的定时器。" },
+      "prerequisites": ["已调用 TIM_ICInit 配置通道 1 为输入捕获"],
+      "registers": ["TIMx_CCR1"],
+      "relatedFunctions": ["TIM_ICInit", "TIM_GetCounter", "TIM_GetCapture2", "TIM_PWMIConfig"],
+      "exampleCode": "uint16_t capture;\n\n/* 等捕获完成 */\nwhile (TIM_GetFlagStatus(TIM3, TIM_FLAG_CC1) == RESET)\n{\n}\nTIM_ClearFlag(TIM3, TIM_FLAG_CC1);\n\ncapture = TIM_GetCapture1(TIM3);\n/* 实际时间 = capture / (定时器时钟 / 分频) */",
+      "notesZh": [
+        "读到的只是计数值，换算成时间要除以定时器频率",
+        "信号周期超过计数器满量程时会溢出，需要配合溢出中断计数"
+      ]
+    },
+
+    "TIM_GetCapture2": {
+      "briefZh": "读取通道 2 的输入捕获值。",
+      "usageZh": "同 TIM_GetCapture1，作用于通道 2。PWM 输入模式下 CCR2 存放高电平时间。",
+      "returnDescZh": "返回捕获到的计数值（16 位）。",
+      "paramsZh": { "TIMx": "要读取的定时器。" },
+      "prerequisites": ["已调用 TIM_ICInit 或 TIM_PWMIConfig"],
+      "registers": ["TIMx_CCR2"],
+      "relatedFunctions": ["TIM_ICInit", "TIM_PWMIConfig", "TIM_GetCapture1"],
+      "exampleCode": "/* PWM 输入模式：CCR1=周期，CCR2=高电平时间 */\nuint16_t period = TIM_GetCapture1(TIM3);\nuint16_t high   = TIM_GetCapture2(TIM3);\n/* 占空比 = high / period */",
+      "notesZh": ["PWM 输入模式下与 TIM_GetCapture1 配对使用"]
+    },
+
+    "TIM_GetCapture3": {
+      "briefZh": "读取通道 3 的输入捕获值。",
+      "usageZh": "同 TIM_GetCapture1，作用于通道 3。",
+      "returnDescZh": "返回捕获到的计数值（16 位）。",
+      "paramsZh": { "TIMx": "要读取的定时器。" },
+      "prerequisites": ["已调用 TIM_ICInit 配置通道 3"],
+      "registers": ["TIMx_CCR3"],
+      "relatedFunctions": ["TIM_ICInit", "TIM_GetCapture1"],
+      "exampleCode": "uint16_t cap3 = TIM_GetCapture3(TIM3);",
+      "notesZh": ["换算成时间要除以定时器频率"]
+    },
+
+    "TIM_GetCapture4": {
+      "briefZh": "读取通道 4 的输入捕获值。",
+      "usageZh": "同 TIM_GetCapture1，作用于通道 4。",
+      "returnDescZh": "返回捕获到的计数值（16 位）。",
+      "paramsZh": { "TIMx": "要读取的定时器。" },
+      "prerequisites": ["已调用 TIM_ICInit 配置通道 4"],
+      "registers": ["TIMx_CCR4"],
+      "relatedFunctions": ["TIM_ICInit", "TIM_GetCapture1"],
+      "exampleCode": "uint16_t cap4 = TIM_GetCapture4(TIM3);",
+      "notesZh": ["换算成时间要除以定时器频率"]
+    },
+
+    "TIM_GetCounter": {
+      "briefZh": "读取计数器的当前值。",
+      "usageZh": "读取实时计数值。编码器模式下标示当前位置；定时应用里可用来算已经过了多少时间。",
+      "returnDescZh": "返回当前计数值（16 位）。",
+      "paramsZh": { "TIMx": "要读取的定时器。" },
+      "prerequisites": [],
+      "registers": ["TIMx_CNT"],
+      "relatedFunctions": ["TIM_SetCounter", "TIM_GetPrescaler", "TIM_EncoderInterfaceConfig"],
+      "exampleCode": "uint16_t cnt = TIM_GetCounter(TIM2);\n\n/* 已过时间 = cnt / (定时器时钟 / (Prescaler+1)) */",
+      "notesZh": [
+        "读取的瞬间计数器仍在跑，连续两次读取的差值才是有意义的",
+        "注意是 16 位，会环绕"
+      ]
+    },
+
+    "TIM_GetPrescaler": {
+      "briefZh": "读取当前的预分频值。",
+      "usageZh": "确认当前分频设置，或在动态改分频后回读校验。",
+      "returnDescZh": "返回当前预分频寄存器的值（实际分频为该值 + 1）。",
+      "paramsZh": { "TIMx": "要读取的定时器。" },
+      "prerequisites": [],
+      "registers": ["TIMx_PSC"],
+      "relatedFunctions": ["TIM_PrescalerConfig", "TIM_GetCounter"],
+      "exampleCode": "uint16_t psc = TIM_GetPrescaler(TIM2);\n/* 实际分频 = psc + 1 */",
+      "notesZh": ["返回值是寄存器原值，实际分频要加 1"]
+    },
+
+    "TIM_GetFlagStatus": {
+      "briefZh": "检查定时器的标志位是否置位。",
+      "usageZh": "轮询方式等待事件（如等待更新、等待捕获完成），不依赖中断。也用于确认事件是否发生。",
+      "returnDescZh": "SET 表示标志已置位，RESET 表示未置位。",
+      "paramsZh": {
+        "TIMx": "要检查的定时器。",
+        "TIM_FLAG": "要检查的标志：TIM_FLAG_Update（更新/溢出）、TIM_FLAG_CC1~CC4（捕获/比较）、TIM_FLAG_Trigger、TIM_FLAG_Break（仅 TIM1）、TIM_FLAG_CC1OF~CC4OF（重复捕获溢出）。"
+      },
+      "prerequisites": [],
+      "registers": ["TIMx_SR"],
+      "relatedFunctions": ["TIM_ClearFlag", "TIM_GetITStatus", "TIM_ClearITPendingBit"],
+      "exampleCode": "/* 轮询等待一次更新（溢出） */\nwhile (TIM_GetFlagStatus(TIM2, TIM_FLAG_Update) == RESET)\n{\n}\nTIM_ClearFlag(TIM2, TIM_FLAG_Update);",
+      "notesZh": [
+        "轮询方式会占用 CPU，实时性要求高时用中断",
+        "返回值是 SET/RESET（FlagStatus 类型），不是 SUCCESS/ERROR",
+        "标志置位后必须 TIM_ClearFlag 清除，否则下次判断立即为真"
+      ]
+    },
+
+    "TIM_ClearFlag": {
+      "briefZh": "清除定时器的标志位。",
+      "usageZh": "轮询方式处理完事件后清除标志。中断方式下用 TIM_ClearITPendingBit 更合适。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_FLAG": "要清除的标志，如 TIM_FLAG_Update、TIM_FLAG_CC1。"
+      },
+      "prerequisites": [],
+      "registers": ["TIMx_SR"],
+      "relatedFunctions": ["TIM_GetFlagStatus", "TIM_ClearITPendingBit"],
+      "exampleCode": "TIM_ClearFlag(TIM2, TIM_FLAG_Update);",
+      "notesZh": [
+        "轮询用 TIM_ClearFlag，中断里用 TIM_ClearITPendingBit，两者都能清标志但语义不同",
+        "忘记清标志会导致下次轮询立即通过，逻辑出错"
+      ]
+    },
+
+    "TIM_GetITStatus": {
+      "briefZh": "检查定时器中断是否发生且已使能。",
+      "usageZh": "中断服务函数里判断中断源的**正确函数**。它同时检查「标志置位」与「中断已使能」两个条件，比 TIM_GetFlagStatus 更严谨。",
+      "returnDescZh": "SET 表示该中断已发生且已使能，RESET 表示未发生或未使能。",
+      "paramsZh": {
+        "TIMx": "要检查的定时器。",
+        "TIM_IT": "要检查的中断源：TIM_IT_Update、TIM_IT_CC1~CC4、TIM_IT_Trigger、TIM_IT_Break。"
+      },
+      "prerequisites": [
+        "已用 TIM_ITConfig 使能对应中断",
+        "NVIC 里已使能 TIMx_IRQn"
+      ],
+      "registers": ["TIMx_SR", "TIMx_DIER"],
+      "relatedFunctions": ["TIM_ClearITPendingBit", "TIM_ITConfig", "TIM_GetFlagStatus"],
+      "exampleCode": "void TIM2_IRQHandler(void)\n{\n  /* 中断里用 GetITStatus，不用 GetFlagStatus */\n  if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)\n  {\n    TIM_ClearITPendingBit(TIM2, TIM_IT_Update);   /* 必须清 */\n    /* 用户代码 */\n  }\n}",
+      "notesZh": [
+        "中断服务函数里用这个，不要用 TIM_GetFlagStatus",
+        "返回值是 SET/RESET（ITStatus 类型）",
+        "判断为真后必须 TIM_ClearITPendingBit 清标志，否则会反复进中断"
+      ]
+    },
+
+    "TIM_ClearITPendingBit": {
+      "briefZh": "清除定时器的中断挂起标志。",
+      "usageZh": "中断服务函数里处理完必须调用，否则中断会反复触发，程序看起来像卡死。",
+      "returnDescZh": "无返回值",
+      "paramsZh": {
+        "TIMx": "要操作的定时器。",
+        "TIM_IT": "要清除的中断标志，如 TIM_IT_Update、TIM_IT_CC1。"
+      },
+      "prerequisites": [],
+      "registers": ["TIMx_SR"],
+      "relatedFunctions": ["TIM_GetITStatus", "TIM_ITConfig", "TIM_ClearFlag"],
+      "exampleCode": "void TIM2_IRQHandler(void)\n{\n  if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)\n  {\n    TIM_ClearITPendingBit(TIM2, TIM_IT_Update);\n  }\n}",
+      "notesZh": [
+        "忘记清标志是定时器中断最常见的 bug，表现为程序卡死或响应异常",
+        "清标志要放在中断处理的最后，避免处理期间标志又被置位"
+      ]
+    }
+  }
+}

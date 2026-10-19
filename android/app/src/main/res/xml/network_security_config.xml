@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  网络安全配置：全面禁止明文流量。
+
+  本 APP 完全离线，不发起任何网络请求。这个配置是第二道防线——
+  即使将来某个依赖试图联网，也会被系统直接拒绝。
+
+  配合 AndroidManifest.xml 中不声明 INTERNET 权限，构成双重保证。
+-->
+<network-security-config>
+    <!-- 默认禁止所有明文流量 -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -1,0 +1,896 @@
+{
+  "schemaVersion": 1,
+  "peripheral": "DMA",
+  "functions": [
+    {
+      "id": "DMA_DeInit",
+      "name": "DMA_DeInit",
+      "peripheral": "DMA",
+      "sectionId": "DMA#sec1",
+      "prototype": "void DMA_DeInit(DMA_Channel_TypeDef* DMAy_Channelx);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "DMAy_Channelx",
+          "type": "DMA_Channel_TypeDef*",
+          "descEn": "where y can be 1 or 2 to select the DMA and x can be 1 to 7 for DMA1 and 1 to 5 for DMA2 to select the DMA Channel.",
+          "descZh": "要复位的 DMA 通道，取 DMA1_Channel1 ~ DMA1_Channel7，或 DMA2_Channel1 ~ DMA2_Channel5。C8T6 上实际可用的是 DMA1_Channel1~7；DMA2 虽然有 5 个通道的寄存器，但 C8T6 上 DMA2 的请求源对应的外设大多没有引出。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Deinitializes the DMAy Channelx registers to their default reset values.",
+      "briefZh": "把某个 DMA 通道的寄存器恢复为复位默认值（关闭通道并清零配置）。",
+      "usageZh": "重新配置一个通道前先复位，避免上一次留下的配置残留。DMA 通道的配置寄存器很多（CCR/CNDTR/CPAR/CMAR），只改其中几个字段很容易漏掉旧值，所以「先 DeInit 再 Init」是更稳妥的写法。注意它只是把通道配置清零，**不会复位 DMA 控制器本身，也不会动其它通道**。",
+      "prerequisites": [
+        "已通过 RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE) 打开 DMA1 时钟（DMA2 用 RCC_AHBPeriph_DMA2）",
+        "该通道当前没有正在进行的传输（最好先 DMA_Cmd(DISABLE)）"
+      ],
+      "registers": [
+        "DMA_CCR1",
+        "DMA_CNDTR1",
+        "DMA_CPAR1",
+        "DMA_CMAR1"
+      ],
+      "relatedFunctions": [
+        "DMA_Init",
+        "DMA_StructInit",
+        "DMA_Cmd",
+        "RCC_AHBPeriphClockCmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "复位后通道是关闭状态（CCR 的 EN 位清零），必须重新 DMA_Init 并 DMA_Cmd(ENABLE)",
+        "不会影响其它通道的配置，可以单独复位一个通道",
+        "没开 DMA1 的 AHB 时钟时调用它，寄存器实际写不进去，现象是「复位了但配置没变」",
+        "传输中直接复位会立刻中止传输，外设侧可能停在半途（例如 USART 发到一半），建议先 DISABLE 再复位"
+      ],
+      "exampleCode": "RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);\n\n/* 重新配置前先复位，清掉上一次的残留设置 */\nDMA_DeInit(DMA1_Channel4);   /* USART1_TX 固定用 DMA1_Channel4 */\nDMA_Init(DMA1_Channel4, &DMA_InitStructure);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "DMA1",
+        "DMA1_Channel1",
+        "DMA1_Channel4",
+        "DMA1_Channel7",
+        "DMA2",
+        "DMA2_Channel1",
+        "DMA2_Channel5",
+        "DMA_Channel_TypeDef",
+        "DMA_Cmd",
+        "DMA_Init",
+        "ENABLE",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_DMA1",
+        "RCC_AHBPeriph_DMA2"
+      ],
+      "headerLine": 409,
+      "sourceLine": 108,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "DMA_Init",
+      "name": "DMA_Init",
+      "peripheral": "DMA",
+      "sectionId": "DMA#sec1",
+      "prototype": "void DMA_Init(DMA_Channel_TypeDef* DMAy_Channelx, DMA_InitTypeDef* DMA_InitStruct);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "DMAy_Channelx",
+          "type": "DMA_Channel_TypeDef*",
+          "descEn": "where y can be 1 or 2 to select the DMA and x can be 1 to 7 for DMA1 and 1 to 5 for DMA2 to select the DMA Channel.",
+          "descZh": "要配置的 DMA 通道，取 DMA1_Channel1 ~ DMA1_Channel7（C8T6 实际可用），或 DMA2_Channel1 ~ DMA2_Channel5。通道号必须与外设的固定映射一致，否则传输不会发生。"
+        },
+        {
+          "name": "DMA_InitStruct",
+          "type": "DMA_InitTypeDef*",
+          "descEn": "pointer to a DMA_InitTypeDef structure that contains the configuration information for the specified DMA Channel.",
+          "descZh": "指向 DMA_InitTypeDef 结构体的指针，字段包括：DMA_PeripheralBaseAddr（外设数据寄存器地址，如 (uint32_t)&USART1->DR）、DMA_MemoryBaseAddr（内存缓冲区地址，如 (uint32_t)buffer）、DMA_DIR（DMA_DIR_PeripheralDST 内存→外设，或 DMA_DIR_PeripheralSRC 外设→内存）、DMA_BufferSize（传输数据个数，1~65535）、DMA_PeripheralInc（外设地址是否自增，一般用 DMA_PeripheralInc_Disable）、DMA_MemoryInc（内存地址是否自增，缓冲区传输用 DMA_MemoryInc_Enable）、DMA_PeripheralDataSize（DMA_PeripheralDataSize_Byte / HalfWord / Word）、DMA_MemoryDataSize（同上）、DMA_Mode（DMA_Mode_Normal 单次，或 DMA_Mode_Circular 循环）、DMA_Priority（DMA_Priority_Low / Medium / High / VeryHigh）、DMA_M2M（DMA_M2M_Enable 存储器到存储器，或 DMA_M2M_Disable）。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Initializes the DMAy Channelx according to the specified parameters in the DMA_InitStruct.",
+      "briefZh": "按 DMA_InitTypeDef 配置某个 DMA 通道（外设地址、内存地址、传输方向、数据宽度、数量、模式、优先级等）。",
+      "usageZh": "DMA 配置的核心函数。关键约束是**通道与外设的映射是硬件固定的，不能自选**：例如 USART1_TX 只能用 DMA1_Channel4、USART1_RX 只能用 DMA1_Channel5、SPI1_TX 用 DMA1_Channel3、SPI1_RX 用 DMA1_Channel2、ADC1 用 DMA1_Channel1、I2C1_TX 用 DMA1_Channel6、I2C1_RX 用 DMA1_Channel7。选错通道的后果是 DMA 完全不触发，而且没有任何报错。配置完还需要单独调用 DMA_Cmd(ENABLE) 才会开始工作。",
+      "prerequisites": [
+        "已通过 RCC_AHBPeriphClockCmd 打开对应 DMA 控制器的 AHB 时钟",
+        "传输的源外设（ADC/USART/SPI/TIM 等）已初始化并已使能其 DMA 请求（如 USART_DMACmd、SPI_I2S_DMACmd、ADC_DMACmd）",
+        "若使用中断，已调用 NVIC_Init 使能对应的 DMAx_Channely_IRQn"
+      ],
+      "registers": [
+        "DMA_CCR1",
+        "DMA_CNDTR1",
+        "DMA_CPAR1",
+        "DMA_CMAR1"
+      ],
+      "relatedFunctions": [
+        "DMA_StructInit",
+        "DMA_Cmd",
+        "DMA_ITConfig",
+        "DMA_SetCurrDataCounter",
+        "DMA_GetFlagStatus",
+        "DMA_ClearFlag",
+        "USART_DMACmd",
+        "SPI_I2S_DMACmd",
+        "ADC_DMACmd",
+        "TIM_DMACmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "通道与外设的映射由硬件固定：USART1_TX=DMA1_Channel4、USART1_RX=DMA1_Channel5、USART2_TX=Ch7、USART2_RX=Ch6、USART3_TX=Ch2、USART3_RX=Ch3、SPI1_TX=Ch3、SPI1_RX=Ch2、SPI2_TX=Ch5、SPI2_RX=Ch4、I2C1_TX=Ch6、I2C1_RX=Ch7、ADC1=Ch1、TIM2_UP=Ch2、TIM3_UP=Ch3、TIM4_UP=Ch7。选错通道 DMA 静默不工作",
+        "DMA_BufferSize 是「数据个数」不是字节数：数据宽度为 HalfWord 时，填 100 表示传输 200 字节",
+        "外设地址必须填数据寄存器地址（&USART1->DR），填外设基地址会写坏控制寄存器",
+        "DMA_DIR 设反的现象是缓冲区内容不变、外设什么也没发出，且不报错",
+        "DMA_PeripheralDataSize 与 DMA_MemoryDataSize 不一致时，硬件按两者中较小的一方拆分，容易出现数据错位",
+        "DMA_M2M_Enable 时 DMA_DIR 必须以 DMA_MemoryBaseAddr 为源；存储器到存储器模式只能由软件触发，外设请求无效",
+        "配置完不调 DMA_Cmd(ENABLE) 通道不会启动，看起来像「初始化成功但没反应」",
+        "如果要循环采集（如 ADC 连续扫描），必须用 DMA_Mode_Circular，Normal 模式传完就停，需要手动重装计数并重新使能",
+        "C8T6 只有 DMA1 的 7 个通道可靠可用；DMA2 的通道在 C8T6 上对应的请求源（SPI3、SDIO、ADC3、UART4 等）大多没有引脚引出"
+      ],
+      "exampleCode": "DMA_InitTypeDef DMA_InitStructure;\n\nRCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);\n\n/* USART1_TX 硬件固定映射到 DMA1_Channel4，不能乱选 */\nDMA_DeInit(DMA1_Channel4);\nDMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&USART1->DR;\nDMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)txBuffer;\nDMA_InitStructure.DMA_DIR                = DMA_DIR_PeripheralDST;   /* 内存 -> 外设 */\nDMA_InitStructure.DMA_BufferSize         = 128;\nDMA_InitStructure.DMA_PeripheralInc      = DMA_PeripheralInc_Disable;\nDMA_InitStructure.DMA_MemoryInc          = DMA_MemoryInc_Enable;\nDMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;\nDMA_InitStructure.DMA_MemoryDataSize     = DMA_MemoryDataSize_Byte;\nDMA_InitStructure.DMA_Mode               = DMA_Mode_Normal;\nDMA_InitStructure.DMA_Priority           = DMA_Priority_Medium;\nDMA_InitStructure.DMA_M2M                = DMA_M2M_Disable;\nDMA_Init(DMA1_Channel4, &DMA_InitStructure);\n\n/* 打开外设侧的 DMA 请求，再使能通道 */\nUSART_DMACmd(USART1, USART_DMAReq_Tx, ENABLE);\nDMA_Cmd(DMA1_Channel4, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ADC1",
+        "ADC3",
+        "ADC_DMACmd",
+        "DMA1",
+        "DMA1_Channel1",
+        "DMA1_Channel2",
+        "DMA1_Channel3",
+        "DMA1_Channel4",
+        "DMA1_Channel5",
+        "DMA1_Channel6",
+        "DMA1_Channel7",
+        "DMA2",
+        "DMA2_Channel1",
+        "DMA2_Channel5",
+        "DMA_Channel_TypeDef",
+        "DMA_Cmd",
+        "DMA_DIR_PeripheralDST",
+        "DMA_DIR_PeripheralSRC",
+        "DMA_DeInit",
+        "DMA_InitTypeDef",
+        "DMA_M2M_Disable",
+        "DMA_M2M_Enable",
+        "DMA_MemoryDataSize_Byte",
+        "DMA_MemoryInc_Enable",
+        "DMA_Mode_Circular",
+        "DMA_Mode_Normal",
+        "DMA_PeripheralDataSize_Byte",
+        "DMA_PeripheralInc_Disable",
+        "DMA_Priority_Low",
+        "DMA_Priority_Medium",
+        "ENABLE",
+        "NVIC_Init",
+        "RCC_AHBPeriphClockCmd",
+        "RCC_AHBPeriph_DMA1",
+        "SDIO",
+        "SPI3",
+        "SPI_I2S_DMACmd",
+        "UART4",
+        "USART1",
+        "USART_DMACmd",
+        "USART_DMAReq_Tx"
+      ],
+      "headerLine": 411,
+      "sourceLine": 202,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "DMA_StructInit",
+      "name": "DMA_StructInit",
+      "peripheral": "DMA",
+      "sectionId": "DMA#sec1",
+      "prototype": "void DMA_StructInit(DMA_InitTypeDef* DMA_InitStruct);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "DMA_InitStruct",
+          "type": "DMA_InitTypeDef*",
+          "descEn": "pointer to a DMA_InitTypeDef structure which will be initialized.",
+          "descZh": "指向待初始化的 DMA_InitTypeDef 结构体的指针。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Fills each DMA_InitStruct member with its default value.",
+      "briefZh": "把 DMA_InitTypeDef 各字段填成库的默认值。",
+      "usageZh": "推荐在 DMA_Init 之前调用，避免局部结构体里的野值。默认值是：外设基地址 0xFFFFFFFF、内存基地址 0、方向为 PeripheralSRC（外设→内存）、BufferSize=0xFFFF、外设与内存地址都不自增、数据宽度都是 Byte、Normal 模式、优先级 Low、M2M 关闭（实际实现是 Interrupt 参数被设置，注意外设地址是 0xFFFFFFFF 这个明显的哨兵值）。",
+      "prerequisites": [],
+      "registers": [],
+      "relatedFunctions": [
+        "DMA_Init",
+        "DMA_DeInit"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "默认 DMA_PeripheralBaseAddr 是 0xFFFFFFFF，忘记赋值会直接触发总线错误（HardFault）",
+        "默认 DMA_BufferSize 是 0xFFFF，忘记改会想传 65535 个数据，通常表现为程序卡在等传输完成",
+        "默认数据宽度是 Byte，用 16 位 ADC 采集而不改宽度会只取到低字节，数据看起来像噪声",
+        "默认方向是 PeripheralSRC（外设→内存），做发送时必须显式改成 DMA_DIR_PeripheralDST",
+        "库的默认值不一定是你要的，逐字段赋值仍然是最稳的写法"
+      ],
+      "exampleCode": "DMA_InitTypeDef DMA_InitStructure;\n\nDMA_StructInit(&DMA_InitStructure);\nDMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&ADC1->DR;  /* 默认是 0xFFFFFFFF，必须改 */\nDMA_InitStructure.DMA_MemoryBaseAddr     = (uint32_t)adcBuf;\nDMA_InitStructure.DMA_BufferSize         = 256;\nDMA_InitStructure.DMA_Mode               = DMA_Mode_Circular;\nDMA_Init(DMA1_Channel1, &DMA_InitStructure);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ADC1",
+        "DMA1_Channel1",
+        "DMA_DIR_PeripheralDST",
+        "DMA_Init",
+        "DMA_InitTypeDef",
+        "DMA_Mode_Circular"
+      ],
+      "headerLine": 412,
+      "sourceLine": 259,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "DMA_Cmd",
+      "name": "DMA_Cmd",
+      "peripheral": "DMA",
+      "sectionId": "DMA#sec2",
+      "prototype": "void DMA_Cmd(DMA_Channel_TypeDef* DMAy_Channelx, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "DMAy_Channelx",
+          "type": "DMA_Channel_TypeDef*",
+          "descEn": "where y can be 1 or 2 to select the DMA and x can be 1 to 7 for DMA1 and 1 to 5 for DMA2 to select the DMA Channel.",
+          "descZh": "要控制的 DMA 通道，取 DMA1_Channel1 ~ DMA1_Channel7 或 DMA2_Channel1 ~ DMA2_Channel5。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the DMAy Channelx. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 启动通道，DISABLE 关闭通道。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified DMAy Channelx.",
+      "briefZh": "使能或关闭指定的 DMA 通道（置位/清除 CCR 的 EN 位）。",
+      "usageZh": "DMA_Init 之后必须调一次 ENABLE 通道才会真正开始搬运数据。DMA_Mode_Normal 传输完成后硬件会自动清 EN 位，所以下一次传输需要重新 DMA_SetCurrDataCounter 再 DMA_Cmd(ENABLE)；DMA_Mode_Circular 则不需要，计数会自动重装。临时中止传输就用 DISABLE。",
+      "prerequisites": [
+        "已调用 DMA_Init 完成通道配置",
+        "已使能外设侧的 DMA 请求（如 USART_DMACmd / SPI_I2S_DMACmd / ADC_DMACmd）"
+      ],
+      "registers": [
+        "DMA_CCR1"
+      ],
+      "relatedFunctions": [
+        "DMA_Init",
+        "DMA_SetCurrDataCounter",
+        "DMA_GetCurrDataCounter",
+        "DMA_GetFlagStatus",
+        "DMA_Cmd"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "配置完不调 DMA_Cmd(ENABLE)，通道一直停着，外设的 DMA 请求也无人响应，现象是数据一个字节都不动",
+        "DMA_Mode_Normal 传输结束后 EN 位被硬件自动清零，想再次传输必须重新 SetCurrDataCounter + Cmd(ENABLE)，只调 Cmd(ENABLE) 会以 CNDTR=0 立即结束",
+        "运行中直接调 DMA_Cmd(DISABLE) 会立即停止搬运，外设侧可能停在半途；USART 发送中断可能导致对方收到半帧",
+        "C8T6 上 DMA1 的 7 个通道共用同一个 DMA1_Channel1_IRQHandler 之外的中断向量：Channel1 有独立向量，Channel2~3 共用 DMA1_Channel2_3_IRQn，Channel4~7 共用 DMA1_Channel4_7_IRQn",
+        "同一时刻多个通道竞争总线时由 DMA_Priority 决定优先级，硬件优先级是「通道号小的优先」，软件优先级只在同组内起作用"
+      ],
+      "exampleCode": "/* Normal 模式：每次传输都要重装计数并重新使能 */\nvoid DMA1_Channel4_SendAgain(uint16_t len)\n{\n  DMA_Cmd(DMA1_Channel4, DISABLE);              /* 必须先在关闭状态下改计数 */\n  DMA_SetCurrDataCounter(DMA1_Channel4, len);   /* 重装数据个数 */\n  DMA_ClearFlag(DMA1_FLAG_TC4 | DMA1_FLAG_GL4); /* 清旧标志 */\n  DMA_Cmd(DMA1_Channel4, ENABLE);               /* 重新启动 */\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ADC_DMACmd",
+        "DISABLE",
+        "DMA1",
+        "DMA1_Channel1",
+        "DMA1_Channel4",
+        "DMA1_Channel7",
+        "DMA1_FLAG_GL4",
+        "DMA1_FLAG_TC4",
+        "DMA2",
+        "DMA2_Channel1",
+        "DMA2_Channel5",
+        "DMA_Channel_TypeDef",
+        "DMA_ClearFlag",
+        "DMA_Init",
+        "DMA_Mode_Circular",
+        "DMA_Mode_Normal",
+        "DMA_SetCurrDataCounter",
+        "ENABLE",
+        "FunctionalState",
+        "SPI_I2S_DMACmd",
+        "USART_DMACmd"
+      ],
+      "headerLine": 413,
+      "sourceLine": 294,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "DMA_ITConfig",
+      "name": "DMA_ITConfig",
+      "peripheral": "DMA",
+      "sectionId": "DMA#sec3",
+      "prototype": "void DMA_ITConfig(DMA_Channel_TypeDef* DMAy_Channelx, uint32_t DMA_IT, FunctionalState NewState);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "DMAy_Channelx",
+          "type": "DMA_Channel_TypeDef*",
+          "descEn": "where y can be 1 or 2 to select the DMA and x can be 1 to 7 for DMA1 and 1 to 5 for DMA2 to select the DMA Channel.",
+          "descZh": "要配置中断的 DMA 通道，取 DMA1_Channel1 ~ DMA1_Channel7 或 DMA2_Channel1 ~ DMA2_Channel5。"
+        },
+        {
+          "name": "DMA_IT",
+          "type": "uint32_t",
+          "descEn": "specifies the DMA interrupts sources to be enabled or disabled. This parameter can be any combination of the following values:",
+          "descZh": "要控制的中断源，取 DMA_IT_TC（传输完成）、DMA_IT_HT（半传输完成）、DMA_IT_TE（传输错误），可用 | 组合。"
+        },
+        {
+          "name": "NewState",
+          "type": "FunctionalState",
+          "descEn": "new state of the specified DMA interrupts. This parameter can be: ENABLE or DISABLE.",
+          "descZh": "ENABLE 使能选中的中断源，DISABLE 关闭。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Enables or disables the specified DMAy Channelx interrupts.",
+      "briefZh": "使能或关闭 DMA 通道的中断源（传输完成、半传输、传输错误）。",
+      "usageZh": "需要「传输完成后做点什么」（发通知、切换缓冲区、拉片选）时的标准做法。三个中断源可以组合：TC 在整块传完时触发，HT 在传了一半时触发（做双缓冲用），TE 在传输出错时触发。**只调 DMA_ITConfig 不会进中断**，还必须 `NVIC_Init` 使能对应的 DMA 中断通道。",
+      "prerequisites": [
+        "已调用 DMA_Init 配置通道",
+        "已调用 NVIC_PriorityGroupConfig 设定分组，并调用 NVIC_Init 使能对应 IRQ 通道（如 DMA1_Channel4_IRQn）",
+        "中断服务函数名必须与启动文件一致：DMA1_Channel1_IRQHandler、DMA1_Channel2_3_IRQHandler、DMA1_Channel4_7_IRQHandler"
+      ],
+      "registers": [
+        "DMA_CCR1"
+      ],
+      "relatedFunctions": [
+        "DMA_GetITStatus",
+        "DMA_ClearITPendingBit",
+        "NVIC_Init",
+        "DMA_Cmd",
+        "DMA_GetFlagStatus"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "开了 DMA_ITConfig 但忘了 NVIC_Init，标志会置位但中断不进，且不报错——与 EXTI/USART 的坑完全相同",
+        "中断服务函数里必须清标志（DMA_ClearITPendingBit 或 DMA_ClearFlag），否则会连续不断地重复进入中断",
+        "DMA1_Channel2 与 Channel3 共用一个向量（DMA1_Channel2_3_IRQn），Channel4~Channel7 共用 DMA1_Channel4_7_IRQn，服务函数里要逐条判断 DMA1_IT_TCx，不能用 else if 漏判",
+        "DMA_IT_HT 主要用于双缓冲：传一半时切换处理缓冲区，能显著降低大块数据的延迟，但要注意半传输标志也要清",
+        "DMA_IT_TE 只报告总线级的传输错误，外设自身的错误（如 USART 帧错误）不会触发它",
+        "Normal 模式下传输完成中断只触发一次；Circular 模式下每转一圈都会触发一次，处理函数里别做耗时操作，否则会漏掉下一圈"
+      ],
+      "exampleCode": "DMA_ITConfig(DMA1_Channel4, DMA_IT_TC, ENABLE);\n\nNVIC_InitStructure.NVIC_IRQChannel = DMA1_Channel4_IRQn;   /* 注意 4~7 共用一个向量 */\nNVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x01;\nNVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x01;\nNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;\nNVIC_Init(&NVIC_InitStructure);\n\n/* 4~7 共用一个服务函数，必须逐条判断是哪个通道 */\nvoid DMA1_Channel4_7_IRQHandler(void)\n{\n  if (DMA_GetITStatus(DMA1_IT_TC4) != RESET)\n  {\n    DMA_ClearITPendingBit(DMA1_IT_TC4);   /* 不清就会反复进中断 */\n    /* 标记一次发送结束 */\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "DMA1",
+        "DMA1_Channel1",
+        "DMA1_Channel2",
+        "DMA1_Channel4",
+        "DMA1_Channel7",
+        "DMA1_IT_TC4",
+        "DMA2",
+        "DMA2_Channel1",
+        "DMA2_Channel5",
+        "DMA_Channel_TypeDef",
+        "DMA_ClearFlag",
+        "DMA_ClearITPendingBit",
+        "DMA_GetITStatus",
+        "DMA_IT_HT",
+        "DMA_IT_TC",
+        "DMA_IT_TE",
+        "DMA_Init",
+        "ENABLE",
+        "EXTI",
+        "FunctionalState",
+        "NVIC_Init",
+        "NVIC_PriorityGroupConfig",
+        "RESET"
+      ],
+      "headerLine": 414,
+      "sourceLine": 326,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "DMA_SetCurrDataCounter",
+      "name": "DMA_SetCurrDataCounter",
+      "peripheral": "DMA",
+      "sectionId": "DMA#sec4",
+      "prototype": "void DMA_SetCurrDataCounter(DMA_Channel_TypeDef* DMAy_Channelx, uint16_t DataNumber);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "DMAy_Channelx",
+          "type": "DMA_Channel_TypeDef*",
+          "descEn": "where y can be 1 or 2 to select the DMA and x can be 1 to 7 for DMA1 and 1 to 5 for DMA2 to select the DMA Channel.",
+          "descZh": "要设置的 DMA 通道，取 DMA1_Channel1 ~ DMA1_Channel7 或 DMA2_Channel1 ~ DMA2_Channel5。"
+        },
+        {
+          "name": "DataNumber",
+          "type": "uint16_t",
+          "descEn": "The number of data units in the current DMAy Channelx transfer.",
+          "descZh": "本次传输的数据个数（不是字节数），取值 1~65535。数据宽度为 HalfWord 时实际字节数是它的两倍。填 0 会导致通道使能后立刻进入「传输完成」状态。"
+        }
+      ],
+      "returnDescEn": "None.",
+      "returnDescZh": "无返回值",
+      "briefEn": "Sets the number of data units in the current DMAy Channelx transfer.",
+      "briefZh": "设置当前 DMA 通道还要传输的数据个数（写 CNDTR）。",
+      "usageZh": "两个典型用途：一是 Normal 模式下重新发起一次传输（此时 CNDTR 已经是 0，必须重装）；二是变长数据发送（例如 USART 发送长度不固定的报文）。**要求通道处于关闭状态**，运行中设置的值会被硬件忽略或被当前传输覆盖。",
+      "prerequisites": [
+        "该通道已通过 DMA_Init 完成配置",
+        "调用前必须先用 DMA_Cmd(DMAy_Channelx, DISABLE) 关闭通道"
+      ],
+      "registers": [
+        "DMA_CNDTR1",
+        "DMA_CCR1"
+      ],
+      "relatedFunctions": [
+        "DMA_Cmd",
+        "DMA_GetCurrDataCounter",
+        "DMA_Init",
+        "DMA_ClearFlag"
+      ],
+      "remarks": [
+        "This function can only be used when the DMAy_Channelx is disabled."
+      ],
+      "notesZh": [
+        "必须在通道关闭（EN=0）时调用，规则写在参考手册里；运行中写 CNDTR 的值不可预测",
+        "数据宽度为 HalfWord/Word 时 CNDTR 是「个数」不是字节数，算长度时别把它当字节数用",
+        "若缓冲区地址变了（例如切换到一个新的数组），光设计数不够，还要改 CMAR（可以用 DMA_Init 重配，或直接写 DMAy_Channelx->CMAR）",
+        "重装计数前最好清一下 DMA_FLAG_GLx / DMA_FLAG_TCx，否则上一轮的完成标志还在，会误判成本轮已完成",
+        "DMA_Mode_Circular 下不需要手动重装，硬件在每轮结束时自动把 CNDTR 恢复到初值"
+      ],
+      "exampleCode": "/* 变长发送：每次发送前重装长度 */\nvoid USART1_DMASend(uint8_t *buf, uint16_t len)\n{\n  while (DMA_GetCurrDataCounter(DMA1_Channel4) != 0) { }  /* 等上一次发完 */\n\n  DMA_Cmd(DMA1_Channel4, DISABLE);\n  DMA_SetCurrDataCounter(DMA1_Channel4, len);   /* 重装长度 */\n  DMA1_Channel4->CMAR = (uint32_t)buf;          /* 缓冲区变了要改内存地址 */\n  DMA_ClearFlag(DMA1_FLAG_TC4 | DMA1_FLAG_GL4);\n  DMA_Cmd(DMA1_Channel4, ENABLE);\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "DMA1",
+        "DMA1_Channel1",
+        "DMA1_Channel4",
+        "DMA1_Channel7",
+        "DMA1_FLAG_GL4",
+        "DMA1_FLAG_TC4",
+        "DMA2",
+        "DMA2_Channel1",
+        "DMA2_Channel5",
+        "DMA_Channel_TypeDef",
+        "DMA_ClearFlag",
+        "DMA_Cmd",
+        "DMA_GetCurrDataCounter",
+        "DMA_Init",
+        "DMA_Mode_Circular",
+        "ENABLE"
+      ],
+      "headerLine": 415,
+      "sourceLine": 353,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "DMA_GetCurrDataCounter",
+      "name": "DMA_GetCurrDataCounter",
+      "peripheral": "DMA",
+      "sectionId": "DMA#sec5",
+      "prototype": "uint16_t DMA_GetCurrDataCounter(DMA_Channel_TypeDef* DMAy_Channelx);",
+      "returnType": "uint16_t",
+      "params": [
+        {
+          "name": "DMAy_Channelx",
+          "type": "DMA_Channel_TypeDef*",
+          "descEn": "where y can be 1 or 2 to select the DMA and x can be 1 to 7 for DMA1 and 1 to 5 for DMA2 to select the DMA Channel.",
+          "descZh": "要查询的 DMA 通道，取 DMA1_Channel1 ~ DMA1_Channel7 或 DMA2_Channel1 ~ DMA2_Channel5。"
+        }
+      ],
+      "returnDescEn": "The number of remaining data units in the current DMAy Channelx transfer.",
+      "returnDescZh": "返回当前剩余的待传输数据个数。返回 0 表示本次传输的数据已经全部搬运完毕。",
+      "briefEn": "Returns the number of remaining data units in the current DMAy Channelx transfer.",
+      "briefZh": "读取当前 DMA 通道还剩余多少个数据没有传输（读 CNDTR）。",
+      "usageZh": "用来判断传输进度或判断传输是否结束（返回 0 表示已全部传完），也可以反推「已经传了多少个」（初值减返回值得出），这在变长接收（如 USART + DMA 接收不定长数据、配合空闲中断）里非常常用。",
+      "prerequisites": [
+        "已调用 DMA_Init 配置通道并 DMA_Cmd(ENABLE) 启动"
+      ],
+      "registers": [
+        "DMA_CNDTR1"
+      ],
+      "relatedFunctions": [
+        "DMA_SetCurrDataCounter",
+        "DMA_GetFlagStatus",
+        "DMA_Cmd",
+        "DMA_GetITStatus"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "返回的是「剩余个数」，不是「已传输个数」；已传输个数要用初始 BufferSize 相减",
+        "在通道刚使能、一个数据都还没传时，返回的是完整初值，别误判成传输没开始",
+        "判断传输是否结束更可靠的方式是看 DMA_FLAG_TCx 标志，因为 CNDTR 到 0 与标志置位之间有一个时钟的延迟",
+        "Circular 模式下 CNDTR 会不停地在初值和 0 之间循环，用它算进度要小心，容易读到刚重装的值",
+        "它与 DMA_GetFlagStatus 不同：CNDTR 是实时值，标志位是事件记录，两者用途不一样"
+      ],
+      "exampleCode": "/* USART1 + DMA 接收不定长数据：靠空闲中断判断一帧结束 */\n#define RX_BUF_SIZE 128\nuint8_t rxBuf[RX_BUF_SIZE];\n\nvoid USART1_IRQHandler(void)\n{\n  if (USART_GetITStatus(USART1, USART_IT_IDLE) != RESET)\n  {\n    (void)USART1->SR; (void)USART1->DR;   /* 读 SR 再读 DR 清空闲标志 */\n\n    /* 收到的长度 = 总长度 - 剩余未传个数 */\n    uint16_t received = RX_BUF_SIZE - DMA_GetCurrDataCounter(DMA1_Channel5);\n\n    /* 处理 rxBuf[0..received-1] */\n\n    /* 重新开始接收 */\n    DMA_Cmd(DMA1_Channel5, DISABLE);\n    DMA_SetCurrDataCounter(DMA1_Channel5, RX_BUF_SIZE);\n    DMA_Cmd(DMA1_Channel5, ENABLE);\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "DMA1",
+        "DMA1_Channel1",
+        "DMA1_Channel5",
+        "DMA1_Channel7",
+        "DMA2",
+        "DMA2_Channel1",
+        "DMA2_Channel5",
+        "DMA_Channel_TypeDef",
+        "DMA_Cmd",
+        "DMA_GetFlagStatus",
+        "DMA_Init",
+        "DMA_SetCurrDataCounter",
+        "ENABLE",
+        "RESET",
+        "USART1",
+        "USART_GetITStatus",
+        "USART_IT_IDLE"
+      ],
+      "headerLine": 416,
+      "sourceLine": 371,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "DMA_GetFlagStatus",
+      "name": "DMA_GetFlagStatus",
+      "peripheral": "DMA",
+      "sectionId": "DMA#sec6",
+      "prototype": "FlagStatus DMA_GetFlagStatus(uint32_t DMAy_FLAG);",
+      "returnType": "FlagStatus",
+      "params": [
+        {
+          "name": "DMAy_FLAG",
+          "type": "uint32_t",
+          "descEn": "specifies the flag to check. This parameter can be one of the following values:",
+          "descZh": "要查询的标志，取 DMA1_FLAG_GL1 ~ DMA1_FLAG_GL7（全局标志）、DMA1_FLAG_TC1 ~ DMA1_FLAG_TC7（传输完成）、DMA1_FLAG_HT1 ~ DMA1_FLAG_HT7（半传输）、DMA1_FLAG_TE1 ~ DMA1_FLAG_TE7（传输错误），DMA2 同名为 DMA2_FLAG_GL1 ~ DMA2_FLAG_GL5 等。一次只能填一个值。"
+        }
+      ],
+      "returnDescEn": "The new state of DMAy_FLAG (SET or RESET).",
+      "returnDescZh": "SET 表示该标志已置位，RESET 表示未置位。",
+      "briefEn": "Checks whether the specified DMAy Channelx flag is set or not.",
+      "briefZh": "查询 DMA 通道的标志位（全局标志、传输完成、半传输、传输错误）。",
+      "usageZh": "轮询方式判断 DMA 传输是否完成的标准做法，比用 DMA_GetCurrDataCounter 判断更准确（标志是「事件已发生」的记录，不会被后续操作改变）。轮询时必须手动清标志，否则下一轮判断会立刻成立。三个标志分别对应 GL（全局，TC/HT/TE 的或）、TC（传输完成）、HT（半传输）、TE（传输错误）。",
+      "prerequisites": [
+        "已调用 DMA_Init 配置通道并 DMA_Cmd(ENABLE) 启动传输"
+      ],
+      "registers": [
+        "DMA_ISR",
+        "DMA_IFCR"
+      ],
+      "relatedFunctions": [
+        "DMA_ClearFlag",
+        "DMA_GetITStatus",
+        "DMA_ClearITPendingBit",
+        "DMA_GetCurrDataCounter"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "轮询后必须调 DMA_ClearFlag 清标志，否则下一轮 while 判断立刻通过，看起来像「传输瞬间完成」，实际上数据根本没搬",
+        "DMA_FLAG_TCx 置位时 DMA_FLAG_GLx 也一定是置位的，推荐两个一起清",
+        "标志在通道使能后不会自动清零，即使重新配置通道，旧标志也会保留，所以每次重新启动传输前先清一次",
+        "C8T6 上 DMA1 的 7 个通道标志都在 DMA_ISR 里，清除要用 DMA_IFCR；DMA2 的标志在 DMA2_ISR/DMA2_IFCR 里",
+        "与 DMA_GetITStatus 的区别：GetFlagStatus 只看标志位，GetITStatus 还要看 CCR 里的中断使能位，轮询用前者、中断服务函数用后者"
+      ],
+      "exampleCode": "/* 轮询等一块数据搬完（不用中断） */\nwhile (DMA_GetFlagStatus(DMA1_FLAG_TC4) == RESET) { }\nDMA_ClearFlag(DMA1_FLAG_TC4 | DMA1_FLAG_GL4);   /* 必须清，否则下次判断直接成立 */\n\n/* 之后才能安全地做收尾，例如拉高片选或切换缓冲区 */\nGPIO_SetBits(GPIOA, GPIO_Pin_4);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DMA1",
+        "DMA1_FLAG_GL1",
+        "DMA1_FLAG_GL4",
+        "DMA1_FLAG_GL7",
+        "DMA1_FLAG_HT1",
+        "DMA1_FLAG_HT7",
+        "DMA1_FLAG_TC1",
+        "DMA1_FLAG_TC4",
+        "DMA1_FLAG_TC7",
+        "DMA1_FLAG_TE1",
+        "DMA1_FLAG_TE7",
+        "DMA2",
+        "DMA2_FLAG_GL1",
+        "DMA2_FLAG_GL5",
+        "DMA_ClearFlag",
+        "DMA_Cmd",
+        "DMA_GetCurrDataCounter",
+        "DMA_GetITStatus",
+        "DMA_Init",
+        "ENABLE",
+        "FlagStatus",
+        "GPIOA",
+        "GPIO_Pin_4",
+        "GPIO_SetBits",
+        "RESET",
+        "SET"
+      ],
+      "headerLine": 417,
+      "sourceLine": 433,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "DMA_ClearFlag",
+      "name": "DMA_ClearFlag",
+      "peripheral": "DMA",
+      "sectionId": "DMA#sec6",
+      "prototype": "void DMA_ClearFlag(uint32_t DMAy_FLAG);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "DMAy_FLAG",
+          "type": "uint32_t",
+          "descEn": "specifies the flag to clear. This parameter can be any combination (for the same DMA) of the following values:",
+          "descZh": "要清除的标志，取 DMA1_FLAG_GL1 ~ DMA1_FLAG_GL7、DMA1_FLAG_TC1 ~ DMA1_FLAG_TC7、DMA1_FLAG_HT1 ~ DMA1_FLAG_HT7、DMA1_FLAG_TE1 ~ DMA1_FLAG_TE7，或 DMA2 对应的同名标志。同一个 DMA 的多个标志可用 | 组合。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Clears the DMAy Channelx's pending flags.",
+      "briefZh": "清除 DMA 通道的挂起标志（写 DMA_IFCR）。",
+      "usageZh": "轮询方式下每次判断完必须调它；中断方式下用 DMA_ClearITPendingBit（两者实现相同，都是写 IFCR）。同一 DMA 控制器的多个标志可以一次清掉，但**不能跨控制器组合**（DMA1 的标志和 DMA2 的标志不能写在同一个参数里）。",
+      "prerequisites": [
+        "已确认该标志已置位（通常由 DMA_GetFlagStatus 或 DMA_GetITStatus 得到）"
+      ],
+      "registers": [
+        "DMA_IFCR"
+      ],
+      "relatedFunctions": [
+        "DMA_GetFlagStatus",
+        "DMA_ClearITPendingBit",
+        "DMA_GetITStatus",
+        "DMA_SetCurrDataCounter"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "写 1 清零，参数里没提到的位不受影响，可以放心按位清除",
+        "DMA1 与 DMA2 的标志在不同寄存器（DMA_IFCR 与 DMA2_IFCR）里，不能用一个参数同时清两个控制器的标志",
+        "忘记清标志的后果：轮询 while 立刻通过、中断服务函数反复进出，两种现象都很隐蔽",
+        "推荐在每次启动新传输前把 GL/TC/HT/TE 四个标志一起清掉，避免上一轮的残留干扰本轮判断",
+        "DMA_ClearFlag 与 DMA_ClearITPendingBit 功能完全相同，区别只是语义"
+      ],
+      "exampleCode": "/* 重新发起一次传输前，先清干净旧标志 */\nDMA_ClearFlag(DMA1_FLAG_GL4 | DMA1_FLAG_TC4 | DMA1_FLAG_HT4 | DMA1_FLAG_TE4);\n\nDMA_Cmd(DMA1_Channel4, DISABLE);\nDMA_SetCurrDataCounter(DMA1_Channel4, len);\nDMA_Cmd(DMA1_Channel4, ENABLE);",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DISABLE",
+        "DMA1",
+        "DMA1_Channel4",
+        "DMA1_FLAG_GL1",
+        "DMA1_FLAG_GL4",
+        "DMA1_FLAG_GL7",
+        "DMA1_FLAG_HT1",
+        "DMA1_FLAG_HT4",
+        "DMA1_FLAG_HT7",
+        "DMA1_FLAG_TC1",
+        "DMA1_FLAG_TC4",
+        "DMA1_FLAG_TC7",
+        "DMA1_FLAG_TE1",
+        "DMA1_FLAG_TE4",
+        "DMA1_FLAG_TE7",
+        "DMA2",
+        "DMA_ClearITPendingBit",
+        "DMA_Cmd",
+        "DMA_GetFlagStatus",
+        "DMA_GetITStatus",
+        "DMA_SetCurrDataCounter",
+        "ENABLE"
+      ],
+      "headerLine": 418,
+      "sourceLine": 523,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "DMA_GetITStatus",
+      "name": "DMA_GetITStatus",
+      "peripheral": "DMA",
+      "sectionId": "DMA#sec3",
+      "prototype": "ITStatus DMA_GetITStatus(uint32_t DMAy_IT);",
+      "returnType": "ITStatus",
+      "params": [
+        {
+          "name": "DMAy_IT",
+          "type": "uint32_t",
+          "descEn": "specifies the DMAy interrupt source to check. This parameter can be one of the following values:",
+          "descZh": "要查询的中断源，取 DMA1_IT_GL1 ~ DMA1_IT_GL7、DMA1_IT_TC1 ~ DMA1_IT_TC7、DMA1_IT_HT1 ~ DMA1_IT_HT7、DMA1_IT_TE1 ~ DMA1_IT_TE7，或 DMA2 对应的同名宏。一次只能填一个值。"
+        }
+      ],
+      "returnDescEn": "The new state of DMAy_IT (SET or RESET).",
+      "returnDescZh": "SET 表示该中断源已使能且处于挂起状态，应当处理；RESET 表示未使能或没有挂起。",
+      "briefEn": "Checks whether the specified DMAy Channelx interrupt has occurred or not.",
+      "briefZh": "查询 DMA 通道中断是否发生（同时检查标志位与 CCR 中的中断使能位）。",
+      "usageZh": "DMA 中断服务函数里的标准写法。因为 C8T6 上多个通道共用一个中断向量（Channel2~3 共用 DMA1_Channel2_3_IRQn，Channel4~7 共用 DMA1_Channel4_7_IRQn），服务函数第一件事就是用它的多个 `if` 逐条判断到底是哪个通道的哪个事件，确认后立刻清标志。",
+      "prerequisites": [
+        "已调用 DMA_ITConfig 使能对应的中断源",
+        "已通过 NVIC_Init 使能 DMA 的中断通道，且已进入该中断服务函数"
+      ],
+      "registers": [
+        "DMA_ISR",
+        "DMA_CCR1"
+      ],
+      "relatedFunctions": [
+        "DMA_ITConfig",
+        "DMA_ClearITPendingBit",
+        "DMA_GetFlagStatus",
+        "NVIC_Init",
+        "DMA_ClearFlag"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "必须用多个独立的 if（不能用 else if），因为一次进入服务函数可能有多个通道同时置位",
+        "与 DMA_GetFlagStatus 的区别是它额外检查 CCR 里的中断使能位，所以中断服务函数里应该用它",
+        "处理完必须调 DMA_ClearITPendingBit，不清的话服务函数一退出就会被立刻重新进入",
+        "C8T6 上只有 DMA1 有实际中断可用；DMA2 的中断向量虽然存在，但对应外设（SPI3/SDIO/ADC3 等）大多没有引出",
+        "Channel1 有独立向量 DMA1_Channel1_IRQn（常用于 ADC1），Channel2 与 Channel3 共用，Channel4~Channel7 共用"
+      ],
+      "exampleCode": "/* Channel4~Channel7 共用一个向量，必须逐条判断 */\nvoid DMA1_Channel4_7_IRQHandler(void)\n{\n  if (DMA_GetITStatus(DMA1_IT_TC4) != RESET)\n  {\n    DMA_ClearITPendingBit(DMA1_IT_TC4);\n    /* USART1 发送完成 */\n  }\n  if (DMA_GetITStatus(DMA1_IT_TC5) != RESET)\n  {\n    DMA_ClearITPendingBit(DMA1_IT_TC5);\n    /* USART1 接收完成 */\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "ADC1",
+        "ADC3",
+        "DMA1",
+        "DMA1_IT_GL1",
+        "DMA1_IT_GL7",
+        "DMA1_IT_HT1",
+        "DMA1_IT_HT7",
+        "DMA1_IT_TC1",
+        "DMA1_IT_TC4",
+        "DMA1_IT_TC5",
+        "DMA1_IT_TC7",
+        "DMA1_IT_TE1",
+        "DMA1_IT_TE7",
+        "DMA2",
+        "DMA_ClearITPendingBit",
+        "DMA_GetFlagStatus",
+        "DMA_ITConfig",
+        "ITStatus",
+        "NVIC_Init",
+        "RESET",
+        "SDIO",
+        "SET",
+        "SPI3",
+        "USART1"
+      ],
+      "headerLine": 419,
+      "sourceLine": 595,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    },
+    {
+      "id": "DMA_ClearITPendingBit",
+      "name": "DMA_ClearITPendingBit",
+      "peripheral": "DMA",
+      "sectionId": "DMA#sec3",
+      "prototype": "void DMA_ClearITPendingBit(uint32_t DMAy_IT);",
+      "returnType": "void",
+      "params": [
+        {
+          "name": "DMAy_IT",
+          "type": "uint32_t",
+          "descEn": "specifies the DMAy interrupt pending bit to clear. This parameter can be any combination (for the same DMA) of the following values:",
+          "descZh": "要清除的中断挂起位，取 DMA1_IT_GL1 ~ DMA1_IT_GL7、DMA1_IT_TC1 ~ DMA1_IT_TC7、DMA1_IT_HT1 ~ DMA1_IT_HT7、DMA1_IT_TE1 ~ DMA1_IT_TE7，或 DMA2 对应的同名宏。同一个 DMA 的多个位可用 | 组合。"
+        }
+      ],
+      "returnDescEn": "None",
+      "returnDescZh": "无返回值",
+      "briefEn": "Clears the DMAy Channelx's interrupt pending bits.",
+      "briefZh": "清除 DMA 通道的中断挂起位。",
+      "usageZh": "DMA 中断服务函数中的收尾动作，与 DMA_ClearFlag 实现完全相同（都是往 DMA_IFCR 写位）。不清的直接后果是退出中断后挂起位仍为 1，CPU 立刻重新进入同一个服务函数，主循环完全得不到执行。",
+      "prerequisites": [
+        "已进入对应的 DMA 中断服务函数，或已确认该中断源有挂起标志"
+      ],
+      "registers": [
+        "DMA_IFCR"
+      ],
+      "relatedFunctions": [
+        "DMA_GetITStatus",
+        "DMA_ClearFlag",
+        "DMA_ITConfig",
+        "NVIC_Init"
+      ],
+      "remarks": [],
+      "notesZh": [
+        "写 1 清零，未提到的位不受影响",
+        "必须在中断服务函数返回前清掉，否则会陷入反复进入中断的死循环，现象是主循环代码完全不执行",
+        "多通道共用一个向量时（Channel2_3、Channel4_7），每个触发条件都要各自清一次",
+        "推荐把 GL 标志也一起清（DMA1_IT_GL4 | DMA1_IT_TC4），避免残留的全局标志影响后续判断",
+        "它只清 DMA 控制器的标志；如果同时使能了外设侧的中断（如 USART_IT_TC），那些标志还要另外清"
+      ],
+      "exampleCode": "void DMA1_Channel1_IRQHandler(void)\n{\n  if (DMA_GetITStatus(DMA1_IT_TC1) != RESET)\n  {\n    DMA_ClearITPendingBit(DMA1_IT_TC1);   /* 先清标志，再处理数据 */\n    /* 处理 ADC 采集到的缓冲区 */\n  }\n}",
+      "exampleLanguage": "c",
+      "symbolRefs": [
+        "DMA1_IT_GL1",
+        "DMA1_IT_GL4",
+        "DMA1_IT_GL7",
+        "DMA1_IT_HT1",
+        "DMA1_IT_HT7",
+        "DMA1_IT_TC1",
+        "DMA1_IT_TC4",
+        "DMA1_IT_TC7",
+        "DMA1_IT_TE1",
+        "DMA1_IT_TE7",
+        "DMA2",
+        "DMA_ClearFlag",
+        "DMA_GetITStatus",
+        "RESET",
+        "USART_IT_TC"
+      ],
+      "headerLine": 420,
+      "sourceLine": 684,
+      "flags": {
+        "deprecated": false,
+        "isrSafe": false,
+        "inline": false,
+        "macroLike": false
+      },
+      "ai": null,
+      "zhSource": "overlay"
+    }
+  ]
+}

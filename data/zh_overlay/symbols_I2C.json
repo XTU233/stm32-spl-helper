@@ -1,0 +1,16 @@
+{
+  "_comment": "I2C 结构体成员中文。STM32F103C8T6 只有 I2C1（PB6=SCL、PB7=SDA，重映射后 PB8/PB9）与 I2C2（PB10=SCL、PB11=SDA），两台都挂在 APB1 上，常用配置下即 PCLK1=36MHz。",
+  "symbols": {
+    "I2C_InitTypeDef": {
+      "briefZh": "I2C 初始化参数结构体，I2C_Init 用它配置时钟频率、模式、快速模式占空比、自身地址与应答行为。",
+      "membersZh": {
+        "I2C_ClockSpeed": "期望的 SCL 时钟频率，单位 Hz，直接写数值：100000（标准模式）或 400000（快速模式）。库按 APB1 时钟 PCLK1 反算 CCR 与 TRISE：≤100000 走标准模式公式，>100000 切到快速模式并置 F/S 位。I2C_Init 的断言只允许 5000~400000，写超过 400000 会直接触发 assert_failed，写小于 5000 会被断言拦住（I2C_StructInit 的默认值就是 5000，即 5kHz 的最小值）。36MHz PCLK1 下写 400000 得到约 400kHz（CCR=30）、写 100000 得到约 100kHz（CCR=180），分频取整后频率有少许偏差。I2C_Init 内部会调 RCC_GetClocksFreq() 读真实 PCLK1，所以必须等 RCC 配好之后再调，否则算出的分频是按旧时钟来的。",
+        "I2C_Mode": "工作模式，取 I2C_Mode_I2C（普通 I2C，几乎总是用它）、I2C_Mode_SMBusDevice（SMBus 从机）或 I2C_Mode_SMBusHost（SMBus 主机）。I2C_StructInit 的默认值是 I2C_Mode_I2C。做 I2C 时填错了会切到 SMBus 协议（多出超时与 PEC 时序），与常见 EEPROM、MPU6050 等器件的时序不兼容，表现为读不出数据。",
+        "I2C_DutyCycle": "快速模式（I2C_ClockSpeed > 100000）下 SCL 的高低电平比例，取 I2C_DutyCycle_2（Tlow/Thigh=2，可用频率更高，常用）或 I2C_DutyCycle_16_9（Tlow/Thigh=16/9，占空比接近 50%，总线负载重时信号质量更好）。只在快速模式下有效：标准模式下 CCR 的 DUTY 位不存在，填什么都按 1:1 处理。库里的换算公式不同：选 _2 时 CCR = PCLK1/(频率×3)，选 _16_9 时 CCR = PCLK1/(频率×25) 并置 DUTY 位，所以换选值后实际频率也会变。",
+        "I2C_OwnAddress1": "本机作为从机被访问时使用的第一个自身地址，写裸 7 位或 10 位地址值（如 0x0A），不能把读写位一起或进去。断言只允许 ≤ 0x3FF（10 位上限）。地址有效位数由 I2C_AcknowledgedAddress 决定：选 7bit 时只有低 7 位参与比较，选 10bit 时 OAR1 的 ADD0 位标成 10 位地址。作为主机去读写别的从机时这一项不影响通信，填 0 即可。从机最多同时响应两个 7 位地址，第二个用 I2C_OwnAddress2Config 单独配（只能 7 位，且与 OwnAddress1 不同时使用 10 位寻址），所以需要多个地址时不能靠这个字段实现。",
+        "I2C_Ack": "是否在接收到的字节后自动回 ACK，取 I2C_Ack_Enable 或 I2C_Ack_Disable。I2C_StructInit 的默认值是 I2C_Ack_Disable，直接拿默认值去读 EEPROM 会一直等下去。主机读数据必须填 Enable，否则从机发完第一个字节收不到应答，主机会卡在等 RXNE 的 while 里。唯一例外是读最后一个字节前临时调 I2C_AcknowledgeConfig(I2Cx, DISABLE) 发 NACK 通知从机结束，读完再开回来。作为从机接收时也必须 Enable，否则主机的写操作收不到应答。",
+        "I2C_AcknowledgedAddress": "本机作为从机时按 7 位还是 10 位地址被寻址，取 I2C_AcknowledgedAddress_7bit（默认，99% 的场合）或 I2C_AcknowledgedAddress_10bit。这个值会和 I2C_OwnAddress1 一起直接拼进 OAR1，其中 ADD0 位就来自这一项，所以必须与 OwnAddress1 的写法匹配：选 10bit 时 OwnAddress1 也必须是 10 位地址值，否则本机永远匹配不上。作为主机去访问别的器件时这一项不起作用——主机对外发 7 位还是 10 位地址，取决于发送的地址字节写法（I2C_Send7bitAddress 或完整的 10 位地址帧序列）。"
+      }
+    }
+  }
+}
