@@ -8,6 +8,7 @@ import '../providers/app_providers.dart';
 import '../utils/theme.dart';
 import '../widgets/item_actions.dart';
 import '../widgets/keyword_text.dart';
+import '../widgets/library_chip.dart';
 import '../widgets/recent_view_recorder.dart';
 import '../widgets/section_header.dart';
 
@@ -119,22 +120,37 @@ class _SymbolDetailPageState extends ConsumerState<SymbolDetailPage> {
     final peripheral = data?.peripheral(item.peripheral);
     // 该符号涉及的其它符号也允许点击
     final whitelist = <String>{...item.relatedSymbols};
+    final library = item.library;
 
     return Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(
-              item.name,
-              style: const TextStyle(
-                fontFamilyFallback: AppFonts.mono,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
+            // 标题旁挂库徽标：GPIO_InitTypeDef（HAL）与 GPIO_InitTypeDef（SPL）
+            // 同名不同源，靠徽标区分是哪份头文件里的
+            Row(
+              children: <Widget>[
+                Flexible(
+                  child: Text(
+                    item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamilyFallback: AppFonts.mono,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                LibraryChip(library: library, compact: true),
+              ],
             ),
             Text(
               '${item.kindLabelZh}${peripheral != null ? ' · ${peripheral.nameZh}' : ''}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 11.5),
             ),
           ],
@@ -167,7 +183,6 @@ class _SymbolDetailPageState extends ConsumerState<SymbolDetailPage> {
         children: <Widget>[
           // ---- 概要 ----
           _SymbolSummary(item: item, fromRegisters: _fromRegisters),
-
           // ---- 中文说明 ----
           if (item.briefZh.isNotEmpty) ...<Widget>[
             const SectionHeader(icon: Icons.info_outline, title: '说明'),
@@ -333,6 +348,36 @@ class _SymbolSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final rows = <Widget>[];
+
+    // 所属库：SPL/HAL/LL 都有同名符号（如 GPIO_InitTypeDef），
+    // 必须先说清这个符号来自哪一份头文件。
+    rows.add(
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          children: <Widget>[
+            SizedBox(
+              width: 78,
+              child: Text(
+                '所属库',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            LibraryChip(library: item.library),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(
+              child: Text(
+                item.library.labelZh,
+                style: const TextStyle(fontSize: 12.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
 
     // 值
     if (item.value != null && item.value!.isNotEmpty) {
