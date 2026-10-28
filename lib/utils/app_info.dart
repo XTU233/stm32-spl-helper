@@ -16,10 +16,10 @@ const String appName = 'STM32 库函数助手';
 /// `test/settings_test.dart` 有一条测试专门比对两者，不匹配就会失败。
 /// 递增版本号请用 `tools/release.ps1`——它会同时维护 versionCode
 /// 并回读 APK 校验，避免漏改导致新包装不上。
-const String appVersion = '2.0.1';
+const String appVersion = '2.0.2';
 
 /// Android 包名
-const String appPackageName = 'com.example.stm32_spl_helper';
+const String appPackageName = 'io.github.laobinghongcha.stm32helper';
 
 /// 目标芯片
 const String targetChip = 'STM32F103C8T6';

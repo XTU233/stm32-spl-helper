@@ -2,7 +2,7 @@ name: stm32_spl_helper
 description: "STM32F103C8T6 离线查阅工具：标准库（SPL V3.5.0）+ HAL 库（STM32CubeF1 V1.8.7）+ LL 库 + 寄存器直驱。完全离线，无任何网络请求。"
 publish_to: 'none'
 
-version: 2.0.1+7
+version: 2.0.2+8
 environment:
   sdk: ^3.13.5
 

@@ -6,12 +6,29 @@ Flutter + Android，**完全离线**。
 
 ## 下载安装
 
-- 直接下载：**[release/stm32-helper-2.0.0.apk](release/stm32-helper-2.0.0.apk)**（约 56.7 MB，Android 7.0+）
-- 或从 [Releases](../../releases) 页面获取
+- 到 **[Releases](../../releases)** 页面下载最新的 `stm32-helper-*.apk`（约 57 MB，Android 7.0+）
 - 安装时需在系统设置中允许「安装未知来源应用」
+- 每个 Release 附带 `SHA256SUMS.txt`，下载后可自行核对完整性：
+
+  ```powershell
+  # Windows
+  Get-FileHash .\stm32-helper-2.0.2.apk -Algorithm SHA256
+  # macOS / Linux
+  sha256sum stm32-helper-2.0.2.apk
+  ```
+
+> **APK 不放在仓库里**：单个安装包约 57 MB，若提交进 Git 会让仓库体积不可控
+> （历史上提交过的二进制无法真正删除）。官方安装包统一由 Releases 分发。
 
 APK 使用自签名证书（`CN=STM32 Helper`）签发，未上架任何应用商店。
-正式分发请用 `tools/make_keystore.ps1` 生成自己的密钥，不要在仓库里放密钥库。
+签名密钥与口令**不在本仓库**，自行构建发布版请用 `tools/make_keystore.ps1` 生成自己的密钥。
+
+| 项目 | 值 |
+|---|---|
+| 包名 | `io.github.laobinghongcha.stm32helper` |
+| 最低系统 | Android 7.0（API 24） |
+| 目标 SDK | 36 |
+| 签名证书指纹（SHA-256） | `6f0cad01074bfc761483dcefc9347c7c7301c8e5bb1e899454caddfa84a1f33b` |
 
 ## 这是什么
 
@@ -19,24 +36,26 @@ APK 使用自签名证书（`CN=STM32 Helper`）签发，未上架任何应用�
 全局搜索、收藏/最近/笔记、引脚速查、编译错误速查。
 全部数据随包内置，**运行时不发起任何网络请求**（未申请 Android INTERNET 权限）。
 
-### v2.0 新增：四库并存
+### 四库并存
 
 | 库 | 来源 | 函数数 | 说明 |
 |---|---|---:|---|
 | 标准库 SPL | STM32F10x_StdPeriph_Lib V3.5.0 | 488 | `GPIO_Init` 这类传统写法 |
-| HAL 库 | STM32CubeF1 V1.8.7 | 776 | `HAL_GPIO_Init`，STM32CubeMX 生成的代码用的就是它 |
+| HAL 库 | STM32CubeF1 V1.8.7 | 801 | `HAL_GPIO_Init`，STM32CubeMX 生成的代码用的就是它 |
 | LL 库 | STM32CubeF1 V1.8.7 | 1137 | `LL_GPIO_SetPinMode`，比 HAL 更贴近寄存器 |
 | 寄存器直驱 | CMSIS `stm32f103xb.h` | 472 | 直接操作 `GPIOA->ODR` 这类寄存器 |
 
-合计 **2873 个函数**（原 488），另含 3167 条位域定义、12526 个符号。
+合计 **2898 个函数**（原 488），另含 3167 条位域定义、12830 个符号。
 
 使用要点：
 
 - **设置 → 函数库** 里可自由勾选显示哪几套库（至少保留一个）
 - **外设详情页顶部**有库切换条，按库查看函数；每行行尾有库徽标（SPL 蓝 / HAL 绿 / LL 橙 / REG 紫）
 - 「使用总览」按调用顺序**逐条分行、序号顶格**显示，不再挤成一行长句
-- HAL/LL 的 1913 个函数**全部有中文说明**（简述、用法、参数、示例、坑位）
+- HAL/LL 的 1938 个函数**全部有中文说明**（简述、用法、参数、示例、坑位）
 - 寄存器库每个条目就是**一个寄存器**：给位域表（`GPIO_CRL_MODE0 = bits[1:0]`）与直接读写示例
+- HAL 与 SPL 有 12 个同名但成员完全不同的结构体（如 `GPIO_InitTypeDef`），
+  详情页按当前阅读的库给出对应那份，并可在两个版本间切换
 
 ## 当前进度
 
@@ -52,7 +71,14 @@ APK 使用自签名证书（`CN=STM32 Helper`）签发，未上架任何应用�
 | 7 | 引脚速查表 | 已完成 |
 | 8 | 编译错误速查 | 已完成 |
 | 9 | 打磨与打包 | 已完成 |
-| 10 | **四库支持（HAL / LL / 寄存器）+ 使用总览改版** | 已完成 |
+| 10 | 四库支持（HAL / LL / 寄存器）+ 使用总览改版 | 已完成 |
+| 11 | 修复 APK 资源打包与同名类型混淆，转为可发布版本 | 已完成 |
+
+## 许可
+
+代码与中文说明以 [MIT](LICENSE) 许可开源。内置数据中来自 ST 的
+函数原型、英文注释与寄存器定义，版权归 STMicroelectronics 所有，
+详见 [LICENSE](LICENSE) 末尾的第三方声明。
 
 ## 快速开始
 
