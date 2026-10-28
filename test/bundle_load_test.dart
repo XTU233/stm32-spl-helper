@@ -96,6 +96,41 @@ void main() {
       expect(symbols.any((s) => s.name == 'GPIO_InitTypeDef'), isTrue);
     });
 
+    test('loadCore 必须把 HAL/LL 符号一并带上（v2.0.3 回归）', () {
+      // 早先 loadHalSymbols() 写好了但全项目无人调用，
+      // 运行时 data.halSymbols 恒为空 → 搜不到 ADC_HandleTypeDef、
+      // HAL 函数页里的类型名点不动、GPIO_InitTypeDef 永远只给 SPL 那份。
+      // 这条测试锁住「启动即加载」这个契约。
+      expect(
+        data.halSymbols,
+        isNotEmpty,
+        reason: 'loadCore 没带 HAL 符号，HAL 相关功能会静默失效',
+      );
+      expect(
+        data.halSymbols.any((s) => s.name == 'GPIO_InitTypeDef'),
+        isTrue,
+      );
+      // 库限定 id 也必须在索引里
+      expect(data.symbol('GPIO_InitTypeDef@hal'), isNotNull);
+      // 同名两个版本都能解析到
+      expect(data.symbolVariantsOf('GPIO_InitTypeDef').length,
+          greaterThanOrEqualTo(2));
+    });
+
+    test('HAL 函数引用的类型名能在符号表里解析（关键词跳转依赖它）', () async {
+      final bundle = await repo.loadFunctionsOf('GPIO', LibraryKind.hal);
+      final init = bundle.functions.firstWhere((f) => f.id == 'HAL_GPIO_Init');
+      final unresolved = <String>[];
+      for (final p in init.params) {
+        final t = p.type.replaceAll('*', '').replaceAll('const', '').trim();
+        if (t.isEmpty || t == 'void') continue;
+        if (data.symbolOf(t, preferredLib: LibraryKind.hal) == null) {
+          unresolved.add(t);
+        }
+      }
+      expect(unresolved, isEmpty, reason: '这些参数类型解析不到：$unresolved');
+    });
+
     test('loadFunctionsOf 返回值不是"静默空包"：声明数与实际数必须一致', () async {
       // 这条专门防 v2.0.0 那种「文件没打进包 → 容错吞成空包 → 界面全是 0」
       for (final p in data.peripherals) {

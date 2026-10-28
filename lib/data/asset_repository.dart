@@ -175,6 +175,27 @@ class AssetRepository {
     final symbolBundle =
         SymbolBundle.fromJson(await _loadJson('symbols.json'));
 
+    // HAL/LL 符号（3.77 MB）。
+    //
+    // 必须在这里加载，不能留成"按需"：搜索索引、关键词跳转、函数详情页的
+    // 参数类型跳转、同名类型切换全都要用。早先 `loadHalSymbols()` 写好了
+    // 但**全项目无人调用**，于是运行时 halSymbols 恒为空——
+    // 表现就是搜不到 `ADC_HandleTypeDef`、HAL 函数里的类型名点不动、
+    // `GPIO_InitTypeDef` 永远只显示 SPL 那份。
+    //
+    // 3.77 MB 走 compute 在独立 isolate 解析，不阻塞 UI；
+    // 相比"功能静默失效"，这点启动开销是值得的。
+    List<SymbolItem> halSymbols = const <SymbolItem>[];
+    final halSymbolPath = manifest.fileOf('symbolsHal', fallback: 'symbols_hal.json');
+    try {
+      final halBundle =
+          SymbolBundle.fromJson(await _loadJson(halSymbolPath));
+      halSymbols = halBundle.symbols;
+    } catch (e) {
+      // v1 数据没有这个文件；缺失时降级为空，不影响 SPL 部分可用
+      debugPrint('[AssetRepository] HAL 符号加载失败，降级为空：$e');
+    }
+
     // 引脚
     final pinoutPath = manifest.fileOf('pinout', fallback: 'pinout_f103c8t6.json');
     PinoutData pinout;
@@ -213,16 +234,14 @@ class AssetRepository {
       });
 
     // 函数详情不在这里加载（按需读），所以核心数据的 functions 先为空，
-    // 索引里只放外设、符号、引脚、编译错误。
-    //
-    // symbols_hal.json 也**不**在这里读：HAL/LL 符号只在外设详情页里
-    // 展开关键字时才用得上，首屏多读一个 200 KB 文件不值得。
+    // 索引里放外设、符号（SPL + HAL/LL）、引脚、编译错误。
     final data = SplData(
       manifest: manifest,
       chip: chip,
       peripherals: peripherals,
       functions: const [],
       symbols: symbolBundle.symbols,
+      halSymbols: halSymbols,
       pinout: pinout,
       compileErrors: compileErrors,
     );

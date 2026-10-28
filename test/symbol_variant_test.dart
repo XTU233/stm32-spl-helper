@@ -31,8 +31,9 @@ void main() {
 
     setUpAll(() async {
       repo = AssetRepository();
-      final core = await repo.loadCore();
-      data = core.withHalSymbols(await repo.loadHalSymbols());
+      // 直接用 loadCore：v2.0.3 起它已经把 HAL/LL 符号一并加载，
+      // 这里不再手动 withHalSymbols，否则测的就不是运行时真实路径了。
+      data = await repo.loadCore();
     });
 
     test('HAL 的 GPIO_InitTypeDef 被保留，且成员是 HAL 那套', () {

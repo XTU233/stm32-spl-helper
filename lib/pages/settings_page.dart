@@ -296,9 +296,10 @@ class SettingsPage extends ConsumerWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+          // 统计数字从数据里取，不写死——写死必然随数据更新而过时
+          // （这里曾经写死 2873 / HAL 776，实际早已是 2898 / 801）。
           child: Text(
-            '四库合计 2873 个函数：标准库 488 · HAL 776 · LL 1137 · 寄存器 472\n'
-            '48 个引脚 · 15 条常见错误',
+            _footerStats(ref),
             style: TextStyle(
               fontSize: 11.5,
               height: 1.6,
@@ -491,4 +492,23 @@ class _LibrarySection extends ConsumerWidget {
       SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
     );
   }
+}
+
+/// 「关于」页底部的数据统计行。
+///
+/// 从 manifest 与芯片数据里取实际值，**不写死**：写死的数字必然随数据
+/// 更新而失真（这里曾经长期写着「2873 个函数 / HAL 776」，实际已是 2898 / 801）。
+String _footerStats(WidgetRef ref) {
+  final data = ref.watch(splDataProvider).valueOrNull;
+  if (data == null) return '';
+  final s = data.manifest.stats;
+  final counts = s.libraryFunctionCounts;
+  final perLib = <String>[
+    if (counts['spl'] != null) '标准库 ${counts['spl']}',
+    if (counts['hal'] != null) 'HAL ${counts['hal']}',
+    if (counts['ll'] != null) 'LL ${counts['ll']}',
+    if (counts['reg'] != null) '寄存器 ${counts['reg']}',
+  ].join(' · ');
+  return '四库合计 ${s.functionCount} 个函数：$perLib\n'
+      '${s.pinCount} 个引脚 · ${s.compileErrorCount} 条常见错误';
 }

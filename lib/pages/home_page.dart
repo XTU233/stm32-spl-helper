@@ -71,7 +71,10 @@ class HomePage extends ConsumerWidget {
                     0,
                     (a, p) => a + _enabledFunctionCount(p, enabled),
                   ),
-                  symbols: data.symbols.length,
+                  // 符号数取 manifest 的统计值，与设置页的「数据统计」同一口径。
+                  // 不能再用 data.symbols.length：那只是 SPL 的 API 符号（2450），
+                  // 不含 HAL/LL 的 5021 个，也不含寄存器位定义。
+                  symbols: data.manifest.stats.symbolCount,
                   pins: data.pinout.pins.length,
                   // 各库函数数（只统计启用的库，与上面的合计口径一致）
                   perLibrary: <LibraryKind, int>{

@@ -231,19 +231,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
   /// 判断一条搜索结果属于哪个库；不属于任何库时返回 null。
   ///
-  /// 搜索结果里目前没有 library 字段（索引在 data 层，不在本次改动范围内），
-  /// 所以按 id 前缀反推——契约里三类库的前缀天然不冲突
-  /// （HAL_ / LL_ / REG_），剩下的都算 SPL。
-  static LibraryKind? _libraryOfHit(SearchHit h) {
-    if (h.itemType != ItemType.function && h.itemType != ItemType.symbol) {
-      return null;
-    }
-    final id = h.id;
-    if (id.startsWith('HAL_')) return LibraryKind.hal;
-    if (id.startsWith('LL_')) return LibraryKind.ll;
-    if (id.startsWith('REG_')) return LibraryKind.reg;
-    return LibraryKind.spl;
-  }
+  /// v2.0.3 起直接用索引里带的 `library` 字段，不再按 id 前缀猜。
+  /// 前缀推断的问题：HAL 里 3313 个符号并不带 `HAL_` 前缀
+  /// （`GPIO_InitTypeDef@hal`、`ADC_HandleTypeDef`、各类 Callback typedef…），
+  /// 会被一律算成标准库；用户关掉 SPL 想只看 HAL 时这些符号会整片消失。
+  static LibraryKind? _libraryOfHit(SearchHit h) => h.library;
 
   /// 统计每类结果数，用于筛选条上的角标。
   Map<SearchCategory, int> _countsByCategory(List<SearchHit> hits) {

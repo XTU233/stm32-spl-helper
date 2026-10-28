@@ -54,7 +54,12 @@ final symbolMatcherProvider = Provider<SymbolMatcher?>((ref) {
 
   return SymbolMatcher(
     functions: functionNames,
-    symbols: data.symbols.map((s) => s.name),
+    // SPL 与 HAL/LL 的符号都要收：只给 SPL 的话，HAL 函数页正文里的
+    // `GPIO_InitTypeDef`、`HAL_StatusTypeDef` 这些类型名全点不动。
+    symbols: <String>[
+      ...data.symbols.map((s) => s.name),
+      ...data.halSymbols.map((s) => s.name),
+    ],
   );
 });
 
