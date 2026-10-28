@@ -56,6 +56,15 @@ class SplData {
   /// 符号 id → 符号（SPL 符号 + HAL 符号）
   final Map<String, SymbolItem> symbolById;
 
+  /// 「名字@库」→ 符号（v2.0.1 新增）。
+  ///
+  /// HAL/LL 与 SPL 各有一套同名但成员布局不同的结构体
+  /// （`GPIO_InitTypeDef`：HAL 是 Pin/Mode/Pull/Speed，SPL 是
+  /// GPIO_Pin/GPIO_Speed/GPIO_Mode）。数据层把它们存成
+  /// `GPIO_InitTypeDef@hal` 与 `GPIO_InitTypeDef`，靠这个索引区分，
+  /// 跳转时按当前阅读的库选对应那份。
+  final Map<String, SymbolItem> _symbolByQualified;
+
   /// 外设 id → 该外设的函数列表（跨库，按库顺序）
   final Map<String, List<FunctionItem>> functionsByPeripheral;
 
@@ -100,6 +109,7 @@ class SplData {
   })  : peripheralById = {for (final p in peripherals) p.id: p},
         functionById = {for (final f in functions) f.id: f},
         symbolById = {for (final s in [...symbols, ...halSymbols]) s.id: s},
+        _symbolByQualified = _indexQualifiedSymbols([...symbols, ...halSymbols]),
         functionsByPeripheral = _groupFunctions(functions),
         _functionsByPeripheralLib = _groupFunctionsByLib(functions),
         symbolsByPeripheral = _groupSymbols([...symbols, ...halSymbols]),
@@ -108,6 +118,25 @@ class SplData {
         _allFunctionIds = _collectFunctionIds(peripherals),
         _functionToPeripheral = _mapFunctionToPeripheral(peripherals),
         _functionToLibrary = _mapFunctionToLibrary(peripherals);
+
+  /// 建立「名字@库」索引。
+  ///
+  /// 数据里库限定符号的 id 形如 `GPIO_InitTypeDef@hal`，而函数正文里
+  /// 引用它的写法是 `GPIO_InitTypeDef`。为了让「在 HAL 页点它 → 打开 HAL 那份」
+  /// 成立，这里登记两种键：精确 id 本身，以及 `name@library`（同一符号两者相同，
+  /// 但 name 与 id 分离后仍能命中，防止将来改 id 规则时跳转失效）。
+  /// 只为 id 带 `@` 的符号建键，普通符号不重复占内存。
+  static Map<String, SymbolItem> _indexQualifiedSymbols(
+    List<SymbolItem> all,
+  ) {
+    final map = <String, SymbolItem>{};
+    for (final s in all) {
+      if (!s.id.contains('@')) continue;
+      map[s.id] = s;
+      map.putIfAbsent('${s.name}@${s.library.raw}', () => s);
+    }
+    return map;
+  }
 
   /// 换出一个带 HAL/LL 符号的新实例（索引随之重建）。
   ///
@@ -298,7 +327,68 @@ class SplData {
 
 
   /// 判断一个名字是否是库内符号（关键词跳转的白名单判断）。
-  bool isKnownSymbol(String name) => symbolById.containsKey(name);
+  ///
+  /// 接受两种写法：
+  ///   - 普通名字 `GPIO_InitTypeDef`；
+  ///   - 库限定 id `GPIO_InitTypeDef@hal`（HAL/SPL 同名不同类型时用）。
+  bool isKnownSymbol(String name) =>
+      symbolById.containsKey(name) || _symbolByQualified.containsKey(name);
+
+  /// 「名字@库」→ 符号 的索引（v2.0.1 新增）。
+  ///
+  /// HAL 与 SPL 都定义了 `GPIO_InitTypeDef`，但成员完全不同
+  /// （HAL: Pin/Mode/Pull/Speed；SPL: GPIO_Pin/GPIO_Speed/GPIO_Mode）。
+  /// 数据层把 HAL 那份存成 `GPIO_InitTypeDef@hal`，两者因此能在同一个
+  /// 全局索引里共存。这个映射用于：
+  ///   1. 详情页按 `name@lib` 精确打开某一库的版本；
+  ///   2. 跳转时优先选**与当前阅读上下文同库**的那份。
+  Map<String, SymbolItem> get symbolByQualifiedName => _symbolByQualified;
+
+  /// 去掉 `@lib` 后缀，返回基础名字（无后缀时原样返回）。
+  static String stripLibSuffix(String name) {
+    final at = name.lastIndexOf('@');
+    return at <= 0 ? name : name.substring(0, at);
+  }
+
+  /// 在给定库上下文中解析一个符号名（v2.0.1 新增，跳转链路的核心）。
+  ///
+  /// 优先级：
+  ///   1. 精确 id（`GPIO_InitTypeDef@hal` 这种）——调用方明确指定了库；
+  ///   2. `name@preferredLib`——当前正在读 HAL 函数，就优先给 HAL 那份定义；
+  ///   3. 无后缀的同名符号——SPL 那份（老行为，向后兼容）；
+  ///   4. `name@hal`——最后的兜底。
+  ///
+  /// [preferredLib] 传 null 时退化为老行为（只查无后缀 id）。
+  SymbolItem? symbolOf(String name, {LibraryKind? preferredLib}) {
+    final direct = symbolById[name];
+    if (direct != null && name.contains('@')) return direct;
+    if (preferredLib != null) {
+      final qualified = _symbolByQualified['$name@${preferredLib.raw}'];
+      if (qualified != null) return qualified;
+    }
+    if (direct != null) return direct;
+    return _symbolByQualified['$name@hal'];
+  }
+
+  /// 取同名符号的**全部版本**（v2.0.1 新增）。
+  ///
+  /// 用于详情页的「这个类型在其它库里也有定义」切换入口：
+  /// `GPIO_InitTypeDef` 会同时返回 SPL 那份与 `GPIO_InitTypeDef@hal`。
+  /// 按库顺序（spl→hal→ll→reg）排列，保证切换入口的呈现顺序稳定。
+  List<SymbolItem> symbolVariantsOf(String name) {
+    final base = stripLibSuffix(name);
+    final out = <SymbolItem>[];
+    final seen = <String>{};
+    final plain = symbolById[base];
+    if (plain != null && seen.add(plain.id)) out.add(plain);
+    for (final lib in LibraryKind.ordered) {
+      final q = _symbolByQualified['$base@${lib.raw}'];
+      if (q != null && seen.add(q.id)) out.add(q);
+    }
+    out.sort((a, b) => a.library.orderIndex.compareTo(b.library.orderIndex));
+    return out;
+  }
+
 
   /// 判断一个名字是否是库内函数。
   ///

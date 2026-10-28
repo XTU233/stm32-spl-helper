@@ -203,5 +203,223 @@
     "prerequisites": [
       "SysTick 已由 HAL_Init 或 HAL_SYSTICK_Config 启动"
     ]
+  },
+  "HAL_Init": {
+    "briefZh": "初始化 HAL 库：配置 Flash 预取、设置 NVIC 优先级分组、启动 SysTick 节拍中断，并调用 HAL_MspInit() 让用户补底层初始化。",
+    "usageZh": "main() 里的**第一句**（在 SystemInit 之后、任何外设初始化之前）。不调它的话 HAL_Delay/HAL_GetTick 不会走（节拍中断没起来），所有 xxx_Init 里的超时判断都会立刻失败。",
+    "notesZh": [
+      "HAL_Init 只做通用初始化，具体的时钟/引脚要在 HAL_MspInit() 或之后自己配。",
+      "CubeMX 生成的代码已经帮你调了，手写工程千万不能忘。",
+      "默认节拍 1ms（HAL_TICK_FREQ_DEFAULT），要改就重写 HAL_InitTick()。"
+    ],
+    "exampleCode": "int main(void)\n{\n  HAL_Init();                       /* 必须最先调用 */\n  SystemClock_Config();             /* 配置 72MHz 主频 */\n  MX_GPIO_Init();\n  while (1) { }\n}",
+    "prerequisites": [
+      "系统时钟已由 SystemInit() / 启动文件建立（HAL_Init 在它之后调用）"
+    ]
+  },
+  "HAL_DeInit": {
+    "briefZh": "把 HAL 恢复到复位后的状态：关 SysTick 节拍、复位 NVIC 优先级分组，并调用 HAL_MspDeInit()。",
+    "usageZh": "几乎只在「软件复位前」或「把 MCU 交给别的固件（如 bootloader 跳转）」时用。正常应用不需要调。",
+    "notesZh": [
+      "调完之后 HAL_Delay/HAL_GetTick 都不可用，除非重新 HAL_Init()。"
+    ],
+    "exampleCode": "/* 跳转到 bootloader 之前把 HAL 收干净 */\nHAL_DeInit();\n__disable_irq();\nJumpToBootloader();",
+    "prerequisites": []
+  },
+  "HAL_MspInit": {
+    "briefZh": "MSP 底层初始化回调（__weak 空实现）：由 HAL_Init() 自动调用，用来放与芯片/板级相关的初始化。",
+    "usageZh": "在用户代码里**重新实现同名函数**（不要改库文件），把 SysTick 时钟源、AFIO 时钟、EXTI 时钟这类「HAL 不知道、但你的板子需要」的初始化写进去。",
+    "notesZh": [
+      "库里的实现是 __weak 空的，不重写就等于什么都没做。",
+      "CubeMX 会把它生成到 stm32f1xx_hal_msp.c 里。"
+    ],
+    "exampleCode": "void HAL_MspInit(void)\n{\n  __HAL_RCC_AFIO_CLK_ENABLE();\n  __HAL_RCC_PWR_CLK_ENABLE();\n  /* 关掉 JTAG 保留 SWD，释放 PA15/PB3/PB4 作普通 IO */\n  __HAL_AFIO_REMAP_SWJ_NOJTAG();\n}",
+    "prerequisites": []
+  },
+  "HAL_MspDeInit": {
+    "briefZh": "MSP 底层反初始化回调（__weak 空实现）：由 HAL_DeInit() 调用，用来撤销 HAL_MspInit() 做的事。",
+    "usageZh": "一般不用实现。只有在需要把外设资源完全交还给别的固件时才重写。",
+    "notesZh": [],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_InitTick": {
+    "briefZh": "配置 HAL 的 1ms 节拍来源（默认用 SysTick），是 HAL_Delay / HAL_GetTick 能用起来的前提。",
+    "usageZh": "由 HAL_Init() 自动调用。若要改用 TIM 做节拍源、或改节拍频率，就重写本函数。",
+    "notesZh": [
+      "重写后必须在函数末尾调用 HAL_SYSTICK_Config() 或自行启动定时器，否则节拍不走。",
+      "改了主频之后要重新调本函数（否则 1ms 不再是 1ms）。"
+    ],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_IncTick": {
+    "briefZh": "把 HAL 的毫秒计数加一，由 SysTick 中断（SysTick_Handler）自动调用。",
+    "usageZh": "正常不用手动调。只有当你把 HAL 节拍改成用别的定时器时，才需要在那个定时器的中断里调它。",
+    "notesZh": [
+      "在中断里调用，不要在里面做耗时操作。"
+    ],
+    "exampleCode": "/* 自定义节拍源时，在定时器中断里补这一句 */\nvoid TIM6_IRQHandler(void)\n{\n  HAL_TIM_IRQHandler(&htim6);\n  HAL_IncTick();\n}",
+    "prerequisites": []
+  },
+  "HAL_GetTick": {
+    "briefZh": "返回开机以来的毫秒数（由 SysTick 中断累加）。",
+    "usageZh": "写非阻塞延时、做超时判断的标准做法：记一个起点，循环里比较 `HAL_GetTick() - start > timeout`。比 HAL_Delay 好在不会卡住 CPU。",
+    "notesZh": [
+      "计数是 32 位，约 49.7 天溢出一次；用「差值」比较就不会被溢出坑到。",
+      "节拍没起来（没调 HAL_Init）时它永远返回 0。"
+    ],
+    "exampleCode": "uint32_t start = HAL_GetTick();\nwhile (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) {\n  if (HAL_GetTick() - start > 500) { /* 超时 500ms */ break; }\n}",
+    "prerequisites": [
+      "HAL_Init() 已调用，SysTick 节拍在跑"
+    ]
+  },
+  "HAL_GetTickPrio": {
+    "briefZh": "返回节拍中断（SysTick）当前配置的中断优先级。",
+    "usageZh": "排查中断优先级分组问题时用：可以确认节拍中断的优先级是否高于/低于你的外设中断。",
+    "notesZh": [],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_SetTickFreq": {
+    "briefZh": "改变 HAL 节拍频率（如从 1kHz 改到 100Hz），会重新配置 SysTick。",
+    "usageZh": "需要降低 SysTick 中断开销时用（比如做低功耗，1ms 一次太频繁）。改完要重新调 HAL_InitTick() 才真正生效。",
+    "notesZh": [
+      "改频率后所有基于 HAL_GetTick 的超时时间语义随之改变，注意换算。"
+    ],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_Delay": {
+    "briefZh": "忙等延时指定毫秒数（基于 SysTick 节拍）。",
+    "usageZh": "简单场景直接用。但它**是阻塞的**：延时期间 CPU 干不了别的，也进不了低功耗。中断里绝对不要调（节拍中断被自己挡住会死等）。",
+    "notesZh": [
+      "在中断服务函数里调用会导致死循环——节拍中断优先级低于当前中断时永远走不动。",
+      "要同时干别的就用 HAL_GetTick() 做非阻塞计时。",
+      "延时精度是 1ms 量级，需要微秒级用 DWT->CYCCNT 或定时器。"
+    ],
+    "exampleCode": "HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);\nHAL_Delay(500);                       /* 亮 500ms（阻塞） */\nHAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);",
+    "prerequisites": [
+      "HAL_Init() 已调用，SysTick 节拍在跑"
+    ]
+  },
+  "HAL_SuspendTick": {
+    "briefZh": "暂停 SysTick 节拍中断（不关 SysTick 本身，只是不让它进中断）。",
+    "usageZh": "进低功耗或临界区前临时停掉节拍中断，减少唤醒次数；配合 HAL_ResumeTick() 恢复。",
+    "notesZh": [
+      "暂停期间 HAL_GetTick 不再增长，HAL_Delay 会卡住。"
+    ],
+    "exampleCode": "HAL_SuspendTick();\n__WFI();\nHAL_ResumeTick();",
+    "prerequisites": []
+  },
+  "HAL_ResumeTick": {
+    "briefZh": "恢复被 HAL_SuspendTick() 暂停的 SysTick 节拍中断。",
+    "usageZh": "与 HAL_SuspendTick() 成对使用，退出低功耗后调一次。",
+    "notesZh": [],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_GetHalVersion": {
+    "briefZh": "返回 HAL 库的版本号（形如 0x01080007，即 1.8.7）。",
+    "usageZh": "排查「代码是按新版 HAL 写的、实际链接的是旧版」这类问题时用；也可以打印出来确认工程依赖的库版本。",
+    "notesZh": [
+      "版本号是 24 位打包的，用 (v>>24).(v>>16 & 0xFF).(v & 0xFFFF) 拆开看。"
+    ],
+    "exampleCode": "uint32_t v = HAL_GetHalVersion();\nprintf(\"HAL %d.%d.%d\\n\", v >> 24, (v >> 16) & 0xFF, v & 0xFFFF);",
+    "prerequisites": []
+  },
+  "HAL_GetREVID": {
+    "briefZh": "返回芯片的修订版本号（Revision ID），可以据此区分 A/B/C/D 等不同批次。",
+    "usageZh": "遇到「同一份代码在旧批次芯片上异常」时，用来确认手上的片子是哪一版。",
+    "notesZh": [
+      "值是从 DBGMCU->IDCODE 里取的。"
+    ],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_GetDEVID": {
+    "briefZh": "返回芯片的器件 ID（Device ID），可用来识别具体型号（如 0x410 对应 F103 中容量）。",
+    "usageZh": "写通用固件时做运行时型号判断。",
+    "notesZh": [],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_GetUIDw0": {
+    "briefZh": "返回芯片唯一 ID 的第 0 个字（共 96 位的 32 位低段）。",
+    "usageZh": "生成设备唯一序列号、做授权绑定：把 UIDw0/w1/w2 三个字拼起来就是 96 位全球唯一 ID。",
+    "notesZh": [
+      "同一颗芯片读多少次都一样，不同芯片必然不同，很适合做设备指纹。"
+    ],
+    "exampleCode": "uint32_t uid[3] = { HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2() };",
+    "prerequisites": []
+  },
+  "HAL_GetUIDw1": {
+    "briefZh": "返回芯片唯一 ID 的第 1 个字（96 位里的中段 32 位）。",
+    "usageZh": "与 HAL_GetUIDw0 / HAL_GetUIDw2 拼成完整 96 位 UID。",
+    "notesZh": [],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_GetUIDw2": {
+    "briefZh": "返回芯片唯一 ID 的第 2 个字（96 位里的高段 32 位）。",
+    "usageZh": "与 HAL_GetUIDw0 / HAL_GetUIDw1 拼成完整 96 位 UID。",
+    "notesZh": [],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_DBGMCU_EnableDBGSleepMode": {
+    "briefZh": "让调试器在 Sleep 低功耗模式下仍能保持连接（休眠时不断开 SWD）。",
+    "usageZh": "单步调试低功耗代码时打开，否则一进 Sleep 调试器就掉线、无法继续单步。",
+    "notesZh": [
+      "会增加 Sleep 模式下的功耗，量产固件里不要留着。"
+    ],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_DBGMCU_DisableDBGSleepMode": {
+    "briefZh": "恢复默认：进入 Sleep 模式时暂停调试（省电，但调试器会掉线）。",
+    "usageZh": "调试完低功耗代码后调回来，或量产固件里保持默认。",
+    "notesZh": [],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_DBGMCU_EnableDBGStopMode": {
+    "briefZh": "让调试器在 Stop 模式下仍能保持连接。",
+    "usageZh": "调试 Stop 低功耗时打开。Stop 模式会关掉大部分时钟，不开这个基本没法调。",
+    "notesZh": [
+      "显著增加 Stop 模式功耗。"
+    ],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_DBGMCU_DisableDBGStopMode": {
+    "briefZh": "恢复默认：进入 Stop 模式时断开调试。",
+    "usageZh": "调试完成后调回来。",
+    "notesZh": [],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_DBGMCU_EnableDBGStandbyMode": {
+    "briefZh": "让调试器在 Standby 模式下仍能保持连接。",
+    "usageZh": "Standby 唤醒后程序从头跑（相当于复位），调试时打开可以观察唤醒过程。",
+    "notesZh": [
+      "Standby 下调试体验仍然受限，多数情况还是靠串口打日志。"
+    ],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_DBGMCU_DisableDBGStandbyMode": {
+    "briefZh": "恢复默认：进入 Standby 模式时断开调试。",
+    "usageZh": "调试完成后调回来。",
+    "notesZh": [],
+    "exampleCode": "",
+    "prerequisites": []
+  },
+  "HAL_GetTickFreq": {
+    "briefZh": "返回当前 HAL 节拍频率（HAL_TICK_FREQ_10HZ / 100HZ / 1KHZ）。",
+    "usageZh": "读回 HAL_SetTickFreq() 设置的值，做超时换算时确认节拍单位。",
+    "notesZh": [],
+    "exampleCode": "",
+    "prerequisites": []
   }
 }

@@ -28,7 +28,9 @@
         "系统已上电，IWDG 由 LSI 驱动，无需开 RCC 时钟（LSI 由 IWDG 自己使能）"
       ],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [
         "超时时间 = (4 × 2^Prescaler) × Reload / 40000 秒。LSI 典型 40kHz 但误差大（F1 手册标 30~60kHz），所以算出的超时值要留足余量",

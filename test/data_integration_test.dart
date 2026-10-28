@@ -1085,7 +1085,17 @@ void main() {
       final seen = <String>{};
       final dup = <String>[];
       for (final s in bundle.symbols) {
-        expect(s.id, s.name, reason: 'symbols_hal 里 id 与 name 不一致：${s.name}');
+        // v2.0.1 起 id 允许是「库限定 id」——当 HAL/LL 与 SPL 定义同名但
+        // 成员完全不同的类型时（GPIO_InitTypeDef 的 Pin/Mode/Pull/Speed
+        // vs GPIO_Pin/GPIO_Speed/GPIO_Mode），必须保留两者且能区分，
+        // 于是 HAL 那份的 id 记作 GPIO_InitTypeDef@hal，name 仍是原名。
+        final isQualified = s.id == '${s.name}@${s.library.raw}';
+        expect(
+          isQualified || s.id == s.name,
+          isTrue,
+          reason: 'symbols_hal 里 id 既不是 name 也不是 name@lib：'
+              'id=${s.id} name=${s.name} lib=${s.library.raw}',
+        );
         if (!seen.add(s.id)) dup.add(s.id);
         // 只允许 hal / ll 两类
         expect(
@@ -1095,6 +1105,13 @@ void main() {
         );
       }
       expect(dup, isEmpty, reason: 'symbols_hal 的 id 重复：${dup.take(10)}');
+
+      // 库限定 id 必须确实带有库后缀，别写成别的形状
+      final badSuffix = bundle.symbols
+          .where((s) => s.id != s.name && !s.id.endsWith('@${s.library.raw}'))
+          .map((s) => s.id)
+          .toList();
+      expect(badSuffix, isEmpty, reason: '库限定 id 的后缀与 library 不符：$badSuffix');
     });
   });
 }

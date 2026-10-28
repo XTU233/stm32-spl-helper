@@ -146,9 +146,14 @@ def main() -> int:
     peripheral_ids = {p["id"] for p in peripherals}
 
     # ---- 1. id 唯一性 ----
+    #
+    # 符号按 `(名字, 库)` 去重，不能只看名字：v2.0.1 起，HAL/LL 与 SPL
+    # 各有一套同名但成员不同的结构体（GPIO_InitTypeDef 的
+    # Pin/Mode/Pull/Speed vs GPIO_Pin/GPIO_Speed/GPIO_Mode），
+    # 两者靠「库限定 id」共存，名字相同是**预期**的。
+    # 同一库里出现同名才是真问题（说明有重复定义漏了去重）。
     for label, items, key in (
         ("函数", functions, "id"),
-        ("符号", symbols, "name"),
         ("外设", peripherals, "id"),
     ):
         seen: dict[str, int] = {}
@@ -159,6 +164,15 @@ def main() -> int:
         if dup:
             preview = list(dup.items())[:10]
             c.error(f"{label} id 重复 {len(dup)} 个：{preview}")
+
+    seen_sym: dict[tuple[str, str], int] = {}
+    for s in symbols:
+        k = (s["name"], s.get("library") or "spl")
+        seen_sym[k] = seen_sym.get(k, 0) + 1
+    dup_sym = {k: v for k, v in seen_sym.items() if v > 1}
+    if dup_sym:
+        preview = list(dup_sym.items())[:10]
+        c.error(f"符号在同一库内重复 {len(dup_sym)} 个：{preview}")
 
     # 引脚号唯一
     if pinout:
@@ -273,7 +287,17 @@ def main() -> int:
                 if name not in symbol_ids:
                     missing_types.setdefault(name, []).append(s["name"])
     if missing_types:
+        # 已知的两个是解析器的边界情况，不影响使用（详情页显示为纯文本，
+        # 不会断链、也不会报错）：
+        #   * ADC_Common_TypeDef —— 定义在 CMSIS 的 stm32f103xb.h 里，
+        #     属于寄存器层，本 APP 不为它建 HAL 符号；
+        #   * NOR_HandleTypeDef —— 用 `typedef struct __NOR_HandleTypeDef
+        #     #else typedef struct #endif {...}` 这种条件编译写法，
+        #     且 NOR 在本型号上不适用（无外部 NOR Flash 控制器引出）。
+        known_ok = {"ADC_Common_TypeDef", "NOR_HandleTypeDef"}
         for name, users in sorted(missing_types.items())[:15]:
+            if name in known_ok:
+                continue
             c.warn(
                 f"类型 {name} 没有对应的符号条目"
                 f"（被 {len(users)} 处引用，如 {users[:3]}），详情页里它会显示为纯文本"

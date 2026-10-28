@@ -556,6 +556,7 @@ class _FunctionDetailPageState extends ConsumerState<FunctionDetailPage> {
                     title: '函数原型',
                     horizontalScroll: true,
                     whitelist: whitelist,
+                    library: item.library,
                   ),
                 ),
 
@@ -581,7 +582,11 @@ class _FunctionDetailPageState extends ConsumerState<FunctionDetailPage> {
                     subtitle: '${item.params.length} 个参数',
                   ),
                   for (final p in item.params)
-                    _ParamTile(param: p, whitelist: whitelist),
+                    _ParamTile(
+                      param: p,
+                      whitelist: whitelist,
+                      library: item.library,
+                    ),
                 ] else ...<Widget>[
                   SectionHeader(
                     key: _sectionKeys['params'],
@@ -616,6 +621,7 @@ class _FunctionDetailPageState extends ConsumerState<FunctionDetailPage> {
                       KeywordText(
                         item.displayReturn,
                         whitelist: whitelist,
+                        library: library,
                         style: const TextStyle(fontSize: 13, height: 1.65),
                       ),
                       if (item.returnDescEn.isNotEmpty &&
@@ -651,6 +657,7 @@ class _FunctionDetailPageState extends ConsumerState<FunctionDetailPage> {
                     child: KeywordText(
                       item.usageZh,
                       whitelist: whitelist,
+                      library: library,
                       style: const TextStyle(fontSize: 13, height: 1.75),
                     ),
                   ),
@@ -669,6 +676,7 @@ class _FunctionDetailPageState extends ConsumerState<FunctionDetailPage> {
                       text: pre,
                       whitelist: whitelist,
                       icon: Icons.check_circle_outline,
+                      library: item.library,
                       color: const Color(0xFF3E9C5A),
                     ),
                 ],
@@ -703,6 +711,7 @@ class _FunctionDetailPageState extends ConsumerState<FunctionDetailPage> {
                       code: item.exampleCode,
                       title: '示例代码',
                       whitelist: whitelist,
+                      library: item.library,
                     ),
                   ),
                 ],
@@ -721,6 +730,7 @@ class _FunctionDetailPageState extends ConsumerState<FunctionDetailPage> {
                         text: n,
                         whitelist: whitelist,
                         icon: Icons.report_problem_outlined,
+                        library: item.library,
                         color: scheme.error,
                       ),
                     for (final r in item.remarks)
@@ -728,6 +738,7 @@ class _FunctionDetailPageState extends ConsumerState<FunctionDetailPage> {
                         text: r,
                         whitelist: whitelist,
                         icon: Icons.info_outline,
+                        library: item.library,
                       ),
                   ],
 
@@ -1071,7 +1082,14 @@ class _ParamTile extends ConsumerWidget {
   final FunctionParam param;
   final Set<String> whitelist;
 
-  const _ParamTile({required this.param, required this.whitelist});
+  /// 函数所属库，用于决定参数类型名点开哪一份定义
+  final LibraryKind library;
+
+  const _ParamTile({
+    required this.param,
+    required this.whitelist,
+    required this.library,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1114,6 +1132,7 @@ class _ParamTile extends ConsumerWidget {
                 child: KeywordText(
                   param.type,
                   whitelist: whitelist,
+                  library: library,
                   style: TextStyle(
                     fontFamilyFallback: AppFonts.mono,
                     fontSize: 11.5,
@@ -1128,6 +1147,7 @@ class _ParamTile extends ConsumerWidget {
             KeywordText(
               param.descZh,
               whitelist: whitelist,
+              library: library,
               style: const TextStyle(fontSize: 13, height: 1.6),
             ),
           ],
@@ -1156,10 +1176,14 @@ class _BulletLine extends StatelessWidget {
   final IconData icon;
   final Color? color;
 
+  /// 当前函数所属库，用于决定文中类型名点开哪一份定义
+  final LibraryKind library;
+
   const _BulletLine({
     required this.text,
     required this.whitelist,
     required this.icon,
+    required this.library,
     this.color,
   });
 
@@ -1181,6 +1205,7 @@ class _BulletLine extends StatelessWidget {
             child: KeywordText(
               text,
               whitelist: whitelist,
+              library: library,
               style: const TextStyle(fontSize: 13, height: 1.6),
             ),
           ),

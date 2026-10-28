@@ -1745,7 +1745,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "uint8_t cmd[2] = {0x9F, 0x00};   /* 读 JEDEC ID */\n\nHAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_RESET);\nHAL_SPI_Transmit(&hspi1, cmd, 2, HAL_MAX_DELAY);\nHAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_SET);",
@@ -1831,7 +1833,8 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
-        "HAL_SPI_TransmitReceive"
+        "HAL_SPI_TransmitReceive",
+        "HAL_GetTick"
       ],
       "remarks": [],
       "notesZh": [],
@@ -1927,7 +1930,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "/* 读从机寄存器：必须用 TransmitReceive，\n   因为 SPI 是全双工，发命令的同时就在收数据 */\nuint8_t tx[2] = {0x80 | reg, 0x00};\nuint8_t rx[2] = {0};\n\nHAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_RESET);\nHAL_SPI_TransmitReceive(&hspi1, tx, rx, 2, HAL_MAX_DELAY);\nHAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_SET);\n\n/* rx[1] 才是寄存器内容，rx[0] 是发命令时收到的垃圾 */\nreturn rx[1];",

@@ -40,7 +40,8 @@
         "HAL_CAN_SleepCallback",
         "HAL_CAN_WakeUpFromRxMsgCallback",
         "HAL_CAN_ErrorCallback",
-        "HAL_CAN_MspInit"
+        "HAL_CAN_MspInit",
+        "HAL_GetTick"
       ],
       "remarks": [],
       "notesZh": [],
@@ -443,7 +444,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "",
@@ -492,7 +495,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "",

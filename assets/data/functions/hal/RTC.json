@@ -1008,7 +1008,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "",
@@ -1103,7 +1105,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [
         "This function must be called before any read operation after an APB reset or an APB clock stop."
       ],
@@ -1439,7 +1443,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "",

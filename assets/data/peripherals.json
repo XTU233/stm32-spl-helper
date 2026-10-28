@@ -7485,6 +7485,47 @@
       "sections": [
         {
           "id": "CORTEX@hal#sec1",
+          "title": "HAL 核心｜初始化与反初始化",
+          "titleEn": "HAL 核心｜Initialization and de-initialization Functions",
+          "functionIds": [
+            "HAL_Init",
+            "HAL_DeInit",
+            "HAL_MspInit",
+            "HAL_MspDeInit",
+            "HAL_InitTick"
+          ],
+          "library": "hal"
+        },
+        {
+          "id": "CORTEX@hal#sec2",
+          "title": "HAL 核心｜控制函数",
+          "titleEn": "HAL 核心｜HAL Control functions",
+          "functionIds": [
+            "HAL_IncTick",
+            "HAL_GetTick",
+            "HAL_GetTickPrio",
+            "HAL_SetTickFreq",
+            "HAL_GetTickFreq",
+            "HAL_Delay",
+            "HAL_SuspendTick",
+            "HAL_ResumeTick",
+            "HAL_GetHalVersion",
+            "HAL_GetREVID",
+            "HAL_GetDEVID",
+            "HAL_GetUIDw0",
+            "HAL_GetUIDw1",
+            "HAL_GetUIDw2",
+            "HAL_DBGMCU_EnableDBGSleepMode",
+            "HAL_DBGMCU_DisableDBGSleepMode",
+            "HAL_DBGMCU_EnableDBGStopMode",
+            "HAL_DBGMCU_DisableDBGStopMode",
+            "HAL_DBGMCU_EnableDBGStandbyMode",
+            "HAL_DBGMCU_DisableDBGStandbyMode"
+          ],
+          "library": "hal"
+        },
+        {
+          "id": "CORTEX@hal#sec3",
           "title": "HAL 初始化与反初始化",
           "titleEn": "Initialization and de-initialization functions",
           "functionIds": [
@@ -7498,7 +7539,7 @@
           "library": "hal"
         },
         {
-          "id": "CORTEX@hal#sec2",
+          "id": "CORTEX@hal#sec4",
           "title": "HAL 外设控制",
           "titleEn": "Peripheral Control functions",
           "functionIds": [
@@ -7765,8 +7806,8 @@
           "header": "stm32f1xx_hal_cortex.h",
           "source": "stm32f1xx_hal_cortex.c",
           "file": "functions/hal/CORTEX.json",
-          "functionCount": 20,
-          "symbolCount": 83,
+          "functionCount": 45,
+          "symbolCount": 136,
           "introZh": "HAL 的 CORTEX 驱动封装了 NVIC（中断优先级与开关）、SysTick（系统时基）和 MPU（内存保护）。它不属于任何外设，但每个工程都会用到——HAL_Init 内部就是用这里的函数把 SysTick 配成 1ms 的。",
           "usageOverviewZh": "工程启动的固定套路：① HAL_Init() 内部完成优先级分组设置与 SysTick 1ms 配置；② 每个用到的中断调 HAL_NVIC_SetPriority 设优先级，再 HAL_NVIC_EnableIRQ 打开；③ 需要更高时基精度就改 HAL_SYSTICK_Config 的重装载值。注意优先级分组只在开头设一次，中途改会让所有已配置的优先级语义全部错乱。",
           "usageSteps": [

@@ -507,6 +507,7 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
+        "HAL_GetTick",
         "HAL_NAND_Read_Status"
       ],
       "remarks": [],
@@ -590,6 +591,7 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
+        "HAL_GetTick",
         "HAL_NAND_Read_Status"
       ],
       "remarks": [],
@@ -673,6 +675,7 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
+        "HAL_GetTick",
         "HAL_NAND_Read_Status"
       ],
       "remarks": [],
@@ -757,6 +760,7 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
+        "HAL_GetTick",
         "HAL_NAND_Read_Status"
       ],
       "remarks": [],
@@ -841,6 +845,7 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
+        "HAL_GetTick",
         "HAL_NAND_Read_Status"
       ],
       "remarks": [],
@@ -928,6 +933,7 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
+        "HAL_GetTick",
         "HAL_NAND_Read_Status"
       ],
       "remarks": [],
@@ -1015,6 +1021,7 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
+        "HAL_GetTick",
         "HAL_NAND_Read_Status"
       ],
       "remarks": [],
@@ -1103,6 +1110,7 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
+        "HAL_GetTick",
         "HAL_NAND_Read_Status"
       ],
       "remarks": [],
@@ -2788,7 +2796,8 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
-        "HAL_NOR_MspWait"
+        "HAL_NOR_MspWait",
+        "HAL_GetTick"
       ],
       "remarks": [],
       "notesZh": [],

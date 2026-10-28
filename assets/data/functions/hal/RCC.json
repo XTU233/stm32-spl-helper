@@ -19,7 +19,10 @@
       "usageZh": "想在运行时彻底重配时钟树、或者从 STOP 模式回来后要完全重来一遍时用。会把 PLL 关掉、SYSCLK 切回 HSI。",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick",
+        "HAL_InitTick"
+      ],
       "remarks": [
         "The default reset state of the clock configuration is given below: - HSI ON and used as system clock source - HSE, PLL, PLL2 and PLL3 are OFF - AHB, APB1 and APB2 prescaler set to 1. - CSS and MCO1 OFF - All interrupts disabled - All flags are cleared",
         "This function does not modify the configuration of the - Peripheral clocks - LSI, LSE and RTC clocks"
@@ -79,7 +82,9 @@
         "HAL_Init() 已完成（SysTick 与优先级分组就绪）"
       ],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [
         "The PLL is not disabled when used as system clock.",
         "The PLL is not disabled when USB OTG FS clock is enabled (specific to devices with USB FS)",
@@ -215,7 +220,9 @@
       ],
       "registers": [],
       "relatedFunctions": [
-        "HAL_RCC_GetSysClockFreq"
+        "HAL_GetTick",
+        "HAL_RCC_GetSysClockFreq",
+        "HAL_InitTick"
       ],
       "remarks": [
         "The SystemCoreClock CMSIS variable is used to store System Clock Frequency and updated by @ref HAL_RCC_GetHCLKFreq() function called within this function",
@@ -811,7 +818,9 @@
         "对应的源时钟（LSE/HSE）已由 HAL_RCC_OscConfig 打开"
       ],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [
         "Care must be taken when HAL_RCCEx_PeriphCLKConfig() is used to select the RTC clock source; in this case the Backup domain will be reset in order to modify the RTC Clock source, as consequence RTC registers (including the backup registers) are set to their reset values.",
         "In case of STM32F105xC or STM32F107xC devices, PLLI2S will be enabled if requested on one of 2 I2S interfaces. When PLLI2S is enabled, you need to call HAL_RCCEx_DisablePLLI2S to manually disable it."
@@ -1021,7 +1030,9 @@
       "usageZh": "F1 只有大容量型号带 I2S 专用 PLL。要把 I2S 配到 44.1kHz/48kHz 采样率时用它。",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [
         "The PLLI2S configuration not modified if used by I2S2 or I2S3 Interface."
       ],
@@ -1077,7 +1088,9 @@
       "usageZh": "不再用 I2S 时关闭以省电。",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [
         "PLLI2S is not disabled if used by I2S2 or I2S3 Interface."
       ],
@@ -1130,7 +1143,9 @@
       "usageZh": "大容量型号才有。用法与 PLLI2S 类似，用于需要额外时钟域的场合。",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [
         "The PLL2 configuration not modified if used indirectly as system clock."
       ],
@@ -1187,7 +1202,9 @@
       "usageZh": "不再需要时关闭省电。",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [
         "PLL2 is not disabled if used indirectly as system clock."
       ],

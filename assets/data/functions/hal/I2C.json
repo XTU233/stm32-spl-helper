@@ -519,7 +519,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "uint8_t cmd[2] = {0x01, 0x02};\n\n/* 主机阻塞发送，DevAddress 同样要左移一位 */\nHAL_I2C_Master_Transmit(&hi2c1, 0x50 << 1, cmd, sizeof(cmd), 100);",
@@ -600,7 +602,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "",
@@ -675,7 +679,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "",
@@ -752,7 +758,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "",
@@ -1439,7 +1447,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "/* 向器件 0x50 的寄存器 0x10 写 2 字节 */\nuint8_t data[2] = {0xAA, 0xBB};\n\nHAL_I2C_Mem_Write(&hi2c1,\n                  0x50 << 1,                  /* 7 位地址要左移一位 */\n                  0x10,                        /* 寄存器地址 */\n                  I2C_MEMADD_SIZE_8BIT,        /* 地址宽度 */\n                  data, sizeof(data),\n                  100);                        /* 超时 ms */",
@@ -1532,7 +1542,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "uint8_t buf[2] = {0};\n\nHAL_I2C_Mem_Read(&hi2c1,\n                 0x50 << 1,\n                 0x10,\n                 I2C_MEMADD_SIZE_8BIT,\n                 buf, sizeof(buf),\n                 100);",
@@ -1799,6 +1811,7 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
+        "HAL_GetTick",
         "HAL_DMA_Start_IT",
         "HAL_DMA_Abort_IT"
       ],
@@ -1897,6 +1910,7 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
+        "HAL_GetTick",
         "HAL_DMA_Start_IT",
         "HAL_DMA_Abort_IT"
       ],
@@ -1981,7 +1995,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [
         "This function is used with Memory devices"
       ],

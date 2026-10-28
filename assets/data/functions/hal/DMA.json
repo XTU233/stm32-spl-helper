@@ -422,7 +422,9 @@
       "usageZh": "在 HAL_DMA_Start 之后需要自己确认完成、或者调试时手动等一次搬运结束时用。会处理传输错误并把错误码写进 hdma->ErrorCode。",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [
         "超时后建议调 HAL_DMA_Abort 收拾残局，否则通道可能停在半途占着资源"

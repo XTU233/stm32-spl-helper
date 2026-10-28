@@ -86,7 +86,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_Delay"
+      ],
       "remarks": [
         "This function initializes the MMC card. It could be used when a card re-initialization is needed."
       ],
@@ -304,7 +306,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [
         "This API should be followed by a check on the card state through HAL_MMC_GetCardState()."
       ],
@@ -391,7 +395,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [
         "This API should be followed by a check on the card state through HAL_MMC_GetCardState()."
       ],
@@ -1489,7 +1495,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "",
@@ -1816,7 +1824,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_Delay"
+      ],
       "remarks": [
         "This function initializes the SD card. It could be used when a card re-initialization is needed."
       ],
@@ -2034,7 +2044,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [
         "This API should be followed by a check on the card state through HAL_SD_GetCardState()."
       ],
@@ -2123,7 +2135,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [
         "This API should be followed by a check on the card state through HAL_SD_GetCardState()."
       ],

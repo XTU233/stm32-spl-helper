@@ -140,6 +140,12 @@ HAL_MODULE_MAP: dict[str, tuple[str, str]] = {
     "wwdg": ("WWDG", ""),
     # 公共定义（只提供类型与宏，没有函数）
     "def": ("MISC", "HAL 公共定义"),
+    # HAL 核心模块（stm32f1xx_hal.h / .c）：
+    # HAL_Init / HAL_Delay / HAL_GetTick / HAL_IncTick / HAL_GetUIDw0..2
+    # 这些是天天要用的基础函数，之前因为文件名是 `hal` 而不是
+    # `hal_<模块>`，被配对的 glob 整个漏掉，搜索结果里根本找不到。
+    "": ("CORTEX", "HAL 核心"),
+    "core": ("CORTEX", "HAL 核心"),
     # 本型号不适用：F103C8T6 无以太网、无 USB OTG（只有全速 USB device，HAL 未建模）
     "eth": ("", "本型号无以太网外设"),
     "hcd": ("", "本型号无 USB OTG 主机"),
@@ -170,6 +176,9 @@ LL_MODULE_MAP: dict[str, str] = {
     "bus": "RCC",  # LL_AHB1_GRP1_EnableClock… 实际都在 RCC 的时钟使能位上
     "system": "",  # 见 _ll_peripheral_of：按 LL_DBGMCU_ / LL_FLASH_ 前缀分流
     "utils": "MISC",  # LL_InitTick / LL_GetUID_* / LL_GetFlashSize
+    # SDIO：F103C8T6 带这个外设。LL 层文件名是 `ll_sdmmc`（SD/MMC/SDIO
+    # 共用一套寄存器访问函数），本芯片上的 SD 卡正是走 SDIO 控制器。
+    "sdmmc": "SDIO",
 }
 
 LL_NAME_PREFIX_MAP: list[tuple[str, str]] = [
@@ -739,6 +748,26 @@ class HalModule:
 def discover_hal_modules(inc: Path, src: Path) -> list[HalModule]:
     """扫描 Inc/ 与 Src/，按模块后缀配对 .h/.c。"""
     modules: dict[str, HalModule] = {}
+
+    # ---- HAL 核心模块（stm32f1xx_hal.h / .c）----
+    #
+    # 它的文件名是 `stm32f1xx_hal` 而不是 `stm32f1xx_hal_<模块>`，
+    # 所以下面那条 `stm32f1xx_hal_*.h` 的 glob 扫不到它。
+    # 但它藏着 HAL_Init / HAL_Delay / HAL_GetTick / HAL_IncTick /
+    # HAL_GetUIDw0..2 这些最基础的函数——查 HAL 的人一半时间在找它们，
+    # 漏掉是不可接受的。这里显式收进来，外设归属记 CORTEX（它们操作的是
+    # SysTick/NVIC 这类内核资源）。
+    core_h = inc / "stm32f1xx_hal.h"
+    core_c = src / "stm32f1xx_hal.c"
+    if core_h.is_file():
+        modules["core"] = HalModule(
+            module="core",
+            peripheral="CORTEX",
+            note="HAL 核心",
+            header=core_h,
+            source=core_c if core_c.is_file() else None,
+        )
+
     for h in sorted(inc.glob("stm32f1xx_hal_*.h")):
         mod = h.stem[len("stm32f1xx_hal_") :]
         if mod in ("conf_template",):
@@ -823,9 +852,17 @@ def collect_ll(inc: Path) -> tuple[dict[str, list[HP.RawFunction]], list[HP.RawS
     seen: dict[str, str] = {}
     for h in sorted(inc.glob("stm32f1xx_ll_*.h")):
         mod = h.stem[len("stm32f1xx_ll_") :]
-        if mod in ("usb", "sdmmc"):
-            warn("ll", f"{h.name} 跳过：本型号无对应外设（{mod}）")
+        if mod == "usb":
+            # USB 的 LL 层只覆盖 F102/F103 设备模式，且与 C8T6 的常用场景
+            # 关系不大，本版不收。
+            warn("ll", f"{h.name} 跳过：USB 不在收录范围（{mod}）")
             continue
+        # 注意：`sdmmc` **不能跳**。STM32F103C8T6 带 SDIO 外设，
+        # `stm32f1xx_ll_sdmmc.h` 就是 SDIO 的 LL 层，里面还定义了
+        # `SDIO_InitTypeDef / SDIO_CmdInitTypeDef / SDIO_DataInitTypeDef`
+        # ——HAL 的 hal_sd.h 只是 `#define SD_InitTypeDef SDIO_InitTypeDef`
+        # 引用它们。早先这里和 usb 一起跳过，导致查 SD 相关函数时
+        # 点开 SDIO_InitTypeDef 只能看到一个空壳宏、没有成员表。
         doc = HP.parse_ll_header(h, warn)
         sym_doc = HP.parse_ll_symbols(h)
         all_symbols.extend(sym_doc.symbols)
@@ -1512,34 +1549,59 @@ def _assign_reg_sections(
 def _drop_spl_duplicate_symbols(
     symbols: list[dict[str, Any]], spl_names: set[str]
 ) -> list[dict[str, Any]]:
-    """剔除与 SPL 同名的 HAL/LL 符号（保留 SPL 那份）。
+    """处理与 SPL 同名的 HAL/LL 符号。
 
-    为什么必须剔除：
-      * `symbols_hal.json` 契约要求 `id == name`（task-2 的集成测试也这么断言），
-        App 用 `symbolById[id]` 建全局索引，id 必须跨文件唯一；
-      * 而 SPL 与 HAL **确实各自定义了同名但语义不同的宏**，例如
-            SPL:  ADC_IT_EOC = ((uint16_t)0x0220)
-            HAL:  ADC_IT_EOC = ADC_CR1_EOCIE
-        `ADC_InitTypeDef` 更是两个库各有各的成员布局。这类重名有 301 个。
-        用户搜 `ADC_IT_EOC` 时只能命中一个确定结果。
+    这里要区分两类重名，它们的最优处理方式完全相反：
 
-    取舍：SPL 是既有数据，一个字节都不动；HAL/LL 侧的重名符号不进
-    symbols_hal.json，并记一条 warning。HAL 函数里引用这些名字时，
-    symbolRefs 指向 SPL 那份——虽然语义略有差异，但用户点进去能看到该宏
-    在 STM32F103 上的取值，而不是断链。要找 HAL 那份原文，函数详情页的
-    `definedIn` 字段会指向 hal 头文件。
+    **一类：结构体 / 枚举类型（`*TypeDef`）——必须保留 HAL 版**
+        `GPIO_InitTypeDef` 在两个库里**成员布局完全不同**：
+            SPL:  GPIO_Pin / GPIO_Speed / GPIO_Mode
+            HAL:  Pin / Mode / Pull / Speed
+        查 HAL 函数时点开 `GPIO_InitTypeDef`，看到 SPL 那份是**错的**，
+        会直接把人带沟里（照着 SPL 的字段名写 HAL 代码编译不过）。
+        所以这类保留 HAL 定义，并把 id 改成 `库限定 id`（`GPIO_InitTypeDef@hal`），
+        保证与 SPL 的 `GPIO_InitTypeDef` 在全局索引里不冲突；
+        `name` 仍是原名（界面上仍显示 `GPIO_InitTypeDef`，与源码一致）。
+
+    **二类：宏（取值不同但语义相近，如 `ADC_IT_EOC`）——保留 SPL 版**
+        SPL: ((uint16_t)0x0220)     HAL: ADC_CR1_EOCIE
+        这类有 300 多个，用户搜到哪个都能用（都是该寄存器的中断使能位），
+        没必要让同名宏在结果里出现两次、把人绕晕。SPL 是既有数据也不动。
+
+    返回：保留的符号列表。类型类的 id 已被改写成 `<name>@<lib>`。
     """
     kept: list[dict[str, Any]] = []
+    rewritten: list[str] = []
     dropped: list[str] = []
+
     for s in symbols:
-        if s["id"] in spl_names:
-            dropped.append(s["id"])
+        name = s["name"]
+        if name not in spl_names:
+            kept.append(s)
             continue
-        kept.append(s)
+
+        # 与 SPL 重名。类型定义保留本方（HAL/LL）这份，宏让给 SPL。
+        if s.get("kind") in ("struct", "typedef", "enum_type"):
+            lib = s.get("library") or "hal"
+            new_id = f"{name}@{lib}"
+            s = dict(s)
+            s["id"] = new_id
+            kept.append(s)
+            rewritten.append(new_id)
+        else:
+            dropped.append(name)
+
+    if rewritten:
+        warn(
+            "symbols",
+            f"{len(rewritten)} 个 HAL/LL 类型与 SPL 同名但定义不同，"
+            f"已用库限定 id 保留本方那份（如 {rewritten[0]}）："
+            f"{', '.join(sorted(rewritten)[:6])} …",
+        )
     if dropped:
         warn(
             "symbols",
-            f"{len(dropped)} 个 HAL/LL 符号与 SPL 同名（两份定义不同），"
+            f"{len(dropped)} 个 HAL/LL 宏与 SPL 同名（取值不同），"
             f"保留 SPL 那份：{', '.join(sorted(dropped)[:8])} …",
         )
     return kept
@@ -1568,11 +1630,31 @@ def _build_symbols(
                     used_by.setdefault(ref, []).append(f["id"])
 
     out: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for sym in hal_symbols + ll_symbols:
-        if sym.name in seen:
+    # 去重键用 (名字, 库)，而不是只用名字。
+    #
+    # 只用名字会误伤一种情况：`SDIO_InitTypeDef` 在 HAL 侧只是
+    #     #define SDIO_InitTypeDef  SDIO_InitTypeDef  ← 实为宏别名
+    # 而 LL 侧（stm32f1xx_ll_sdmmc.h）才是真正的结构体定义。
+    # 按名字去重时，先遍历到的 HAL 宏会把这个名字占掉，LL 的结构体
+    # 就永远进不来——查 SD 相关函数时点 `SDIO_InitTypeDef` 只能看到值、
+    # 看不到成员，白丢一份真正的类型定义。
+    # 同库内的同名重复仍然要去重（ST 有 #if 分支重复定义同一名字的情况）。
+    seen: set[tuple[str, str]] = set()
+    # 结构体/枚举/typedef 优先于同名的宏：类型定义的信息量更大，
+    # 保住它比保住一个别名宏更有用。
+    ordered_symbols = sorted(
+        hal_symbols + ll_symbols,
+        key=lambda s: 0 if s.kind in ("struct", "typedef", "enum_type") else 1,
+    )
+    for sym in ordered_symbols:
+        key = (sym.name, sym.library)
+        if key in seen:
             continue
-        seen.add(sym.name)
+        # 同一名字在**不同库**里出现是允许的（GPIO_InitTypeDef 在 SPL/HAL
+        # 各有定义）；同库重复才丢。
+        if any(k[0] == sym.name and k[1] == sym.library for k in seen):
+            continue
+        seen.add(key)
         periph = periph_of_file.get(sym.defined_in, "")
         if not periph:
             periph = _periph_of_header_file(sym.defined_in)

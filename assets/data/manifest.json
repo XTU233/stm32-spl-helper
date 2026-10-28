@@ -4,26 +4,26 @@
   "splVersion": "STM32F10x_StdPeriph_Lib_V3.5.0",
   "halVersion": "STM32Cube_FW_F1_V1.8.7",
   "defaultChipId": "stm32f103c8t6",
-  "generatedAt": "2026-10-28T00:57:44+08:00",
+  "generatedAt": "2026-10-28T08:24:40+08:00",
   "generator": "tools/build_multi_lib.py",
   "stats": {
     "peripheralCount": 25,
-    "functionCount": 2873,
-    "symbolCount": 12526,
+    "functionCount": 2898,
+    "symbolCount": 12830,
     "apiSymbolCount": 2450,
     "registerSymbolCount": 4887,
     "pinCount": 48,
     "compileErrorCount": 15,
     "libraryFunctionCounts": {
       "spl": 488,
-      "hal": 776,
+      "hal": 801,
       "ll": 1137,
       "reg": 472
     },
     "librarySymbolCounts": {
       "spl": 7337,
-      "hal": 3086,
-      "ll": 1631,
+      "hal": 3148,
+      "ll": 1873,
       "reg": 472
     }
   },

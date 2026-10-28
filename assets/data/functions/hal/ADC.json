@@ -514,6 +514,7 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
+        "HAL_GetTick",
         "HAL_RCCEx_GetPeriphCLKFreq"
       ],
       "remarks": [
@@ -593,7 +594,9 @@
       "usageZh": "",
       "prerequisites": [],
       "registers": [],
-      "relatedFunctions": [],
+      "relatedFunctions": [
+        "HAL_GetTick"
+      ],
       "remarks": [],
       "notesZh": [],
       "exampleCode": "",
@@ -1428,7 +1431,8 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
-        "HAL_RCCEx_GetPeriphCLKFreq"
+        "HAL_RCCEx_GetPeriphCLKFreq",
+        "HAL_GetTick"
       ],
       "remarks": [],
       "notesZh": [],
@@ -1609,6 +1613,7 @@
       "prerequisites": [],
       "registers": [],
       "relatedFunctions": [
+        "HAL_GetTick",
         "HAL_RCCEx_GetPeriphCLKFreq"
       ],
       "remarks": [],
